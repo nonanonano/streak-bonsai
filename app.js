@@ -2200,15 +2200,18 @@ function computeCatchUpRecommendation(currentState) {
 
 function renderRoadmapMilestoneCard(milestone, index, options = {}) {
   const editable = Boolean(options.editable);
+  const isGoal = Boolean(options.isGoal);
   const deadlineLabel = milestone.deadline ? `期限 ${milestone.deadline}` : "";
   const targetLabel = Number.isFinite(Number(milestone.target)) ? `全体目安 ${Math.round(Number(milestone.target))}%` : "";
 
   return `
-    <article class="milestone ${milestone.isActive ? "is-active" : ""} ${milestone.isComplete ? "is-complete" : ""}" data-step="${index + 1}">
+    <article class="milestone ${milestone.isActive ? "is-active" : ""} ${milestone.isComplete ? "is-complete" : ""} ${isGoal ? "is-goal" : ""}" data-step="${index + 1}">
       <div class="panel milestone__panel">
         <div class="milestone__head">
           <span class="milestone__label">${escapeHtml(milestone.label)}</span>
-          ${targetLabel ? `<span class="milestone__target">${escapeHtml(targetLabel)}</span>` : ""}
+          ${isGoal
+            ? `<span class="milestone__goal-badge">GOAL</span>`
+            : targetLabel ? `<span class="milestone__target">${escapeHtml(targetLabel)}</span>` : ""}
         </div>
         ${deadlineLabel ? `<div class="milestone__meta">${escapeHtml(deadlineLabel)}</div>` : ""}
         ${editable ? `
@@ -2249,18 +2252,32 @@ function renderRoadmapMilestoneList(roadmap, options = {}) {
       : `<p class="preview-empty">まだマイルストーンはありません。</p>`;
   }
 
-  return `
-    <div class="milestone-list ${editable ? "milestone-list--editable" : ""}">
-      ${roadmap.milestones.map((milestone, index) => {
-        if (!editable) {
-          return renderRoadmapMilestoneCard(milestone, index, options);
-        }
+  if (editable) {
+    return `
+      <div class="milestone-list milestone-list--editable">
+        ${roadmap.milestones.map((milestone, index) => {
+          const isEditing = Boolean(ui.roadmapDraft && ui.roadmapDraft.mode === "edit" && ui.roadmapDraft.id === milestone.id);
+          return `
+            ${isEditing ? renderRoadmapEditor(index + 1) : renderRoadmapMilestoneCard(milestone, index, options)}
+            ${renderRoadmapInsertSlot(milestone.id)}
+          `;
+        }).join("")}
+      </div>
+    `;
+  }
 
-        const isEditing = Boolean(ui.roadmapDraft && ui.roadmapDraft.mode === "edit" && ui.roadmapDraft.id === milestone.id);
-        return `
-          ${isEditing ? renderRoadmapEditor(index + 1) : renderRoadmapMilestoneCard(milestone, index, options)}
-          ${renderRoadmapInsertSlot(milestone.id)}
-        `;
+  // 閲覧モード: スタート→ゴールの順で表示（データは逆順）
+  const reversed = [...roadmap.milestones].reverse();
+  const goalIndex = reversed.length - 1;
+
+  return `
+    <div class="milestone-list">
+      <div class="milestone-start-label">START</div>
+      ${reversed.map((milestone, index) => {
+        return renderRoadmapMilestoneCard(milestone, index, {
+          ...options,
+          isGoal: index === goalIndex,
+        });
       }).join("")}
     </div>
   `;

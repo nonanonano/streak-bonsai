@@ -1433,10 +1433,9 @@ button {
   border-radius: 999px;
   background: linear-gradient(
     180deg,
-    rgba(96, 121, 111, 0.55) 0%,
-    rgba(96, 121, 111, 0.3) 40%,
-    rgba(203, 95, 55, 0.25) 70%,
-    rgba(203, 95, 55, 0.08) 100%
+    rgba(34, 32, 29, 0.1) 0%,
+    rgba(96, 121, 111, 0.35) 60%,
+    rgba(96, 121, 111, 0.6) 100%
   );
 }
 
@@ -1586,6 +1585,44 @@ button {
   outline: none;
   background: rgba(203, 95, 55, 0.08);
 }
+
+.milestone-start-label {
+  position: relative;
+  padding-left: 0;
+  margin-bottom: 2px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: rgba(34, 32, 29, 0.32);
+  padding-left: 4px;
+  margin-left: -2px;
+}
+
+.milestone__goal-badge {
+  flex: none;
+  align-self: start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(96, 121, 111, 0.15);
+  color: var(--sage);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.milestone.is-goal .milestone__panel {
+  border-color: rgba(96, 121, 111, 0.25);
+  background: linear-gradient(135deg, rgba(226, 238, 231, 0.7), rgba(255, 251, 245, 0.94));
+}
+
+.milestone.is-goal::before {
+  background: var(--sage);
+  border-color: var(--sage);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(96, 121, 111, 0.3);
+}
+
 .mode-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
