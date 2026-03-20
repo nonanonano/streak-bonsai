@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f1e9dc" />
-    <title>StreakGarden</title>
-    <link rel="icon" type="image/svg+xml" href="./sunflower-favicon.svg" />
+    <title>StreakBonsai</title>
+    <link rel="icon" type="image/svg+xml" href="./crystal-favicon.svg" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -16,7 +16,7 @@
       <div class="device-frame">
         <header class="topbar">
           <div class="topbar__brand">
-            <span class="brand-chip">StreakGarden</span>
+            <span class="brand-chip">StreakBonsai</span>
             <p class="topbar__date" id="today-label"></p>
           </div>
           <button
@@ -78,6 +78,47 @@
     <div class="sheet" id="session-sheet" hidden></div>
     <div class="toast" id="toast" hidden></div>
 
+    <div class="auth-overlay" id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg viewBox="0 0 40 40" width="48" height="48" aria-hidden="true">
+        <circle cx="20" cy="28" r="8" fill="#e8c87a" opacity="0.9"/>
+        <rect x="19" y="10" width="2" height="18" rx="1" fill="#7a9e6e"/>
+        <ellipse cx="20" cy="10" rx="6" ry="7" fill="#f6d365" opacity="0.85"/>
+        <ellipse cx="13" cy="16" rx="5" ry="3.5" transform="rotate(-30 13 16)" fill="#f6d365" opacity="0.7"/>
+        <ellipse cx="27" cy="16" rx="5" ry="3.5" transform="rotate(30 27 16)" fill="#f6d365" opacity="0.7"/>
+      </svg>
+      <span class="auth-logo__name">StreakBonsai</span>
+    </div>
+
+    <div class="auth-tabs" id="auth-tabs">
+      <button type="button" class="auth-tab is-active" data-auth-tab="login">ログイン</button>
+      <button type="button" class="auth-tab" data-auth-tab="signup">新規登録</button>
+    </div>
+
+    <form class="auth-form" id="auth-form" autocomplete="on">
+      <div class="field">
+        <label class="field__label" for="auth-email">メールアドレス</label>
+        <input class="field__input" type="email" id="auth-email" name="email" required autocomplete="email" placeholder="you@example.com" />
+      </div>
+      <div class="field">
+        <label class="field__label" for="auth-password">パスワード</label>
+        <input class="field__input" type="password" id="auth-password" name="password" required autocomplete="current-password" placeholder="8文字以上" minlength="8" />
+      </div>
+      <p class="auth-error" id="auth-error" hidden></p>
+      <button type="submit" class="action-button action-button--primary auth-submit" id="auth-submit">ログイン</button>
+    </form>
+
+    <p class="auth-hint" id="auth-hint">
+      アカウントをお持ちでないですか？
+      <button type="button" class="auth-switch" id="auth-switch-btn">新規登録はこちら</button>
+    </p>
+
+    <p class="auth-loading" id="auth-loading" hidden>読み込み中...</p>
+  </div>
+</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./app.js"></script>
   </body>
 </html>

@@ -59,63 +59,55 @@ const ROADMAP_ID_ORDER = ["goal", "checkpoint", "foundation", "week", "next"];
 const WEEKDAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const FLOWER_STAGE_THRESHOLDS = [0, 1, 2, 3, 5, 7, 10, 14, 21, 30];
 const FLOWER_STAGE_LABELS = ["種", "芽", "双葉", "茎のび", "つぼみ", "色づき", "咲き始め", "七分咲き", "満開", "押し花"];
+// 目標植物ライブラリ（梅・桜・さつき）
 const FLOWER_LIBRARY = {
-  tulip: {
-    label: "チューリップ",
-    trait: "短期習慣・毎日コツコツ",
-    copy: "小さく始めて、毎日の積み上げで一気に花が開くタイプです。",
-    bud: "#f28e7c",
-    petal: "#f15b61",
-    petalLight: "#ffd6cf",
-    center: "#f8d671",
-    stem: "#5f9462",
-    leaf: "#89bf7d",
-    soil: "#c38d68",
+  ume: {
+    label: "梅",
+    trait: "はじめて咲く目標",
+    copy: "短期の目標に。厳しい時期を越えて最初に咲く、達成の喜びを感じやすい植物です。",
+    trunk: "#6a5248", branch: "#5a4238",
+    bud: "#e8b4c8", petal: "#f9f0f4", petalLight: "#fffbfe", center: "#d4526e",
+    pot: "#8a7060", potRim: "#786050", soil: "#6a5040",
+    stem: "#6a5248", leaf: "#4a3830",
   },
-  sunflower: {
-    label: "ひまわり",
-    trait: "大きな目標・長期継続",
-    copy: "時間をかけて背が伸び、最後に大きく咲く長期戦向きの花です。",
-    bud: "#d89a3e",
-    petal: "#f5c94a",
-    petalLight: "#fff0ad",
-    center: "#7f532d",
-    stem: "#5b9452",
-    leaf: "#7cb85a",
-    soil: "#b27b4b",
+  sakura: {
+    label: "桜",
+    trait: "節目を祝う目標",
+    copy: "大きな節目や本番に。満開の瞬間が最も美しく、達成の感動が大きい植物です。",
+    trunk: "#7a6258", branch: "#6a5248",
+    bud: "#f4c0d8", petal: "#f9d8e8", petalLight: "#fff4f8", center: "#e87090",
+    pot: "#907060", potRim: "#7e6050", soil: "#6e5040",
+    stem: "#7a6258", leaf: "#6a5248",
   },
-  lavender: {
-    label: "ラベンダー",
-    trait: "整える習慣・心を落ち着ける習慣",
-    copy: "静かに伸びて香りが立つように、整える習慣と相性がいい花です。",
-    bud: "#8a78d9",
-    petal: "#a88cff",
-    petalLight: "#e2d7ff",
-    center: "#6a54b1",
-    stem: "#4f8b61",
-    leaf: "#79b28a",
-    soil: "#aa7f66",
+  satsuki: {
+    label: "さつき",
+    trait: "進みが見える目標",
+    copy: "段階的な目標に。進捗率に応じて花が増えるので、頑張りがそのまま見えます。",
+    trunk: "#6a5c48", branch: "#5a4c38",
+    bud: "#d04880", petal: "#e8609a", petalLight: "#ffd8ec", center: "#a02860",
+    pot: "#887060", potRim: "#766050", soil: "#665040",
+    stem: "#6a5c48", leaf: "#5a4c38",
   },
 };
 
 const BONSAI_LIBRARY = {
   pine: {
-    label: "黒松", trait: "凛として揺るがない",
+    label: "松", trait: "積み上げる習慣",
     trunk: "#5a4a3a", branch: "#4a3c2c",
     foliage: "#2e6644", foliageDark: "#1e4e32", foliageLight: "#4e8e5c",
     pot: "#8c6e58", potRim: "#7a5c48", soil: "#6a5040",
   },
-  bamboo: {
-    label: "孟宗竹", trait: "しなやかで真っ直ぐ",
-    trunk: "#8ab870", branch: "#6a9850",
-    foliage: "#78b850", foliageDark: "#5a9038", foliageLight: "#aad880",
-    pot: "#8a7060", potRim: "#786050", soil: "#6a5540",
+  maple: {
+    label: "もみじ", trait: "変わる習慣",
+    trunk: "#7a5840", branch: "#6a4c36",
+    foliage: "#c04020", foliageDark: "#8a2c14", foliageLight: "#f08040",
+    pot: "#906858", potRim: "#7e5848", soil: "#6e5038",
   },
-  plum: {
-    label: "紅梅", trait: "厳しさの中に美しさ",
-    trunk: "#6a5870", branch: "#5a4862",
-    foliage: "#d45a8a", foliageDark: "#b44070", foliageLight: "#f4b0d0",
-    pot: "#7a6880", potRim: "#6a5870", soil: "#5a4858",
+  moss: {
+    label: "苔", trait: "整える習慣",
+    trunk: "#5a7040", branch: "#4a6030",
+    foliage: "#5a9040", foliageDark: "#3a6828", foliageLight: "#8abf60",
+    pot: "#7a8060", potRim: "#6a7050", soil: "#5a6040",
   },
 };
 const BONSAI_STAGE_LABELS = ["鉢のみ","芽生え","幼木","成長期","形成期","樹形成","整い","老成","銘木","傑作"];
@@ -211,18 +203,27 @@ function normalizeLogs(logs = []) {
 
 function inferDefaultFlowerType(setup = {}) {
   const goalText = `${setup.goal || ""} ${setup.currentLevel || ""}`.toLowerCase();
-
-  if (/整|片付|睡眠|瞑想|呼吸|calm|reset|routine/.test(goalText)) {
-    return "lavender";
+  if (/始|最初|まず|first|week|週|1週/.test(goalText)) {
+    return "ume";
   }
-  if (/毎日|daily|news|英語|5分|習慣/.test(goalText)) {
-    return "tulip";
+  if (/試験|受験|発表|本番|プレゼン|面接|提出|exam|test/.test(goalText)) {
+    return "sakura";
   }
-  return "sunflower";
+  return "satsuki";
 }
 
 function normalizeFlowerType(flowerType, setup = {}) {
-  return FLOWER_LIBRARY[flowerType] ? flowerType : inferDefaultFlowerType(setup);
+  // Migrate old flower type keys
+  const migrate = { tulip: "ume", sunflower: "sakura", lavender: "satsuki" };
+  const resolved = migrate[flowerType] || flowerType;
+  return FLOWER_LIBRARY[resolved] ? resolved : inferDefaultFlowerType(setup);
+}
+
+function normalizeBonsaiKey(key) {
+  // Migrate old bonsai keys
+  const migrate = { bamboo: "maple", plum: "moss" };
+  const resolved = migrate[key] || key;
+  return BONSAI_LIBRARY[resolved] ? resolved : "pine";
 }
 
 function normalizeStudyDays(studyDays) {
@@ -319,7 +320,8 @@ function getGoalFlowerState(goalRecord) {
 }
 
 function getBonsaiTypeMeta(key) {
-  return { key: key || "pine", ...(BONSAI_LIBRARY[key] || BONSAI_LIBRARY.pine) };
+  const resolved = normalizeBonsaiKey(key);
+  return { key: resolved, ...(BONSAI_LIBRARY[resolved] || BONSAI_LIBRARY.pine) };
 }
 
 function getBonsaiGrowth(logs) {
@@ -1802,8 +1804,8 @@ function renderGoalLibrary() {
           const flower = isHabitGoal ? null : getGoalFlowerState(goal);
           const bonsaiMeta = isHabitGoal ? getBonsaiTypeMeta(goal.setup.bonsaiKey) : null;
           const meta = isHabitGoal
-            ? `習慣 / 盆栽 ${bonsaiMeta.label}`
-            : `${formatDeadlineBadge(deadlineText)} / 花 ${flower.label}`;
+            ? `習慣 / ${bonsaiMeta.label}`
+            : `${formatDeadlineBadge(deadlineText)} / 植物 ${flower.label}`;
           return `
             <article class="goal-library-card ${isActive ? "is-active" : ""}">
               <div class="goal-library-card__head">
@@ -3019,8 +3021,8 @@ function renderFlowerPicker(selectedType, actionName, options = {}) {
   return `
     <div class="field flower-picker ${compact ? "flower-picker--compact" : ""}">
       <div>
-        <span class="field__label">育てる花</span>
-        <p class="section-copy">見た目だけでなく、この目標の育て方に合う花を選びます。</p>
+        <span class="field__label">育てる植物</span>
+        <p class="section-copy">目標の種類に合った植物を選びます。咲く木として成長します。</p>
         <p class="flower-picker__current">選択中: ${escapeHtml(currentFlower.label)}</p>
       </div>
       <div class="flower-choice-grid ${compact ? "flower-choice-grid--compact" : ""}">
@@ -3205,8 +3207,8 @@ function renderBonsaiArtwork(bonsaiType, stageIndex, health, options = {}) {
 
   const renderers = {
     pine: renderPineBonsaiSvg,
-    bamboo: renderBambooSvg,
-    plum: renderPlumBonsaiSvg,
+    maple: renderMapleBonsaiSvg,
+    moss: renderMossSvg,
   };
   const body = (renderers[b.key] || renderPineBonsaiSvg)(b, stage, stageRatio, h);
 
@@ -3224,26 +3226,259 @@ function renderFlowerArtwork(flowerType, stageIndex, options = {}) {
   const stage = Math.max(0, Math.min(9, Number(stageIndex) || 0));
   const size = options.size || "picker";
   const stageRatio = stage / 9;
-  const soilColor = flower.soil;
-  const showSoil = options.showSoil !== false;
 
   const renderers = {
-    tulip: renderTulipFlowerSvg,
-    sunflower: renderSunflowerFlowerSvg,
-    lavender: renderLavenderFlowerSvg,
+    ume: renderUmeBonsaiSvg,
+    sakura: renderSakuraBonsaiSvg,
+    satsuki: renderSatsukiSvg,
   };
-  const body = (renderers[flower.key] || renderTulipFlowerSvg)(flower, stage, stageRatio);
+  const body = (renderers[flower.key] || renderUmeBonsaiSvg)(flower, stage, stageRatio);
 
   return `
     <figure class="flower-illustration flower-illustration--${escapeHtml(size)}" data-flower="${flower.key}">
       <svg viewBox="0 0 120 140" aria-hidden="true" focusable="false">
-        ${showSoil ? `<ellipse cx="60" cy="126" rx="34" ry="8" fill="${soilColor}" opacity="0.18"></ellipse>` : ""}
-        ${showSoil ? `<path d="M22 126C34 120 42 119 60 119C78 119 88 120 98 126" fill="none" stroke="${soilColor}" stroke-width="5.5" stroke-linecap="round" opacity="0.42"></path>` : ""}
         ${body}
       </svg>
     </figure>
   `;
 }
+
+// ============================================================
+// 目標植物 SVGレンダラー（梅・桜・さつき）
+// ============================================================
+
+function renderUmeBonsaiSvg(flower, stage, stageRatio) {
+  const pot = `
+    <rect x="30" y="113" width="60" height="17" rx="4" fill="${flower.pot}"/>
+    <rect x="27" y="109" width="66" height="7" rx="3.5" fill="${flower.potRim}"/>
+    <ellipse cx="60" cy="112" rx="27" ry="4.5" fill="${flower.soil}" opacity="0.9"/>
+  `;
+  if (stage === 0) return pot + `<ellipse cx="60" cy="109" rx="3" ry="2.5" fill="${flower.trunk}" opacity="0.6"/>`;
+
+  const trunkH = 20 + stageRatio * 62;
+  const trunkTop = 112 - trunkH;
+  const trunk = `<path d="M60 112 C56 ${112-trunkH*0.3} 65 ${112-trunkH*0.65} 60 ${trunkTop}" stroke="${flower.trunk}" stroke-width="${4 + stageRatio*1.5}" stroke-linecap="round" fill="none"/>`;
+
+  if (stage <= 1) return pot + trunk;
+
+  const bSpread = 10 + stageRatio * 24;
+  const bY1 = trunkTop + trunkH * 0.52;
+  const bY2 = trunkTop + trunkH * 0.26;
+  const branches = `
+    <path d="M60 ${bY1} C50 ${bY1-5} ${60-bSpread} ${bY1-9} ${60-bSpread-8} ${bY1-20}" stroke="${flower.branch}" stroke-width="${2.5+stageRatio}" stroke-linecap="round" fill="none"/>
+    ${stage >= 3 ? `<path d="M60 ${bY1} C70 ${bY1-4} ${60+bSpread} ${bY1-8} ${60+bSpread+6} ${bY1-18}" stroke="${flower.branch}" stroke-width="${2+stageRatio*0.5}" stroke-linecap="round" fill="none"/>` : ""}
+    ${stage >= 5 ? `<path d="M60 ${bY2} C51 ${bY2-4} ${60-bSpread*0.75} ${bY2-9} ${60-bSpread*0.85-5} ${bY2-18}" stroke="${flower.branch}" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <path d="M60 ${bY2} C69 ${bY2-3} ${60+bSpread*0.65} ${bY2-7} ${60+bSpread*0.75+4} ${bY2-15}" stroke="${flower.branch}" stroke-width="1.8" stroke-linecap="round" fill="none"/>` : ""}
+    ${stage >= 7 ? `<path d="M60 ${trunkTop} C56 ${trunkTop-8} 51 ${trunkTop-15} 48 ${trunkTop-20}" stroke="${flower.branch}" stroke-width="1.5" stroke-linecap="round" fill="none"/>` : ""}
+  `;
+
+  let blossoms = "";
+  const blossomPositions = [
+    [60-bSpread-6, bY1-22], [60+bSpread+4, bY1-20],
+    [60-bSpread*0.85-4, bY2-20], [60+bSpread*0.75+3, bY2-17],
+    [60, trunkTop-9], [60-5, trunkTop-17], [60+4, trunkTop-13],
+  ];
+  if (stage >= 4) {
+    blossomPositions.slice(0, Math.min(stage - 2, 7)).forEach(([bx, by]) => {
+      const r = 4.5 + stageRatio * 2;
+      for (let p = 0; p < 5; p++) {
+        const a = (p * 72 - 90) * Math.PI / 180;
+        blossoms += `<circle cx="${(bx+Math.cos(a)*r*0.5).toFixed(1)}" cy="${(by+Math.sin(a)*r*0.5).toFixed(1)}" r="${(r*0.45).toFixed(1)}" fill="${flower.petal}" opacity="0.88"/>`;
+      }
+      blossoms += `<circle cx="${bx}" cy="${by}" r="${(r*0.25).toFixed(1)}" fill="${flower.center}" opacity="0.9"/>`;
+    });
+  } else if (stage >= 2) {
+    blossomPositions.slice(0, stage - 1).forEach(([bx, by]) => {
+      blossoms += `<circle cx="${bx}" cy="${by}" r="3" fill="${flower.bud}" opacity="0.72"/>`;
+    });
+  }
+  return pot + trunk + branches + blossoms;
+}
+
+function renderSakuraBonsaiSvg(flower, stage, stageRatio) {
+  const pot = `
+    <rect x="30" y="113" width="60" height="17" rx="4" fill="${flower.pot}"/>
+    <rect x="27" y="109" width="66" height="7" rx="3.5" fill="${flower.potRim}"/>
+    <ellipse cx="60" cy="112" rx="27" ry="4.5" fill="${flower.soil}" opacity="0.9"/>
+  `;
+  if (stage === 0) return pot + `<ellipse cx="60" cy="109" rx="3" ry="2.5" fill="${flower.trunk}" opacity="0.5"/>`;
+
+  const trunkH = 22 + stageRatio * 58;
+  const trunkTop = 112 - trunkH;
+  const trunk = `<path d="M60 112 C58 ${112-trunkH*0.32} 62 ${112-trunkH*0.62} 60 ${trunkTop}" stroke="${flower.trunk}" stroke-width="${4.5+stageRatio*1.5}" stroke-linecap="round" fill="none"/>`;
+
+  const bSpread = 16 + stageRatio * 22;
+  const bY = trunkTop + trunkH * 0.45;
+  const branches = stage >= 2 ? `
+    <path d="M60 ${bY} C48 ${bY-5} ${60-bSpread} ${bY-6} ${60-bSpread-10} ${bY-14}" stroke="${flower.branch}" stroke-width="${2.5+stageRatio}" stroke-linecap="round" fill="none"/>
+    <path d="M60 ${bY} C72 ${bY-4} ${60+bSpread} ${bY-5} ${60+bSpread+8} ${bY-13}" stroke="${flower.branch}" stroke-width="${2.5+stageRatio*0.8}" stroke-linecap="round" fill="none"/>
+    ${stage >= 4 ? `<path d="M60 ${trunkTop+trunkH*0.2} C50 ${trunkTop+trunkH*0.15} ${60-bSpread*0.7} ${trunkTop} ${60-bSpread*0.8-4} ${trunkTop-10}" stroke="${flower.branch}" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <path d="M60 ${trunkTop+trunkH*0.2} C70 ${trunkTop+trunkH*0.14} ${60+bSpread*0.7} ${trunkTop-2} ${60+bSpread*0.8+3} ${trunkTop-9}" stroke="${flower.branch}" stroke-width="1.8" stroke-linecap="round" fill="none"/>` : ""}
+  ` : "";
+
+  let blossoms = "";
+  if (stage >= 2 && stage <= 3) {
+    const gr = 6 + stageRatio * 4;
+    blossoms = `
+      <circle cx="${60-bSpread-8}" cy="${bY-18}" r="${gr}" fill="#6a9060" opacity="0.7"/>
+      <circle cx="${60+bSpread+6}" cy="${bY-16}" r="${gr*0.9}" fill="#5a8050" opacity="0.7"/>
+      <circle cx="60" cy="${trunkTop-8}" r="${gr*1.1}" fill="#5a8050" opacity="0.65"/>
+    `;
+  } else if (stage >= 4) {
+    const clusters = [
+      [60-bSpread-8, bY-18, 1.0], [60+bSpread+6, bY-16, 0.95],
+      [60-bSpread*0.8-2, trunkTop-2, 0.9], [60+bSpread*0.75+2, trunkTop-1, 0.88],
+      [60, trunkTop-10, 1.0], [60-8, trunkTop-18, 0.85], [60+7, trunkTop-16, 0.88],
+      [60-bSpread*0.4, bY-10, 0.8], [60+bSpread*0.4, bY-9, 0.8],
+    ].slice(0, 3 + Math.floor(stageRatio * 6));
+    clusters.forEach(([cx, cy, op]) => {
+      const r = 4 + stageRatio * 3;
+      for (let p = 0; p < 5; p++) {
+        const a = (p * 72 - 90) * Math.PI / 180;
+        blossoms += `<circle cx="${(cx+Math.cos(a)*r*0.55).toFixed(1)}" cy="${(cy+Math.sin(a)*r*0.55).toFixed(1)}" r="${(r*0.48).toFixed(1)}" fill="${flower.petal}" opacity="${(op*0.85).toFixed(2)}"/>`;
+      }
+      blossoms += `<circle cx="${cx}" cy="${cy}" r="${(r*0.52).toFixed(1)}" fill="${flower.petalLight}" opacity="${(op*0.7).toFixed(2)}"/>`;
+      blossoms += `<circle cx="${cx}" cy="${cy}" r="${(r*0.2).toFixed(1)}" fill="${flower.center}" opacity="${(op*0.9).toFixed(2)}"/>`;
+      if (stage >= 7) {
+        blossoms += `<ellipse cx="${cx+r*1.2}" cy="${cy+r*0.8}" rx="2" ry="1.2" fill="${flower.petal}" opacity="0.45" transform="rotate(-20 ${cx+r*1.2} ${cy+r*0.8})"/>`;
+        blossoms += `<ellipse cx="${cx-r*0.8}" cy="${cy+r*1.4}" rx="1.8" ry="1" fill="${flower.bud}" opacity="0.35" transform="rotate(15 ${cx-r*0.8} ${cy+r*1.4})"/>`;
+      }
+    });
+  }
+  return pot + trunk + branches + blossoms;
+}
+
+function renderSatsukiSvg(flower, stage, stageRatio) {
+  const pot = `
+    <rect x="30" y="113" width="60" height="17" rx="4" fill="${flower.pot}"/>
+    <rect x="27" y="109" width="66" height="7" rx="3.5" fill="${flower.potRim}"/>
+    <ellipse cx="60" cy="112" rx="27" ry="4.5" fill="${flower.soil}" opacity="0.9"/>
+  `;
+  if (stage === 0) return pot + `<ellipse cx="60" cy="109" rx="3" ry="2.5" fill="${flower.trunk}" opacity="0.5"/>`;
+
+  const trunkH = 15 + stageRatio * 45;
+  const trunkTop = 112 - trunkH;
+  const trunk = `<path d="M60 112 C58 ${112-trunkH*0.4} 62 ${112-trunkH*0.7} 60 ${trunkTop}" stroke="${flower.trunk}" stroke-width="${3.5+stageRatio*1.5}" stroke-linecap="round" fill="none"/>`;
+
+  const fr = 10 + stageRatio * 14;
+  const cx = 60, cy = trunkTop - fr * 0.5;
+  const foliage = stage >= 1 ? `
+    <ellipse cx="${cx}" cy="${cy}" rx="${fr}" ry="${fr*0.72}" fill="#5a8848" opacity="0.78"/>
+    ${stage >= 3 ? `<ellipse cx="${cx-fr*0.55}" cy="${cy+fr*0.15}" rx="${fr*0.65}" ry="${fr*0.52}" fill="#4e7a3c" opacity="0.72"/>
+    <ellipse cx="${cx+fr*0.52}" cy="${cy+fr*0.12}" rx="${fr*0.62}" ry="${fr*0.5}" fill="#568040" opacity="0.7"/>` : ""}
+  ` : "";
+
+  const flowerCount = stage >= 3 ? Math.round((stage - 2) / 7 * 16) : 0;
+  let flowers = "";
+  for (let i = 0; i < flowerCount; i++) {
+    const t = i / 16;
+    const angle = t * Math.PI * 2 * 1.618 + 0.7;
+    const r = (0.3 + t * 0.65) * fr;
+    const fx = cx + Math.cos(angle) * r * 0.9;
+    const fy = cy + Math.sin(angle) * r * 0.6;
+    const pr = 3.2 + stageRatio * 1.5;
+    for (let p = 0; p < 5; p++) {
+      const pa = (p * 72) * Math.PI / 180;
+      flowers += `<circle cx="${(fx+Math.cos(pa)*pr*0.52).toFixed(1)}" cy="${(fy+Math.sin(pa)*pr*0.52).toFixed(1)}" r="${(pr*0.42).toFixed(1)}" fill="${flower.petal}" opacity="0.85"/>`;
+    }
+    flowers += `<circle cx="${fx.toFixed(1)}" cy="${fy.toFixed(1)}" r="${(pr*0.22).toFixed(1)}" fill="${flower.center}" opacity="0.9"/>`;
+  }
+  return pot + trunk + foliage + flowers;
+}
+
+// ============================================================
+// 習慣植物 SVGレンダラー（もみじ・苔）
+// ============================================================
+
+function renderMapleBonsaiSvg(b, stage, stageRatio, health) {
+  const hp = Math.max(0.3, health / 100);
+  const fop = (0.7 + hp * 0.3).toFixed(2);
+  const fc = hp < 0.4 ? b.foliageDark : b.foliage;
+
+  const pot = `
+    <rect x="30" y="113" width="60" height="17" rx="4" fill="${b.pot}"/>
+    <rect x="27" y="109" width="66" height="7" rx="3.5" fill="${b.potRim}"/>
+    <ellipse cx="60" cy="112" rx="27" ry="4.5" fill="${b.soil}" opacity="0.9"/>
+  `;
+  if (stage === 0) return pot + `<ellipse cx="60" cy="109" rx="3" ry="3" fill="${b.foliage}" opacity="0.5"/>`;
+
+  const trunkH = 18 + stageRatio * 60;
+  const trunkTop = 112 - trunkH;
+  const trunk = `<path d="M60 112 C58 ${112-trunkH*0.35} 63 ${112-trunkH*0.65} 60 ${trunkTop}" stroke="${b.trunk}" stroke-width="${3.5+stageRatio*2}" stroke-linecap="round" fill="none"/>`;
+
+  if (stage <= 1) return pot + trunk + `<circle cx="60" cy="${trunkTop-4}" r="5" fill="${fc}" opacity="${fop}"/>`;
+
+  const bSpread = 12 + stageRatio * 20;
+  const bY1 = trunkTop + trunkH * 0.55;
+  const bY2 = trunkTop + trunkH * 0.28;
+  const branches = `
+    <path d="M60 ${bY1} C50 ${bY1-5} ${60-bSpread} ${bY1-10} ${60-bSpread-6} ${bY1-20}" stroke="${b.branch}" stroke-width="${2.5+stageRatio}" stroke-linecap="round" fill="none"/>
+    ${stage >= 3 ? `<path d="M60 ${bY1} C70 ${bY1-4} ${60+bSpread} ${bY1-8} ${60+bSpread+5} ${bY1-18}" stroke="${b.branch}" stroke-width="${2+stageRatio*0.5}" stroke-linecap="round" fill="none"/>` : ""}
+    ${stage >= 5 ? `<path d="M60 ${bY2} C51 ${bY2-4} ${60-bSpread*0.8} ${bY2-9} ${60-bSpread*0.9-4} ${bY2-18}" stroke="${b.branch}" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <path d="M60 ${bY2} C69 ${bY2-3} ${60+bSpread*0.7} ${bY2-7} ${60+bSpread*0.8+4} ${bY2-16}" stroke="${b.branch}" stroke-width="1.8" stroke-linecap="round" fill="none"/>` : ""}
+  `;
+
+  const lr = 7 + stageRatio * 5;
+  const leafCluster = (x, y, r, op) => `
+    <circle cx="${x}" cy="${y}" r="${r}" fill="${fc}" opacity="${op}"/>
+    <circle cx="${x}" cy="${y}" r="${(r*0.55).toFixed(1)}" fill="${b.foliageDark}" opacity="${(Number(op)*0.55).toFixed(2)}"/>
+  `;
+  const foliage = `
+    ${stage >= 2 ? leafCluster(60-bSpread-4, bY1-24, lr, fop) : ""}
+    ${stage >= 3 ? leafCluster(60+bSpread+3, bY1-21, lr*0.9, fop) : ""}
+    ${stage >= 5 ? leafCluster(60-bSpread*0.9-2, bY2-20, lr*0.85, fop) : ""}
+    ${stage >= 5 ? leafCluster(60+bSpread*0.8+2, bY2-18, lr*0.8, fop) : ""}
+    ${leafCluster(60, trunkTop-lr*0.7, lr*1.1, fop)}
+    ${stage >= 4 ? leafCluster(60-lr*0.6, trunkTop-lr*1.6, lr*0.75, (Number(fop)*0.9).toFixed(2)) : ""}
+    ${stage >= 6 ? leafCluster(60+lr*0.5, trunkTop-lr*1.4, lr*0.7, (Number(fop)*0.85).toFixed(2)) : ""}
+  `;
+  return pot + trunk + branches + foliage;
+}
+
+function renderMossSvg(b, stage, stageRatio, health) {
+  const hp = Math.max(0.3, health / 100);
+  const fop = (0.65 + hp * 0.35).toFixed(2);
+
+  const pot = `
+    <rect x="30" y="113" width="60" height="17" rx="4" fill="${b.pot}"/>
+    <rect x="27" y="109" width="66" height="7" rx="3.5" fill="${b.potRim}"/>
+    <ellipse cx="60" cy="112" rx="27" ry="4.5" fill="${b.soil}" opacity="0.9"/>
+  `;
+  if (stage === 0) return pot + `<ellipse cx="60" cy="110" rx="4" ry="2" fill="${b.foliage}" opacity="0.4"/>`;
+
+  const spread = 8 + stageRatio * 18;
+  const height = 3 + stageRatio * 12;
+  const density = 3 + Math.floor(stageRatio * 9);
+
+  let mossPatches = `<ellipse cx="60" cy="${(112-height*0.3).toFixed(1)}" rx="${spread.toFixed(1)}" ry="${(height*0.6).toFixed(1)}" fill="${b.foliage}" opacity="${(Number(fop)*0.65).toFixed(2)}"/>`;
+
+  const positions = [
+    [60, 112-height], [60-spread*0.5, 112-height*0.7], [60+spread*0.5, 112-height*0.7],
+    [60-spread*0.8, 112-height*0.4], [60+spread*0.8, 112-height*0.4],
+    [60-spread*0.3, 112-height*1.1], [60+spread*0.3, 112-height*1.0],
+    [60-spread*0.65, 112-height*0.85], [60+spread*0.65, 112-height*0.8],
+    [60, 112-height*1.3], [60-spread*0.15, 112-height*0.5], [60+spread*0.15, 112-height*0.45],
+  ].slice(0, density);
+
+  positions.forEach(([px, py], i) => {
+    const r = (2.5 + stageRatio * 2.5 - i * 0.08).toFixed(1);
+    const localOp = (Number(fop) * (0.88 - i * 0.02)).toFixed(2);
+    const tfc = i % 3 === 0 ? b.foliageLight : (i % 3 === 1 ? b.foliage : b.foliageDark);
+    mossPatches += `<ellipse cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" rx="${r}" ry="${(Number(r)*0.65).toFixed(1)}" fill="${tfc}" opacity="${localOp}"/>`;
+  });
+
+  if (health > 60 && stage >= 5) {
+    mossPatches += `
+      <circle cx="${(60-spread*0.2).toFixed(1)}" cy="${(112-height*1.05).toFixed(1)}" r="1.5" fill="#c8eaf8" opacity="0.65"/>
+      <circle cx="${(60+spread*0.4).toFixed(1)}" cy="${(112-height*0.9).toFixed(1)}" r="1.2" fill="#c8eaf8" opacity="0.55"/>
+    `;
+  }
+  return pot + mossPatches;
+}
+
+// ============================================================
+// 旧フラワー SVGレンダラー（互換性のため保持）
+// ============================================================
 
 function renderTulipFlowerSvg(flower, stage, stageRatio) {
   const G = 122;
@@ -4854,7 +5089,7 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `streakgarden-backup-${toISODate(new Date())}.json`;
+  a.download = `streakbonsai-backup-${toISODate(new Date())}.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -5213,6 +5448,7 @@ function microStepFromMission(mission) {
 }
 
 function warmupExample(example) {
+  if (!example) return "机を開いて2分だけ準備する";
   if (example.includes("1問")) {
     return "公式を1つだけ見返す";
   }
@@ -5299,6 +5535,7 @@ function parseWindow(windowValue) {
 }
 
 function splitWindow(windowValue) {
+  if (!windowValue || !windowValue.includes("-")) return { start: "07:00", end: "08:00" };
   const [start, end] = windowValue.split("-");
   return { start, end };
 }
