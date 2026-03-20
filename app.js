@@ -788,6 +788,25 @@ function handleClick(event) {
     return;
   }
 
+  if (action === "select-goal-library-type") {
+    if (!ui.goalLibraryDraft) return;
+    const t = target.dataset.goalType;
+    if (t === "habit" || t === "goal") {
+      ui.goalLibraryDraft.goalType = t;
+      render();
+    }
+    return;
+  }
+
+  if (action === "select-goal-library-bonsai") {
+    if (!ui.goalLibraryDraft) return;
+    if (BONSAI_LIBRARY[target.dataset.bonsaiKey]) {
+      ui.goalLibraryDraft.bonsaiKey = target.dataset.bonsaiKey;
+      render();
+    }
+    return;
+  }
+
   if (action === "select-goal-library-flower") {
     if (!ui.goalLibraryDraft) {
       return;
@@ -1683,12 +1702,25 @@ function renderGoalLibrary() {
               ${isEditing
                 ? `
                   <div class="goal-library-card__editor">
+                    <div class="field">
+                      <span class="field__label">種類</span>
+                      <div class="goal-type-toggle goal-type-toggle--compact">
+                        <button type="button" class="goal-type-btn ${ui.goalLibraryDraft.goalType !== "habit" ? "is-active" : ""}" data-action="select-goal-library-type" data-goal-type="goal">
+                          <span class="goal-type-btn__icon">🎯</span>
+                          <span class="goal-type-btn__label">目標達成</span>
+                        </button>
+                        <button type="button" class="goal-type-btn ${ui.goalLibraryDraft.goalType === "habit" ? "is-active" : ""}" data-action="select-goal-library-type" data-goal-type="habit">
+                          <span class="goal-type-btn__icon">🌿</span>
+                          <span class="goal-type-btn__label">習慣</span>
+                        </button>
+                      </div>
+                    </div>
                     <label class="field">
                       <span class="field__label">目標</span>
                       <input class="field__control" data-goal-library-field="goal" type="text" value="${escapeHtml(ui.goalLibraryDraft.goal)}" />
                     </label>
-                    ${isHabitGoal
-                      ? ""
+                    ${ui.goalLibraryDraft.goalType === "habit"
+                      ? renderBonsaiPicker(ui.goalLibraryDraft.bonsaiKey, "select-goal-library-bonsai")
                       : `<label class="field">
                           <span class="field__label">期限（空欄で期限なし）</span>
                           <input class="field__control" data-goal-library-field="deadline" type="date" value="${escapeHtml(ui.goalLibraryDraft.deadline)}" />
@@ -2766,7 +2798,7 @@ function renderMetricCard(label, value, unit = "%") {
   `;
 }
 
-function renderBonsaiPicker(selectedKey) {
+function renderBonsaiPicker(selectedKey, actionName = "select-setup-bonsai") {
   const currentKey = BONSAI_LIBRARY[selectedKey] ? selectedKey : "pine";
   return `
     <div class="field">
@@ -2774,7 +2806,7 @@ function renderBonsaiPicker(selectedKey) {
       <p class="section-copy">盆栽の種類を選びます。日々のチェックインで育っていきます。</p>
       <div class="bonsai-picker">
         ${Object.entries(BONSAI_LIBRARY).map(([key, bonsai]) => `
-          <button type="button" class="bonsai-picker-item ${currentKey === key ? "is-active" : ""}" data-action="select-setup-bonsai" data-bonsai-key="${key}" aria-pressed="${currentKey === key ? "true" : "false"}">
+          <button type="button" class="bonsai-picker-item ${currentKey === key ? "is-active" : ""}" data-action="${actionName}" data-bonsai-key="${key}" aria-pressed="${currentKey === key ? "true" : "false"}">
             ${renderBonsaiArtwork(key, 5, 100, { size: "picker" })}
             <span class="bonsai-picker-item__label">${escapeHtml(bonsai.label)}</span>
             <span class="bonsai-picker-item__trait">${escapeHtml(bonsai.trait)}</span>
@@ -4122,6 +4154,8 @@ function buildGoalLibraryDraft(goalId) {
     goal: goal.setup.goal || "",
     deadline: goal.setup.deadline || "",
     flowerType: normalizeFlowerType(goal.setup.flowerType, goal.setup),
+    goalType: goal.setup.goalType === "habit" ? "habit" : "goal",
+    bonsaiKey: BONSAI_LIBRARY[goal.setup.bonsaiKey] ? goal.setup.bonsaiKey : "pine",
   };
 }
 
@@ -4137,20 +4171,22 @@ function commitGoalLibraryDraft() {
     return false;
   }
 
+  const isHabitDraft = ui.goalLibraryDraft.goalType === "habit";
   const nextSetup = {
     ...cloneData(goal.setup),
     goal: nextGoalName,
-    deadline: normalizeOptionalDate(ui.goalLibraryDraft.deadline),
+    deadline: isHabitDraft ? "" : normalizeOptionalDate(ui.goalLibraryDraft.deadline),
     currentLevel: "",
     flowerType: normalizeFlowerType(ui.goalLibraryDraft.flowerType, goal.setup),
+    goalType: ui.goalLibraryDraft.goalType,
+    bonsaiKey: ui.goalLibraryDraft.bonsaiKey || "pine",
   };
   nextSetup.studyDays = normalizeStudyDays(nextSetup.studyDays);
 
-  const nextRoadmap = preserveRoadmapForSetupEdit(goal.roadmap, nextSetup);
-  const nextToday = {
-    ...cloneData(goal.today || {}),
-    ...buildToday(nextSetup, nextRoadmap),
-  };
+  const nextRoadmap = isHabitDraft ? [] : preserveRoadmapForSetupEdit(goal.roadmap, nextSetup);
+  const nextToday = isHabitDraft
+    ? { missionTitle: nextSetup.goal, missionNote: "", recommendedPlan: "A", lastOutcome: null, lastRecordedAt: null }
+    : { ...cloneData(goal.today || {}), ...buildToday(nextSetup, nextRoadmap) };
   const nextPlans = buildPlans(nextSetup, nextToday.missionTitle);
   const weekly = getWeekRoadmapItem(nextRoadmap);
   const nextStep = getNextRoadmapItem(nextRoadmap);
