@@ -3098,28 +3098,34 @@ function renderSunflowerFlowerSvg(flower, stage, stageRatio) {
 
   let blossom = "";
   if (stage < 3) {
-    const r = 4 + stage * 2;
-    blossom = `<circle cx="60" cy="${bY + 5}" r="${r}" fill="${flower.bud}" opacity="0.88"/>`;
+    // 種〜茎のび: 土の上に小さな丸い芽/蕾
+    const r = 3.5 + stage * 1.5;
+    blossom = `<circle cx="60" cy="${bY + 5}" r="${r}" fill="${flower.bud}" opacity="0.82"/>`;
+  } else if (stage < 6) {
+    // つぼみ〜色づき: 花弁なし、膨らんだ丸い蕾だけ
+    const r = 5 + (stage - 3) * 3.5;
+    blossom = `
+      <circle cx="60" cy="${bY.toFixed(1)}" r="${(r + 2).toFixed(1)}" fill="${flower.center}" opacity="0.22"/>
+      <circle cx="60" cy="${bY.toFixed(1)}" r="${r.toFixed(1)}" fill="${flower.bud}" opacity="0.9"/>
+    `;
   } else {
-    const petalCount = Math.round(8 + stage * 1.3);
-    const centerR = 6 + stage * 1.6;
-    const petalL = stage >= 5 ? 18 + stageRatio * 5 : 8 + stage * 2;
-    const petalW = stage >= 5 ? 5.5 + stageRatio * 1.2 : 3 + stage * 0.5;
-    const innerR = centerR + 3;
+    // 咲き始め以降: 花弁が開く
+    const petalCount = Math.round(10 + (stage - 6) * 1.5);
+    const centerR = 7 + (stage - 6) * 2.2;
+    const petalL = 12 + (stage - 6) * 4 + stageRatio * 4;
+    const petalW = 4 + (stage - 6) * 0.8 + stageRatio * 0.6;
+    const innerR = centerR + 2;
 
-    const petals = stage >= 4
-      ? Array.from({ length: petalCount }, (_, i) => {
-        const angle = (360 / petalCount) * i + (i % 2 === 0 ? 0 : 180 / petalCount);
-        const op = 0.82 + (i % 3 === 0 ? 0.1 : 0);
-        return `<ellipse cx="60" cy="${(bY - innerR - petalL * 0.5).toFixed(1)}" rx="${petalW.toFixed(1)}" ry="${petalL.toFixed(1)}" fill="${flower.petal}" transform="rotate(${angle.toFixed(1)} 60 ${bY.toFixed(1)})" opacity="${op}"/>`;
-      }).join("")
-      : "";
+    const petals = Array.from({ length: petalCount }, (_, i) => {
+      const angle = (360 / petalCount) * i + (i % 2 === 0 ? 0 : 180 / petalCount);
+      const op = 0.82 + (i % 3 === 0 ? 0.1 : 0);
+      return `<ellipse cx="60" cy="${(bY - innerR - petalL * 0.5).toFixed(1)}" rx="${petalW.toFixed(1)}" ry="${petalL.toFixed(1)}" fill="${flower.petal}" transform="rotate(${angle.toFixed(1)} 60 ${bY.toFixed(1)})" opacity="${op}"/>`;
+    }).join("");
 
-    const darkRingOp = stage >= 5 ? "0.28" : "0";
     const lightR = centerR * 0.38;
     blossom = `
       ${petals}
-      <circle cx="60" cy="${bY.toFixed(1)}" r="${(centerR + 1.5).toFixed(1)}" fill="${flower.center}" opacity="0.32"/>
+      <circle cx="60" cy="${bY.toFixed(1)}" r="${(centerR + 1.5).toFixed(1)}" fill="${flower.center}" opacity="0.28"/>
       <circle cx="60" cy="${bY.toFixed(1)}" r="${centerR.toFixed(1)}" fill="${flower.center}"/>
       <circle cx="${(60 - centerR * 0.28).toFixed(1)}" cy="${(bY - centerR * 0.22).toFixed(1)}" r="${lightR.toFixed(1)}" fill="${flower.petalLight}" opacity="0.28"/>
       <circle cx="${(60 + centerR * 0.32).toFixed(1)}" cy="${(bY + centerR * 0.18).toFixed(1)}" r="${(lightR * 0.72).toFixed(1)}" fill="${flower.petalLight}" opacity="0.2"/>
