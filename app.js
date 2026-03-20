@@ -1115,6 +1115,22 @@ function handleClick(event) {
     return;
   }
 
+  if (action === "habit-undo-checkin") {
+    const goalId = target.dataset.goalId;
+    const todayStr = toISODate(new Date());
+    if (goalId !== state.meta.activeGoalId) {
+      activateGoal(goalId);
+    }
+    const before = state.logs.length;
+    state.logs = state.logs.filter(l => !(l.date === todayStr && l.outcome !== "miss"));
+    if (state.logs.length < before) {
+      saveState();
+      render();
+      showToast("チェックインを取り消しました。");
+    }
+    return;
+  }
+
   if (action === "select-setup-bonsai") {
     ensureSetupDraft();
     const key = target.dataset.bonsaiKey;
@@ -1908,6 +1924,9 @@ function renderTodayHabitCard(goal, index) {
   const bonsaiKey = goal.setup.bonsaiKey || "pine";
   const bonsaiMeta = getBonsaiTypeMeta(bonsaiKey);
   const isActiveGoal = goal.id === state.meta.activeGoalId;
+  const selectedPlanKey = isActiveGoal
+    ? (goal.activeSession ? goal.activeSession.planKey : "A")
+    : "";
   const cardClass = `${index === 0 ? "" : " focus-launch--stacked"} ${isActiveGoal ? "is-active-goal" : "is-inactive-goal"} ${isDone ? "is-complete-goal" : "is-pending-goal"}`;
 
   return `
@@ -1928,15 +1947,26 @@ function renderTodayHabitCard(goal, index) {
           ${renderBonsaiArtwork(bonsaiKey, growth.stageIndex, health, { size: "card" })}
         </div>
       </div>
+      <div class="choice-row focus-plan-row focus-plan-row--minimal">
+        ${Object.keys(goal.plans)
+          .map(
+            (planKey) => `
+              <button type="button" class="pill-button focus-plan-button ${selectedPlanKey === planKey ? "is-active" : ""}" data-action="launch-session-plan" data-goal-id="${goal.id}" data-plan="${planKey}">
+                <span class="focus-plan-button__label">${PLAN_META[planKey].label}</span>
+                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}分</span>
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
       <div class="bonsai-health-row">
         ${renderStreakDots(goal.logs || [], goal.setup.studyDays)}
       </div>
       <button
         type="button"
         class="habit-checkin-btn ${isDone ? "is-done" : ""}"
-        data-action="${isDone ? "" : "habit-checkin"}"
+        data-action="${isDone ? "habit-undo-checkin" : "habit-checkin"}"
         data-goal-id="${goal.id}"
-        ${isDone ? "disabled" : ""}
       >${isDone ? "✓ 今日は完了！" : "今日もやった！"}</button>
     </section>
   `;
