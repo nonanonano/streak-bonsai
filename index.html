@@ -1,0 +1,60 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f1e9dc" />
+    <title>StreakGarden</title>
+    <link rel="icon" type="image/svg+xml" href="./sunflower-favicon.svg" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="ambient ambient--left" aria-hidden="true"></div>
+      <div class="ambient ambient--right" aria-hidden="true"></div>
+
+      <div class="device-frame">
+        <header class="topbar">
+          <div class="topbar__brand">
+            <span class="brand-chip">StreakGarden</span>
+            <p class="topbar__date" id="today-label"></p>
+          </div>
+          <button
+            type="button"
+            class="ghost-button"
+            id="setup-shortcut"
+            data-action="open-setup"
+          >
+            設定
+          </button>
+        </header>
+
+        <main class="screen-frame" id="screen-root" aria-live="polite"></main>
+
+        <nav class="tabbar" id="bottom-nav" aria-label="主要画面">
+          <button type="button" class="tabbar__item" data-action="navigate" data-view="today">
+            <span class="tabbar__icon"></span>
+            <span>Today</span>
+          </button>
+          <button type="button" class="tabbar__item" data-action="navigate" data-view="roadmap">
+            <span class="tabbar__icon"></span>
+            <span>Roadmap</span>
+          </button>
+          <button type="button" class="tabbar__item" data-action="navigate" data-view="review">
+            <span class="tabbar__icon"></span>
+            <span>Review</span>
+          </button>
+          <button type="button" class="tabbar__item" data-action="navigate" data-view="garden">
+            <span class="tabbar__icon"></span>
+            <span>Garden</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+
+    <div class="sheet" id="session-sheet" hidden></div>
+    <div class="toast" id="toast" hidden></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
