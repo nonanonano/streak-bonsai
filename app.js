@@ -98,6 +98,28 @@ const FLOWER_LIBRARY = {
   },
 };
 
+const BONSAI_LIBRARY = {
+  pine: {
+    label: "黒松", trait: "凛として揺るがない",
+    trunk: "#5a4a3a", branch: "#4a3c2c",
+    foliage: "#2e6644", foliageDark: "#1e4e32", foliageLight: "#4e8e5c",
+    pot: "#8c6e58", potRim: "#7a5c48", soil: "#6a5040",
+  },
+  bamboo: {
+    label: "孟宗竹", trait: "しなやかで真っ直ぐ",
+    trunk: "#8ab870", branch: "#6a9850",
+    foliage: "#78b850", foliageDark: "#5a9038", foliageLight: "#aad880",
+    pot: "#8a7060", potRim: "#786050", soil: "#6a5540",
+  },
+  plum: {
+    label: "紅梅", trait: "厳しさの中に美しさ",
+    trunk: "#6a5870", branch: "#5a4862",
+    foliage: "#d45a8a", foliageDark: "#b44070", foliageLight: "#f4b0d0",
+    pot: "#7a6880", potRim: "#6a5870", soil: "#5a4858",
+  },
+};
+const BONSAI_STAGE_LABELS = ["鉢のみ","芽生え","幼木","成長期","形成期","樹形成","整い","老成","銘木","傑作"];
+
 const screenRoot = document.querySelector("#screen-root");
 const screenFrame = document.querySelector(".screen-frame");
 const todayLabel = document.querySelector("#today-label");
@@ -295,6 +317,35 @@ function getGoalFlowerState(goalRecord) {
   };
 }
 
+function getBonsaiTypeMeta(key) {
+  return { key: key || "pine", ...(BONSAI_LIBRARY[key] || BONSAI_LIBRARY.pine) };
+}
+
+function getBonsaiGrowth(logs) {
+  const executedDays = (Array.isArray(logs) ? logs : []).filter(l => l.outcome !== "miss" && l.outcome !== "none").length;
+  let stageIndex = 0;
+  for (let i = FLOWER_STAGE_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (executedDays >= FLOWER_STAGE_THRESHOLDS[i]) { stageIndex = i; break; }
+  }
+  return { stageIndex, executedDays, stageLabel: BONSAI_STAGE_LABELS[stageIndex] };
+}
+
+function getBonsaiHealth(logs, studyDays) {
+  const days = normalizeStudyDays(studyDays);
+  const today = new Date();
+  let scheduled = 0, completed = 0;
+  for (let i = 0; i < 14 && scheduled < 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const dayKey = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+    if (!days.includes(dayKey)) continue;
+    scheduled++;
+    const ds = toISODate(d);
+    const log = (Array.isArray(logs) ? logs : []).find(l => l.date === ds);
+    if (log && log.outcome !== "miss" && log.outcome !== "none") completed++;
+  }
+  return scheduled > 0 ? Math.round((completed / scheduled) * 100) : 100;
+}
+
 function createGoalId() {
   return `goal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -314,17 +365,28 @@ function createGoalRecord(config = {}) {
   const setup = cloneData(config.setup || state?.setup || {});
   setup.studyDays = normalizeStudyDays(setup.studyDays);
   setup.flowerType = normalizeFlowerType(setup.flowerType, setup);
+  setup.goalType = setup.goalType === "habit" ? "habit" : "goal";
+  setup.bonsaiKey = BONSAI_LIBRARY[setup.bonsaiKey] ? setup.bonsaiKey : "pine";
   const normalizedMinutes = resolvePlanMinuteValues(setup, setup);
   setup.normalMinutes = normalizedMinutes.normalMinutes;
   setup.shortMinutes = normalizedMinutes.shortMinutes;
   setup.minimumMinutes = normalizedMinutes.minimumMinutes;
-  const roadmap = Array.isArray(config.roadmap)
-    ? normalizeRoadmapItems(config.roadmap, setup)
-    : buildInitialRoadmap(setup);
-  const todayState = {
-    ...buildToday(setup, roadmap),
-    ...(config.today || {}),
-  };
+
+  const isHabit = setup.goalType === "habit";
+
+  const roadmap = isHabit
+    ? []
+    : (Array.isArray(config.roadmap)
+      ? normalizeRoadmapItems(config.roadmap, setup)
+      : buildInitialRoadmap(setup));
+
+  const todayState = isHabit
+    ? { missionTitle: setup.goal, missionNote: "", recommendedPlan: "A", lastOutcome: null, lastRecordedAt: null, ...(config.today || {}) }
+    : {
+        ...buildToday(setup, roadmap),
+        ...(config.today || {}),
+      };
+
   const basePlans = buildPlans(setup, todayState.missionTitle);
   const defaultTuning = buildInitialPlanTuning();
   const nextPlanTuning = {
@@ -475,7 +537,10 @@ function listGoalsByPrimaryWindow() {
 function listGoalsForToday(date = new Date()) {
   return listGoals()
     .filter((goal) => isGoalScheduledForDate(goal, date))
-    .filter((goal) => !getGoalMissionStateForDate(goal, date).isClosed);
+    .filter((goal) => {
+      if (goal.setup && goal.setup.goalType === "habit") return true;
+      return !getGoalMissionStateForDate(goal, date).isClosed;
+    });
 }
 
 function activateGoal(goalId) {
@@ -520,6 +585,39 @@ function init() {
 function bindEvents() {
   document.addEventListener("click", handleClick);
   document.addEventListener("input", handleInput);
+  document.addEventListener("keydown", handleKeydown);
+}
+
+function handleKeydown(event) {
+  if (event.target.matches("input, textarea, select")) {
+    return;
+  }
+  if (event.metaKey || event.ctrlKey || event.altKey) {
+    return;
+  }
+
+  const tabViews = ["today", "roadmap", "review", "garden"];
+  const viewIndex = Number(event.key) - 1;
+  if (viewIndex >= 0 && viewIndex < tabViews.length) {
+    state.meta.currentView = tabViews[viewIndex];
+    saveState();
+    render();
+    return;
+  }
+
+  if (event.key === "Escape") {
+    if (state.meta.currentView === "setup") {
+      ui.setupDraft = null;
+      ui.goalLibraryDraft = null;
+      ui.roadmapDraft = null;
+      ui.setupMode = "edit";
+      state.meta.currentView = "today";
+      render();
+    } else if (ui.sessionOpen || state.activeSession) {
+      ui.sessionOpen = false;
+      render();
+    }
+  }
 }
 
 function renderWithTransition() {
@@ -638,6 +736,22 @@ function handleClick(event) {
     ui.setupMode = "edit";
     state.meta.currentView = "today";
     render();
+    return;
+  }
+
+  if (action === "export-data") {
+    exportData();
+    return;
+  }
+
+  if (action === "import-data") {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".json,application/json";
+    fileInput.addEventListener("change", (e) => {
+      importData(e.target.files[0]);
+    });
+    fileInput.click();
     return;
   }
 
@@ -848,6 +962,65 @@ function handleClick(event) {
     return;
   }
 
+  if (action === "habit-checkin") {
+    const goalId = target.dataset.goalId;
+    const todayStr = toISODate(new Date());
+    // Find the goal to check for existing log
+    const targetGoal = (state.goals || []).find(g => g.id === goalId);
+    if (!targetGoal) return;
+    const logsToCheck = goalId === state.meta.activeGoalId ? state.logs : (targetGoal.logs || []);
+    const existingLog = logsToCheck.find(l => l.date === todayStr && l.outcome !== "miss");
+    if (existingLog) return;
+    // Activate goal if needed so state.logs points to this goal's logs
+    if (goalId !== state.meta.activeGoalId) {
+      activateGoal(goalId);
+    }
+    const missionTitle = state.today ? state.today.missionTitle : targetGoal.setup.goal;
+    const nextEntry = {
+      logId: createLogId(),
+      date: todayStr,
+      outcome: "A",
+      reason: null,
+      missionTitle,
+      recordedAt: new Date().toISOString(),
+      elapsedSeconds: 0,
+      plannedSeconds: 0,
+      progressText: "",
+      reflection: "",
+      milestoneId: "",
+      milestoneLabel: "",
+      milestoneTarget: null,
+      milestoneStatus: "",
+    };
+    state.logs.push(nextEntry);
+    state.logs.sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
+    syncTodayLastLogFields();
+    saveState();
+    render();
+    showToast("今日のチェックインを記録しました！");
+    return;
+  }
+
+  if (action === "select-setup-bonsai") {
+    ensureSetupDraft();
+    const key = target.dataset.bonsaiKey;
+    if (BONSAI_LIBRARY[key]) {
+      ui.setupDraft.bonsaiKey = key;
+    }
+    render();
+    return;
+  }
+
+  if (action === "select-goal-type") {
+    ensureSetupDraft();
+    const goalType = target.dataset.goalType;
+    if (goalType === "habit" || goalType === "goal") {
+      ui.setupDraft.goalType = goalType;
+    }
+    render();
+    return;
+  }
+
   if (action === "open-roadmap-editor") {
     if (ui.setupMode !== "new_goal") {
       ui.setupMode = "edit";
@@ -978,6 +1151,23 @@ function handleInput(event) {
       return;
     }
 
+    if (target.dataset.finishField === "elapsedInput") {
+      const parsed = parseElapsedInput(target.value);
+      if (parsed !== null && parsed > 0) {
+        ui.finishDraft.elapsedSeconds = parsed;
+        target.classList.remove("is-invalid");
+        const edited = parsed !== ui.finishDraft._originalElapsed;
+        target.classList.toggle("is-edited", edited);
+        // Update the human-readable unit label without full re-render (keeps focus)
+        const unitEl = target.closest(".elapsed-timer-wrap")?.querySelector(".elapsed-timer-unit");
+        if (unitEl) unitEl.textContent = edited ? formatLoggedDuration(parsed) : "";
+      } else {
+        target.classList.add("is-invalid");
+        target.classList.remove("is-edited");
+      }
+      return;
+    }
+
     ui.finishDraft[target.dataset.finishField] = target.value;
     return;
   }
@@ -1035,18 +1225,25 @@ function render() {
   }
 
   tabbarButtons.forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.view === currentView);
+    const isActive = button.dataset.view === currentView;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-current", isActive ? "page" : "false");
   });
 
-  const screens = {
-    setup: renderSetupView(),
-    today: renderTodayView(),
-    roadmap: renderRoadmapView(),
-    review: renderReviewView(),
-    garden: renderGardenView(),
+  const renderMap = {
+    setup: renderSetupView,
+    today: renderTodayView,
+    roadmap: renderRoadmapView,
+    review: renderReviewView,
+    garden: renderGardenView,
   };
 
-  screenRoot.innerHTML = screens[currentView] || screens.today;
+  try {
+    screenRoot.innerHTML = (renderMap[currentView] || renderMap.today)();
+  } catch (err) {
+    console.error("render error:", err);
+    screenRoot.innerHTML = `<div class="screen" style="padding:32px 24px;text-align:center;"><p style="font-size:1.1rem;margin-bottom:8px;">表示エラーが発生しました</p><p style="font-size:0.82rem;color:var(--muted)">${escapeHtml(String(err.message || err))}</p></div>`;
+  }
   renderSessionSheet();
 }
 
@@ -1331,19 +1528,38 @@ function renderSetupSectionBody(section, draft) {
     `;
   }
 
+  const isHabitDraft = draft.goalType === "habit";
   return `
     <div class="stack">
       <p class="section-copy">保存すると、今の Today は変えずに新しい目標だけ追加します。</p>
+      <div class="field">
+        <span class="field__label">種類</span>
+        <div class="goal-type-toggle">
+          <button type="button" class="goal-type-btn ${!isHabitDraft ? "is-active" : ""}" data-action="select-goal-type" data-goal-type="goal">
+            <span class="goal-type-btn__icon">🎯</span>
+            <span class="goal-type-btn__label">目標達成</span>
+          </button>
+          <button type="button" class="goal-type-btn ${isHabitDraft ? "is-active" : ""}" data-action="select-goal-type" data-goal-type="habit">
+            <span class="goal-type-btn__icon">🌿</span>
+            <span class="goal-type-btn__label">習慣</span>
+          </button>
+        </div>
+      </div>
       <label class="field">
         <span class="field__label">目標</span>
         <input class="field__control" data-setup-field="goal" type="text" value="${escapeHtml(draft.goal)}" />
       </label>
-      <div class="field">
-        <span class="field__label">期限（空欄で期限なし）</span>
-        <input class="field__control" data-setup-field="deadline" type="date" value="${escapeHtml(draft.deadline)}" />
-      </div>
-      ${renderFlowerPicker(draft.flowerType, "select-setup-flower")}
-      <p class="section-copy">下の設定メニューから Roadmap / 実施時間 / プランもこのまま決められます。</p>
+      ${!isHabitDraft ? `
+        <div class="field">
+          <span class="field__label">期限（空欄で期限なし）</span>
+          <input class="field__control" data-setup-field="deadline" type="date" value="${escapeHtml(draft.deadline)}" />
+        </div>
+        ${renderFlowerPicker(draft.flowerType, "select-setup-flower")}
+        <p class="section-copy">下の設定メニューから Roadmap / 実施時間 / プランもこのまま決められます。</p>
+      ` : `
+        ${renderBonsaiPicker(draft.bonsaiKey)}
+        <p class="section-copy">習慣タイプは Roadmap が不要です。毎日のチェックインで盆栽が育ちます。</p>
+      `}
     </div>
   `;
 }
@@ -1452,8 +1668,12 @@ function renderGoalLibrary() {
           const isActive = goal.id === state.meta.activeGoalId;
           const isEditing = editingGoalId === goal.id;
           const deadlineText = normalizeOptionalDate(isEditing ? ui.goalLibraryDraft?.deadline : goal.setup.deadline);
-          const flower = getGoalFlowerState(goal);
-          const meta = `${formatDeadlineBadge(deadlineText)} / 花 ${flower.label}`;
+          const isHabitGoal = goal.setup && goal.setup.goalType === "habit";
+          const flower = isHabitGoal ? null : getGoalFlowerState(goal);
+          const bonsaiMeta = isHabitGoal ? getBonsaiTypeMeta(goal.setup.bonsaiKey) : null;
+          const meta = isHabitGoal
+            ? `習慣 / 盆栽 ${bonsaiMeta.label}`
+            : `${formatDeadlineBadge(deadlineText)} / 花 ${flower.label}`;
           return `
             <article class="goal-library-card ${isActive ? "is-active" : ""}">
               <div class="goal-library-card__head">
@@ -1467,11 +1687,13 @@ function renderGoalLibrary() {
                       <span class="field__label">目標</span>
                       <input class="field__control" data-goal-library-field="goal" type="text" value="${escapeHtml(ui.goalLibraryDraft.goal)}" />
                     </label>
-                    <label class="field">
-                      <span class="field__label">期限（空欄で期限なし）</span>
-                      <input class="field__control" data-goal-library-field="deadline" type="date" value="${escapeHtml(ui.goalLibraryDraft.deadline)}" />
-                    </label>
-                    ${renderFlowerPicker(ui.goalLibraryDraft.flowerType, "select-goal-library-flower", { compact: true })}
+                    ${isHabitGoal
+                      ? ""
+                      : `<label class="field">
+                          <span class="field__label">期限（空欄で期限なし）</span>
+                          <input class="field__control" data-goal-library-field="deadline" type="date" value="${escapeHtml(ui.goalLibraryDraft.deadline)}" />
+                        </label>
+                        ${renderFlowerPicker(ui.goalLibraryDraft.flowerType, "select-goal-library-flower", { compact: true })}`}
                     <div class="goal-library-card__actions">
                       <button type="button" class="soft-button goal-library-card__action" data-action="save-goal-library-edit">保存</button>
                       <button type="button" class="soft-button goal-library-card__action" data-action="cancel-goal-library-edit">閉じる</button>
@@ -1494,6 +1716,10 @@ function renderGoalLibrary() {
 }
 
 function renderTodayGoalCard(goal, index) {
+  const isHabit = goal.setup && goal.setup.goalType === "habit";
+  if (isHabit) {
+    return renderTodayHabitCard(goal, index);
+  }
   const flower = getGoalFlowerState(goal);
   const missionState = getGoalMissionStateForDate(goal);
   const isActiveGoal = goal.id === state.meta.activeGoalId;
@@ -1532,6 +1758,53 @@ function renderTodayGoalCard(goal, index) {
           )
           .join("")}
       </div>
+    </section>
+  `;
+}
+
+function renderTodayHabitCard(goal, index) {
+  const today = toISODate(new Date());
+  const todayLog = (goal.logs || []).find(l => l.date === today && l.outcome !== "miss");
+  const isDone = Boolean(todayLog);
+  const growth = getBonsaiGrowth(goal.logs || []);
+  const health = getBonsaiHealth(goal.logs || [], goal.setup.studyDays);
+  const bonsaiKey = goal.setup.bonsaiKey || "pine";
+  const bonsaiMeta = getBonsaiTypeMeta(bonsaiKey);
+  const isActiveGoal = goal.id === state.meta.activeGoalId;
+  const cardClass = `${index === 0 ? "" : " focus-launch--stacked"} ${isActiveGoal ? "is-active-goal" : "is-inactive-goal"} ${isDone ? "is-complete-goal" : "is-pending-goal"}`;
+
+  return `
+    <section class="focus-launch focus-launch--minimal focus-launch--habit${cardClass}" style="view-transition-name: goal-card-${goal.id}">
+      <div class="focus-launch__halo" aria-hidden="true"></div>
+      <div class="focus-launch__goal-meta">
+        <div class="focus-launch__status-row">
+          <span class="status-badge ${isDone ? "status-badge--done" : "status-badge--accent"}">${isDone ? "完了済み" : "未完了"}</span>
+          <span class="status-badge">習慣</span>
+        </div>
+        <div class="focus-launch__goal-timing">
+          <span class="focus-launch__goal-slot">${escapeHtml(bonsaiMeta.label)} / ${escapeHtml(growth.stageLabel)}</span>
+        </div>
+      </div>
+      <div class="focus-launch__title-row">
+        <h1 class="focus-launch__goal focus-launch__goal--solo">${escapeHtml(goal.setup.goal)}</h1>
+        <div class="focus-launch__flower-panel">
+          ${renderBonsaiArtwork(bonsaiKey, growth.stageIndex, health, { size: "card" })}
+        </div>
+      </div>
+      <div class="bonsai-health-row">
+        <span>直近の健康度</span>
+        <div class="bonsai-health-bar">
+          <div class="bonsai-health-fill" style="width:${health}%"></div>
+        </div>
+        <span>${health}%</span>
+      </div>
+      <button
+        type="button"
+        class="habit-checkin-btn ${isDone ? "is-done" : ""}"
+        data-action="${isDone ? "" : "habit-checkin"}"
+        data-goal-id="${goal.id}"
+        ${isDone ? "disabled" : ""}
+      >${isDone ? "✓ 今日は完了！" : "今日もやった！"}</button>
     </section>
   `;
 }
@@ -1635,6 +1908,10 @@ function renderSetupView() {
             <strong>変えたいものを選ぶ</strong>
           </div>
           <div class="setup-nav__list">${setupMenu}</div>
+          <div class="setup-nav__data-actions">
+            <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">エクスポート</button>
+            <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">インポート</button>
+          </div>
         </aside>
 
         ${activeSectionKey === "schedule"
@@ -2038,13 +2315,19 @@ function renderReviewLogGrid(entries) {
 }
 
 function renderReviewPotCard(goal) {
-  const flower = getGoalFlowerState(goal);
-  const roadmap = computeRoadmap(goal);
+  const isHabit = goal.setup && goal.setup.goalType === "habit";
+  const flower = isHabit ? null : getGoalFlowerState(goal);
+  const bonsaiGrowth = isHabit ? getBonsaiGrowth(goal.logs || []) : null;
+  const bonsaiHealth = isHabit ? getBonsaiHealth(goal.logs || [], goal.setup.studyDays) : null;
+  const bonsaiMeta = isHabit ? getBonsaiTypeMeta(goal.setup.bonsaiKey) : null;
+  const roadmap = isHabit ? { learningProgress: 0 } : computeRoadmap(goal);
   const todayLog = getGoalLogByDate(goal, toISODate(new Date()));
   const missionState = getGoalMissionStateForDate(goal);
-  const statusCopy = missionState.isClosed && todayLog
-    ? buildLogSummary(todayLog)
-    : `${flower.label} / ${flower.stageLabel}`;
+  const statusCopy = isHabit
+    ? `${bonsaiMeta.label} / ${bonsaiGrowth.stageLabel} / 健康度 ${bonsaiHealth}%`
+    : (missionState.isClosed && todayLog
+      ? buildLogSummary(todayLog)
+      : `${flower.label} / ${flower.stageLabel}`);
 
   return `
     <section class="panel panel--garden stack">
@@ -2052,7 +2335,9 @@ function renderReviewPotCard(goal) {
         <div class="review-pot-card__copy">
           <div class="status-strip">
             <span class="status-badge status-badge--done">選択中</span>
-            <span class="status-badge ${isGoalAchieved(goal) ? "status-badge--done" : "status-badge--accent"}">${isGoalAchieved(goal) ? "達成済み" : "育成中"}</span>
+            ${isHabit
+              ? `<span class="status-badge">習慣</span>`
+              : `<span class="status-badge ${isGoalAchieved(goal) ? "status-badge--done" : "status-badge--accent"}">${isGoalAchieved(goal) ? "達成済み" : "育成中"}</span>`}
           </div>
           <div class="stack stack--tight">
             <h2 class="section-title">${escapeHtml(goal.setup.goal)}</h2>
@@ -2067,22 +2352,24 @@ function renderReviewPotCard(goal) {
         <div class="review-pot-card__scene" aria-hidden="true">
           <div class="review-pot-card__glow"></div>
           <div class="review-pot-card__flower">
-            ${renderFlowerArtwork(flower.key, flower.stageIndex, { size: "review-pot", showSoil: false })}
+            ${isHabit
+              ? renderBonsaiArtwork(goal.setup.bonsaiKey, bonsaiGrowth.stageIndex, bonsaiHealth, { size: "review-pot" })
+              : renderFlowerArtwork(flower.key, flower.stageIndex, { size: "review-pot", showSoil: false })}
           </div>
           <div class="review-pot-card__pot"></div>
         </div>
         <div class="review-pot-card__facts">
           <div class="review-pot-card__fact">
-            <span>咲き方</span>
-            <strong>${escapeHtml(flower.stageLabel)}</strong>
+            <span>${isHabit ? "成長段階" : "咲き方"}</span>
+            <strong>${escapeHtml(isHabit ? bonsaiGrowth.stageLabel : flower.stageLabel)}</strong>
           </div>
           <div class="review-pot-card__fact">
-            <span>育成日数</span>
-            <strong>${escapeHtml(`${flower.executedDays}日`)}</strong>
+            <span>${isHabit ? "継続日数" : "育成日数"}</span>
+            <strong>${escapeHtml(`${isHabit ? bonsaiGrowth.executedDays : flower.executedDays}日`)}</strong>
           </div>
           <div class="review-pot-card__fact">
-            <span>全体進捗</span>
-            <strong>${escapeHtml(`${roadmap.learningProgress}%`)}</strong>
+            <span>${isHabit ? "健康度" : "全体進捗"}</span>
+            <strong>${escapeHtml(isHabit ? `${bonsaiHealth}%` : `${roadmap.learningProgress}%`)}</strong>
           </div>
         </div>
       </div>
@@ -2180,8 +2467,10 @@ function renderReviewLogCard(entry) {
 
 function renderGardenView() {
   const goals = listGoals();
-  const growingGoals = goals.filter((goal) => !isGoalAchieved(goal));
-  const archivedGoals = goals.filter((goal) => isGoalAchieved(goal));
+  const habitGoals = goals.filter((goal) => goal.setup && goal.setup.goalType === "habit");
+  const regularGoals = goals.filter((goal) => !goal.setup || goal.setup.goalType !== "habit");
+  const growingGoals = regularGoals.filter((goal) => !isGoalAchieved(goal));
+  const archivedGoals = regularGoals.filter((goal) => isGoalAchieved(goal));
 
   return `
     <section class="screen">
@@ -2195,7 +2484,8 @@ function renderGardenView() {
         </div>
       </div>
 
-      ${renderGardenShelfSection("今育てている花", "進行中の目標だけをまとめています。選ぶと Today / Review の対象目標が切り替わります。", growingGoals, { emptyCopy: "まだ育成中の花はありません。" })}
+      ${habitGoals.length ? renderGardenShelfSection("育てている盆栽", "習慣タイプの目標です。毎日のチェックインで成長します。", habitGoals, { emptyCopy: "まだ習慣はありません。" }) : ""}
+      ${renderGardenShelfSection("今育てている花", "進行中の目標をまとめています。", growingGoals, { emptyCopy: "まだ育成中の花はありません。" })}
       ${renderAchievementGardenSection("目標達成した花", "達成した花はこの庭に植えて、咲いた記録を残していきます。", archivedGoals, { emptyCopy: "まだ達成した花はありません。" })}
     </section>
   `;
@@ -2228,19 +2518,39 @@ function renderGardenShelfSection(title, copy, goals, options = {}) {
 }
 
 function renderGardenShelfCard(goal, options = {}) {
+  const isHabit = goal.setup && goal.setup.goalType === "habit";
+
+  if (isHabit) {
+    const growth = getBonsaiGrowth(goal.logs || []);
+    const health = getBonsaiHealth(goal.logs || [], goal.setup.studyDays);
+    const bonsaiKey = goal.setup.bonsaiKey || "pine";
+    const bonsaiMeta = getBonsaiTypeMeta(bonsaiKey);
+    return `
+      <div class="garden-card">
+        <div class="garden-card__art" aria-hidden="true">
+          <div class="garden-card__glow"></div>
+          <div class="garden-card__flower">
+            ${renderBonsaiArtwork(bonsaiKey, growth.stageIndex, health, { size: "garden-card" })}
+          </div>
+        </div>
+        <div class="garden-card__body">
+          <div class="garden-card__head">
+            <strong class="garden-card__title">${escapeHtml(goal.setup.goal)}</strong>
+            <span class="status-badge">習慣</span>
+          </div>
+          <p class="garden-card__meta">${escapeHtml(`${bonsaiMeta.label} / ${growth.stageLabel}`)}</p>
+          <p class="garden-card__meta">${escapeHtml(`継続 ${growth.executedDays}日 / 健康度 ${health}%`)}</p>
+        </div>
+      </div>
+    `;
+  }
+
   const flower = getGoalFlowerState(goal);
   const roadmap = computeRoadmap(goal);
   const completed = options.completed === true || isGoalAchieved(goal);
-  const isActive = goal.id === state.meta.activeGoalId;
 
   return `
-    <button
-      type="button"
-      class="garden-card ${completed ? "is-complete" : ""} ${isActive ? "is-active" : ""}"
-      data-action="activate-goal"
-      data-goal-id="${escapeHtml(goal.id)}"
-      ${isActive ? "disabled" : ""}
-    >
+    <div class="garden-card ${completed ? "is-complete" : ""}">
       <div class="garden-card__art" aria-hidden="true">
         <div class="garden-card__glow"></div>
         <div class="garden-card__flower">
@@ -2251,12 +2561,12 @@ function renderGardenShelfCard(goal, options = {}) {
       <div class="garden-card__body">
         <div class="garden-card__head">
           <strong class="garden-card__title">${escapeHtml(goal.setup.goal)}</strong>
-          <span class="status-badge ${completed ? "status-badge--done" : isActive ? "status-badge--done" : ""}">${completed ? "達成済み" : isActive ? "選択中" : "育成中"}</span>
+          <span class="status-badge ${completed ? "status-badge--done" : ""}">${completed ? "達成済み" : "育成中"}</span>
         </div>
         <p class="garden-card__meta">${escapeHtml(`${flower.label} / ${flower.stageLabel}`)}</p>
         <p class="garden-card__meta">${escapeHtml(`育成 ${flower.executedDays}日 / 進捗 ${roadmap.learningProgress}%`)}</p>
       </div>
-    </button>
+    </div>
   `;
 }
 
@@ -2456,6 +2766,25 @@ function renderMetricCard(label, value, unit = "%") {
   `;
 }
 
+function renderBonsaiPicker(selectedKey) {
+  const currentKey = BONSAI_LIBRARY[selectedKey] ? selectedKey : "pine";
+  return `
+    <div class="field">
+      <span class="field__label">育てる盆栽</span>
+      <p class="section-copy">盆栽の種類を選びます。日々のチェックインで育っていきます。</p>
+      <div class="bonsai-picker">
+        ${Object.entries(BONSAI_LIBRARY).map(([key, bonsai]) => `
+          <button type="button" class="bonsai-picker-item ${currentKey === key ? "is-active" : ""}" data-action="select-setup-bonsai" data-bonsai-key="${key}" aria-pressed="${currentKey === key ? "true" : "false"}">
+            ${renderBonsaiArtwork(key, 5, 100, { size: "picker" })}
+            <span class="bonsai-picker-item__label">${escapeHtml(bonsai.label)}</span>
+            <span class="bonsai-picker-item__trait">${escapeHtml(bonsai.trait)}</span>
+          </button>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function renderFlowerPicker(selectedType, actionName, options = {}) {
   const compact = Boolean(options.compact);
   const currentType = normalizeFlowerType(selectedType);
@@ -2491,6 +2820,179 @@ function renderFlowerPicker(selectedType, actionName, options = {}) {
   `;
 }
 
+function renderPineBonsaiSvg(b, stage, stageRatio, health) {
+  const hp = Math.max(0.3, health / 100);
+  const fop = (0.7 + hp * 0.3).toFixed(2);
+  const fc = hp < 0.4 ? b.foliageDark : b.foliage;
+
+  const pot = `
+    <rect x="30" y="113" width="60" height="17" rx="4" fill="${b.pot}"/>
+    <rect x="27" y="109" width="66" height="7" rx="3.5" fill="${b.potRim}"/>
+    <ellipse cx="60" cy="112" rx="27" ry="4.5" fill="${b.soil}" opacity="0.9"/>
+  `;
+
+  if (stage === 0) return pot + `<ellipse cx="60" cy="109" rx="3" ry="2.5" fill="${b.foliage}" opacity="0.6"/>`;
+
+  const trunkHeight = 20 + stageRatio * 65;
+  const trunkTop = 112 - trunkHeight;
+
+  const trunk = `<path d="M60 112 C59 ${112-trunkHeight*0.3} 61 ${112-trunkHeight*0.6} 60 ${trunkTop}" stroke="${b.trunk}" stroke-width="${4 + stageRatio*2}" stroke-linecap="round" fill="none"/>`;
+
+  if (stage <= 1) {
+    return pot + trunk + `<ellipse cx="60" cy="${trunkTop-3}" rx="5" ry="4" fill="${fc}" opacity="${fop}"/>`;
+  }
+
+  const bY1 = trunkTop + trunkHeight * 0.6;
+  const bY2 = trunkTop + trunkHeight * 0.35;
+  const bSpread = 15 + stageRatio * 18;
+
+  const branches = stage >= 3 ? `
+    <path d="M60 ${bY1} C52 ${bY1-4} 44 ${bY1-8} ${60-bSpread} ${bY1-6}" stroke="${b.branch}" stroke-width="${3+stageRatio}" stroke-linecap="round" fill="none"/>
+    <path d="M60 ${bY1} C68 ${bY1-4} 76 ${bY1-8} ${60+bSpread} ${bY1-6}" stroke="${b.branch}" stroke-width="${2.5+stageRatio*0.5}" stroke-linecap="round" fill="none"/>
+    ${stage >= 5 ? `<path d="M60 ${bY2} C52 ${bY2-3} 44 ${bY2-6} ${60-bSpread*0.8} ${bY2-5}" stroke="${b.branch}" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+    <path d="M60 ${bY2} C68 ${bY2-3} 76 ${bY2-6} ${60+bSpread*0.8} ${bY2-5}" stroke="${b.branch}" stroke-width="2" stroke-linecap="round" fill="none"/>` : ""}
+  ` : `<path d="M60 ${bY1} C52 ${bY1-3} 44 ${bY1-5} ${60-bSpread*0.5} ${bY1-4}" stroke="${b.branch}" stroke-width="2.5" stroke-linecap="round" fill="none"/>`;
+
+  const foliageR = 8 + stageRatio * 6;
+  const foliage = stage >= 2 ? `
+    ${stage >= 3 ? `
+      <circle cx="${60-bSpread}" cy="${bY1-10}" r="${foliageR}" fill="${fc}" opacity="${fop}"/>
+      <circle cx="${60-bSpread+8}" cy="${bY1-15}" r="${foliageR*0.8}" fill="${b.foliageDark}" opacity="${(Number(fop)*0.85).toFixed(2)}"/>
+    ` : ""}
+    ${stage >= 3 ? `
+      <circle cx="${60+bSpread}" cy="${bY1-10}" r="${foliageR*0.9}" fill="${fc}" opacity="${fop}"/>
+    ` : ""}
+    ${stage >= 5 ? `
+      <circle cx="${60-bSpread*0.8}" cy="${bY2-8}" r="${foliageR*0.85}" fill="${fc}" opacity="${fop}"/>
+      <circle cx="${60+bSpread*0.8}" cy="${bY2-8}" r="${foliageR*0.8}" fill="${b.foliageDark}" opacity="${(Number(fop)*0.88).toFixed(2)}"/>
+    ` : ""}
+    <circle cx="60" cy="${trunkTop-foliageR*0.6}" r="${foliageR*1.1}" fill="${b.foliageDark}" opacity="${fop}"/>
+    <circle cx="${60-foliageR*0.5}" cy="${trunkTop-foliageR*0.9}" r="${foliageR*0.85}" fill="${fc}" opacity="${(Number(fop)*0.92).toFixed(2)}"/>
+    ${stage >= 6 ? `<circle cx="${60}" cy="${trunkTop-foliageR*1.5}" r="${foliageR*0.7}" fill="${b.foliageLight}" opacity="${(Number(fop)*0.45).toFixed(2)}"/>` : ""}
+  ` : `<circle cx="60" cy="${trunkTop-6}" r="8" fill="${fc}" opacity="${fop}"/>`;
+
+  return pot + trunk + branches + foliage;
+}
+
+function renderBambooSvg(b, stage, stageRatio, health) {
+  const hp = Math.max(0.35, health / 100);
+  const fop = (0.65 + hp * 0.35).toFixed(2);
+
+  const pot = `
+    <rect x="30" y="113" width="60" height="17" rx="4" fill="${b.pot}"/>
+    <rect x="27" y="109" width="66" height="7" rx="3.5" fill="${b.potRim}"/>
+    <ellipse cx="60" cy="112" rx="27" ry="4.5" fill="${b.soil}" opacity="0.9"/>
+  `;
+
+  if (stage === 0) return pot + `<ellipse cx="60" cy="109" rx="3" ry="3" fill="${b.trunk}" opacity="0.7"/>`;
+
+  const culmCount = Math.min(1 + Math.floor(stage / 2), 5);
+  const culmPositions = [60, 48, 72, 42, 78].slice(0, culmCount);
+  const maxHeight = 20 + stageRatio * 75;
+
+  let culms = "";
+  culmPositions.forEach((cx, i) => {
+    const h = maxHeight * (0.7 + (i % 3) * 0.15);
+    const top = 112 - h;
+    const w = 5 - i * 0.5;
+
+    culms += `<rect x="${cx - w/2}" y="${top}" width="${w}" height="${h}" rx="${w/2}" fill="${b.trunk}" opacity="${0.9 - i*0.06}"/>`;
+
+    const nodeCount = Math.floor(h / 12);
+    for (let n = 1; n < nodeCount; n++) {
+      const ny = top + (h / nodeCount) * n;
+      culms += `<rect x="${cx - w/2 - 1}" y="${ny - 1.5}" width="${w + 2}" height="3" rx="1.5" fill="${b.branch}" opacity="0.88"/>`;
+    }
+
+    const leafSpread = 10 + stageRatio * 8;
+    if (stage >= 2 || i === 0) {
+      culms += `
+        <path d="M${cx} ${top} C${cx - leafSpread*0.8} ${top - 8} ${cx - leafSpread} ${top - 14} ${cx - leafSpread*1.1} ${top - 20}" stroke="${b.foliage}" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="${fop}"/>
+        <path d="M${cx} ${top} C${cx + leafSpread*0.7} ${top - 7} ${cx + leafSpread} ${top - 12} ${cx + leafSpread*1.0} ${top - 18}" stroke="${b.foliage}" stroke-width="2" stroke-linecap="round" fill="none" opacity="${fop}"/>
+        <path d="M${cx} ${top} C${cx - leafSpread*0.3} ${top - 10} ${cx} ${top - 18} ${cx + leafSpread*0.2} ${top - 24}" stroke="${b.foliageDark}" stroke-width="2" stroke-linecap="round" fill="none" opacity="${(Number(fop)*0.88).toFixed(2)}"/>
+      `;
+    }
+  });
+
+  return pot + culms;
+}
+
+function renderPlumBonsaiSvg(b, stage, stageRatio, health) {
+  const hp = Math.max(0.3, health / 100);
+  const fop = (0.65 + hp * 0.35).toFixed(2);
+
+  const pot = `
+    <rect x="30" y="113" width="60" height="17" rx="4" fill="${b.pot}"/>
+    <rect x="27" y="109" width="66" height="7" rx="3.5" fill="${b.potRim}"/>
+    <ellipse cx="60" cy="112" rx="27" ry="4.5" fill="${b.soil}" opacity="0.9"/>
+  `;
+
+  if (stage === 0) return pot + `<ellipse cx="60" cy="109" rx="3" ry="2.5" fill="${b.trunk}" opacity="0.6"/>`;
+
+  const trunkH = 22 + stageRatio * 60;
+  const trunkTop = 112 - trunkH;
+
+  const trunk = `<path d="M60 112 C56 ${112-trunkH*0.3} 64 ${112-trunkH*0.65} 60 ${trunkTop}" stroke="${b.trunk}" stroke-width="${4.5 + stageRatio*1.5}" stroke-linecap="round" fill="none"/>`;
+
+  if (stage <= 1) return pot + trunk;
+
+  const bSpread = 12 + stageRatio * 22;
+  const bY1 = trunkTop + trunkH * 0.5;
+  const bY2 = trunkTop + trunkH * 0.25;
+
+  const branches = `
+    <path d="M60 ${bY1} C50 ${bY1-6} ${60-bSpread} ${bY1-10} ${60-bSpread-8} ${bY1-18}" stroke="${b.branch}" stroke-width="${2.5+stageRatio}" stroke-linecap="round" fill="none"/>
+    ${stage >= 3 ? `<path d="M60 ${bY1} C70 ${bY1-5} ${60+bSpread} ${bY1-8} ${60+bSpread+6} ${bY1-15}" stroke="${b.branch}" stroke-width="${2+stageRatio*0.5}" stroke-linecap="round" fill="none"/>` : ""}
+    ${stage >= 5 ? `
+      <path d="M60 ${bY2} C52 ${bY2-4} ${60-bSpread*0.7} ${bY2-8} ${60-bSpread*0.8-6} ${bY2-16}" stroke="${b.branch}" stroke-width="2" stroke-linecap="round" fill="none"/>
+      <path d="M60 ${bY2} C68 ${bY2-3} ${60+bSpread*0.6} ${bY2-7} ${60+bSpread*0.7+5} ${bY2-14}" stroke="${b.branch}" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+    ` : ""}
+    ${stage >= 7 ? `<path d="M60 ${trunkTop} C56 ${trunkTop-8} 52 ${trunkTop-14} 48 ${trunkTop-18}" stroke="${b.branch}" stroke-width="1.5" stroke-linecap="round" fill="none"/>` : ""}
+  `;
+
+  let blossoms = "";
+  if (stage >= 5) {
+    const blossomPositions = [
+      [60-bSpread-8, bY1-20], [60+bSpread+6, bY1-17],
+      [60-bSpread*0.8-8, bY2-18], [60+bSpread*0.7+7, bY2-16],
+      [60, trunkTop-8],
+    ].slice(0, Math.min(stage - 3, 5));
+
+    blossomPositions.forEach(([bx, by]) => {
+      const r = 5 + stageRatio * 3;
+      blossoms += `
+        <circle cx="${bx}" cy="${by}" r="${r}" fill="${b.foliage}" opacity="${(Number(fop)*0.88).toFixed(2)}"/>
+        <circle cx="${bx}" cy="${by}" r="${r*0.5}" fill="${b.foliageLight}" opacity="${(Number(fop)*0.6).toFixed(2)}"/>
+      `;
+    });
+  }
+
+  return pot + trunk + branches + blossoms;
+}
+
+function renderBonsaiArtwork(bonsaiType, stageIndex, health, options = {}) {
+  const b = getBonsaiTypeMeta(bonsaiType);
+  const stage = Math.max(0, Math.min(9, Number(stageIndex) || 0));
+  const stageRatio = stage / 9;
+  const size = options.size || "picker";
+  const h = typeof health === "number" ? health : 100;
+
+  const renderers = {
+    pine: renderPineBonsaiSvg,
+    bamboo: renderBambooSvg,
+    plum: renderPlumBonsaiSvg,
+  };
+  const body = (renderers[b.key] || renderPineBonsaiSvg)(b, stage, stageRatio, h);
+
+  return `
+    <figure class="flower-illustration flower-illustration--${escapeHtml(size)}" data-bonsai="${b.key}">
+      <svg viewBox="0 0 120 140" aria-hidden="true" focusable="false">
+        ${body}
+      </svg>
+    </figure>
+  `;
+}
+
 function renderFlowerArtwork(flowerType, stageIndex, options = {}) {
   const flower = getFlowerTypeMeta(flowerType);
   const stage = Math.max(0, Math.min(9, Number(stageIndex) || 0));
@@ -2518,72 +3020,162 @@ function renderFlowerArtwork(flowerType, stageIndex, options = {}) {
 }
 
 function renderTulipFlowerSvg(flower, stage, stageRatio) {
-  const stemTop = 114 - (stageRatio * 52);
-  const blossomY = stemTop;
-  const budColor = stage >= 5 ? flower.petal : flower.bud;
-  const petalHeight = 11 + (stageRatio * 12);
-  const openOffset = Math.max(0, stage - 4) * 1.6;
-  const leaves = stage >= 2
-    ? `
-      <path d="M59 102C45 88 41 81 37 64C51 70 57 79 63 95" fill="${flower.leaf}" opacity="0.92"></path>
-      <path d="M61 96C73 84 79 76 84 60C72 66 66 75 58 90" fill="${flower.leaf}" opacity="0.85"></path>
-    `
-    : "";
-  const bud = stage >= 3
-    ? `
-      <ellipse cx="60" cy="${blossomY}" rx="${9 + openOffset * 0.2}" ry="${petalHeight}" fill="${flower.petalLight}" opacity="0.96"></ellipse>
-      <ellipse cx="${49 - openOffset * 0.35}" cy="${blossomY + 3}" rx="${7 + openOffset * 0.25}" ry="${petalHeight - 2}" fill="${budColor}" transform="rotate(-16 ${49 - openOffset * 0.35} ${blossomY + 3})"></ellipse>
-      <ellipse cx="${71 + openOffset * 0.35}" cy="${blossomY + 3}" rx="${7 + openOffset * 0.25}" ry="${petalHeight - 2}" fill="${budColor}" transform="rotate(16 ${71 + openOffset * 0.35} ${blossomY + 3})"></ellipse>
-      <path d="M52 ${blossomY + 14}C56 ${blossomY + 9} 64 ${blossomY + 9} 68 ${blossomY + 14}" fill="${flower.center}" opacity="${stage >= 6 ? "0.95" : "0.38"}"></path>
-    `
-    : `<ellipse cx="60" cy="112" rx="6" ry="4" fill="${flower.center}" opacity="0.82"></ellipse>`;
+  const G = 122;
+  const tip = G - 6 - stageRatio * 60;
+  const h = G - tip;
+  const lY = tip + h * 0.56;
+  const lS = 0.32 + stageRatio * 0.68;
+  const L = 22 * lS;
+  const open = Math.max(0, Math.min(1, (stage - 3.5) / 4.5));
+  const sp = open * 18;
+  const pc = stage >= 5 ? flower.petal : flower.bud;
+  const lc = stage >= 5 ? flower.petalLight : flower.bud;
+  const bY = tip;
+  const bBase = bY + 16;
 
-  return `
-    ${stage >= 1 ? `<path d="M60 120C61 108 60 89 60 ${stemTop + 12}" fill="none" stroke="${flower.stem}" stroke-width="5.2" stroke-linecap="round"></path>` : ""}
-    ${leaves}
-    ${bud}
-  `;
+  if (stage === 0) {
+    return `<ellipse cx="60" cy="${G - 3}" rx="8" ry="5.5" fill="${flower.bud}" opacity="0.62"/>`;
+  }
+
+  const stem = `<path d="M60 ${G} C59.5 ${G - 16} 60.5 ${G - 36} 60 ${tip + 9}" stroke="${flower.stem}" stroke-width="5" stroke-linecap="round" fill="none"/>`;
+
+  const ll = stage >= 2
+    ? `<path d="M56 ${lY} C${(56 - L).toFixed(1)} ${(lY - L * 0.36).toFixed(1)} ${(56 - L * 1.2).toFixed(1)} ${(lY - L).toFixed(1)} ${(56 - L * 0.85).toFixed(1)} ${(lY - L * 1.72).toFixed(1)} C${(56 - L * 0.28).toFixed(1)} ${(lY - L * 1.28).toFixed(1)} ${(56 + L * 0.1).toFixed(1)} ${(lY - L * 0.58).toFixed(1)} 56 ${lY.toFixed(1)}Z" fill="${flower.leaf}" opacity="0.92"/>`
+    : "";
+  const rl = stage >= 2
+    ? `<path d="M64 ${(lY - L * 0.24).toFixed(1)} C${(64 + L).toFixed(1)} ${(lY - L * 0.6).toFixed(1)} ${(64 + L * 1.2).toFixed(1)} ${(lY - L * 1.2).toFixed(1)} ${(64 + L * 0.85).toFixed(1)} ${(lY - L * 1.96).toFixed(1)} C${(64 + L * 0.24).toFixed(1)} ${(lY - L * 1.52).toFixed(1)} ${(64 - L * 0.1).toFixed(1)} ${(lY - L * 0.82).toFixed(1)} 64 ${(lY - L * 0.24).toFixed(1)}Z" fill="${flower.leaf}" opacity="0.86"/>`
+    : "";
+
+  let bl = "";
+  if (stage < 3) {
+    bl = `<ellipse cx="60" cy="${bY + 5}" rx="3.5" ry="${4 + stage}" fill="${flower.bud}" opacity="0.74"/>`;
+  } else if (open < 0.05) {
+    bl = `
+      <path d="M52 ${bBase} C50 ${bBase - 10} 50 ${bY - 1} 60 ${bY - 17} C70 ${bY - 1} 70 ${bBase - 10} 68 ${bBase} C64 ${bBase + 4} 56 ${bBase + 4} 52 ${bBase}Z" fill="${pc}" opacity="0.92"/>
+      <path d="M56 ${bBase} C55 ${bBase - 8} 55 ${bY + 2} 60 ${bY - 13}" stroke="${lc}" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5"/>
+      <path d="M64 ${bBase} C65 ${bBase - 8} 65 ${bY + 2} 60 ${bY - 13}" stroke="${lc}" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.5"/>
+    `;
+  } else if (stage === 9) {
+    bl = `
+      <path d="M52 ${bBase + 4} C36 ${bBase - 2} 32 ${bY + 4} 42 ${bY - 10} C52 ${bY - 22} 58 ${bY - 8} 56 ${bBase}Z" fill="${pc}" opacity="0.66"/>
+      <path d="M68 ${bBase + 4} C84 ${bBase - 2} 88 ${bY + 4} 78 ${bY - 10} C68 ${bY - 22} 62 ${bY - 8} 64 ${bBase}Z" fill="${pc}" opacity="0.66"/>
+      <path d="M54 ${bBase + 6} C51 ${bBase - 4} 52 ${bY} 60 ${bY - 24} C68 ${bY} 69 ${bBase - 4} 66 ${bBase + 6} C62 ${bBase + 10} 58 ${bBase + 10} 54 ${bBase + 6}Z" fill="${lc}" opacity="0.74"/>
+      <ellipse cx="60" cy="${bBase + 1}" rx="${4 + sp * 0.15}" ry="4" fill="${flower.center}" opacity="0.58"/>
+    `;
+  } else {
+    bl = `
+      <path d="M58 ${bBase} C51 ${bBase - 5} 44 ${bY + 8} 47 ${(bY - 9 - sp).toFixed(1)} C52 ${(bY - 20 - sp * 0.7).toFixed(1)} 59 ${bY - 16} 57 ${bY - 5} C57 ${bBase - 3} 57.5 ${bBase - 1} 58 ${bBase}Z" fill="${pc}" opacity="0.76"/>
+      <path d="M62 ${bBase} C69 ${bBase - 5} 76 ${bY + 8} 73 ${(bY - 9 - sp).toFixed(1)} C68 ${(bY - 20 - sp * 0.7).toFixed(1)} 61 ${bY - 16} 63 ${bY - 5} C63 ${bBase - 3} 62.5 ${bBase - 1} 62 ${bBase}Z" fill="${pc}" opacity="0.76"/>
+      <path d="M52 ${bBase + 3} C49 ${bBase - 7} 51 ${bY + 2} 60 ${(bY - 18 - sp * 0.55).toFixed(1)} C69 ${bY + 2} 71 ${bBase - 7} 68 ${bBase + 3} C64 ${bBase + 7} 56 ${bBase + 7} 52 ${bBase + 3}Z" fill="${lc}" opacity="0.97"/>
+      <ellipse cx="60" cy="${bBase - 1}" rx="${(2.8 + sp * 0.22).toFixed(1)}" ry="3.8" fill="${flower.center}" opacity="0.8"/>
+    `;
+  }
+
+  return `${stem}${ll}${rl}${bl}`;
 }
 
 function renderSunflowerFlowerSvg(flower, stage, stageRatio) {
-  const stemTop = 116 - (stageRatio * 64);
-  const blossomY = stemTop;
-  const petals = stage >= 5
-    ? Array.from({ length: 12 + stage }, (_, index) => {
-      const angle = (360 / (12 + stage)) * index;
-      return `<ellipse cx="60" cy="${blossomY - 20}" rx="${5 + stageRatio * 1.6}" ry="${12 + stageRatio * 3}" fill="${flower.petal}" transform="rotate(${angle} 60 ${blossomY})"></ellipse>`;
-    }).join("")
+  const G = 122;
+  const tip = G - 4 - stageRatio * 70;
+  const bY = tip;
+  const h = G - tip;
+  const lY = tip + h * 0.52;
+  const lS = 0.35 + stageRatio * 0.65;
+  const L = 24 * lS;
+
+  if (stage === 0) {
+    return `<ellipse cx="60" cy="${G - 3}" rx="8" ry="5.5" fill="${flower.bud}" opacity="0.65"/>`;
+  }
+
+  const stem = `<path d="M60 ${G} C60 ${G - 20} 59.5 ${G - 42} 60 ${tip + 10}" stroke="${flower.stem}" stroke-width="5.4" stroke-linecap="round" fill="none"/>`;
+
+  const ll = stage >= 2
+    ? `<path d="M58 ${lY} C${(58 - L).toFixed(1)} ${(lY - L * 0.4).toFixed(1)} ${(58 - L * 1.3).toFixed(1)} ${(lY - L * 0.9).toFixed(1)} ${(58 - L).toFixed(1)} ${(lY - L * 1.8).toFixed(1)} C${(58 - L * 0.3).toFixed(1)} ${(lY - L * 1.4).toFixed(1)} ${(58 + L * 0.1).toFixed(1)} ${(lY - L * 0.7).toFixed(1)} 58 ${lY.toFixed(1)}Z" fill="${flower.leaf}" opacity="0.9"/>`
+    : "";
+  const rl = stage >= 3
+    ? `<path d="M62 ${(lY - L * 0.3).toFixed(1)} C${(62 + L).toFixed(1)} ${(lY - L * 0.7).toFixed(1)} ${(62 + L * 1.3).toFixed(1)} ${(lY - L * 1.2).toFixed(1)} ${(62 + L).toFixed(1)} ${(lY - L * 2.1).toFixed(1)} C${(62 + L * 0.2).toFixed(1)} ${(lY - L * 1.6).toFixed(1)} ${(62 - L * 0.1).toFixed(1)} ${(lY - L * 0.8).toFixed(1)} 62 ${(lY - L * 0.3).toFixed(1)}Z" fill="${flower.leaf}" opacity="0.84"/>`
     : "";
 
-  return `
-    ${stage >= 1 ? `<path d="M60 120C60 108 60 85 60 ${stemTop + 10}" fill="none" stroke="${flower.stem}" stroke-width="5.6" stroke-linecap="round"></path>` : ""}
-    ${stage >= 2 ? `<path d="M60 96C47 86 43 78 40 63C51 69 57 77 61 90" fill="${flower.leaf}" opacity="0.9"></path>` : ""}
-    ${stage >= 3 ? `<path d="M60 86C74 79 79 71 84 56C73 61 66 70 59 80" fill="${flower.leaf}" opacity="0.84"></path>` : ""}
-    ${petals}
-    <circle cx="60" cy="${stage >= 3 ? blossomY : 112}" r="${stage >= 3 ? 7 + stage * 1.45 : 5}" fill="${stage >= 5 ? flower.center : flower.bud}" stroke="${flower.petalLight}" stroke-width="${stage >= 6 ? "1.6" : "0.8"}"></circle>
-  `;
+  let blossom = "";
+  if (stage < 3) {
+    const r = 4 + stage * 2;
+    blossom = `<circle cx="60" cy="${bY + 5}" r="${r}" fill="${flower.bud}" opacity="0.88"/>`;
+  } else {
+    const petalCount = Math.round(8 + stage * 1.3);
+    const centerR = 6 + stage * 1.6;
+    const petalL = stage >= 5 ? 18 + stageRatio * 5 : 8 + stage * 2;
+    const petalW = stage >= 5 ? 5.5 + stageRatio * 1.2 : 3 + stage * 0.5;
+    const innerR = centerR + 3;
+
+    const petals = stage >= 4
+      ? Array.from({ length: petalCount }, (_, i) => {
+        const angle = (360 / petalCount) * i + (i % 2 === 0 ? 0 : 180 / petalCount);
+        const op = 0.82 + (i % 3 === 0 ? 0.1 : 0);
+        return `<ellipse cx="60" cy="${(bY - innerR - petalL * 0.5).toFixed(1)}" rx="${petalW.toFixed(1)}" ry="${petalL.toFixed(1)}" fill="${flower.petal}" transform="rotate(${angle.toFixed(1)} 60 ${bY.toFixed(1)})" opacity="${op}"/>`;
+      }).join("")
+      : "";
+
+    const darkRingOp = stage >= 5 ? "0.28" : "0";
+    const lightR = centerR * 0.38;
+    blossom = `
+      ${petals}
+      <circle cx="60" cy="${bY.toFixed(1)}" r="${(centerR + 1.5).toFixed(1)}" fill="${flower.center}" opacity="0.32"/>
+      <circle cx="60" cy="${bY.toFixed(1)}" r="${centerR.toFixed(1)}" fill="${flower.center}"/>
+      <circle cx="${(60 - centerR * 0.28).toFixed(1)}" cy="${(bY - centerR * 0.22).toFixed(1)}" r="${lightR.toFixed(1)}" fill="${flower.petalLight}" opacity="0.28"/>
+      <circle cx="${(60 + centerR * 0.32).toFixed(1)}" cy="${(bY + centerR * 0.18).toFixed(1)}" r="${(lightR * 0.72).toFixed(1)}" fill="${flower.petalLight}" opacity="0.2"/>
+    `;
+  }
+
+  return `${stem}${ll}${rl}${blossom}`;
 }
 
 function renderLavenderFlowerSvg(flower, stage, stageRatio) {
-  const stemTop = 118 - (stageRatio * 58);
-  const blossomStart = stemTop - 4;
-  const blossomCount = Math.max(0, stage);
-  const florets = Array.from({ length: blossomCount }, (_, index) => {
-    const y = blossomStart + (index * 5.2);
-    const offset = index % 2 === 0 ? -6 : 6;
-    return `
-      <ellipse cx="${60 + offset}" cy="${y}" rx="${4.4 - Math.min(index * 0.12, 1.6)}" ry="3.8" fill="${stage >= 5 ? flower.petal : flower.bud}" opacity="${0.56 + (index / blossomCount) * 0.4}"></ellipse>
-      <ellipse cx="60" cy="${y + 1}" rx="${4.2 - Math.min(index * 0.14, 1.8)}" ry="3.6" fill="${flower.petalLight}" opacity="${stage >= 6 ? "0.72" : "0.38"}"></ellipse>
-    `;
-  }).join("");
+  const G = 122;
+  const tip = G - 6 - stageRatio * 62;
+  const bY = tip;
+  const h = G - tip;
+  const lY = tip + h * 0.58;
+  const lS = 0.3 + stageRatio * 0.7;
+  const L = 20 * lS;
 
-  return `
-    ${stage >= 1 ? `<path d="M60 120C60 110 60 86 60 ${stemTop + 18}" fill="none" stroke="${flower.stem}" stroke-width="4.6" stroke-linecap="round"></path>` : ""}
-    ${stage >= 2 ? `<path d="M58 104C45 95 42 88 38 76C49 79 55 88 60 98" fill="${flower.leaf}" opacity="0.88"></path>` : ""}
-    ${stage >= 3 ? `<path d="M62 96C75 89 79 82 82 70C72 74 67 81 61 90" fill="${flower.leaf}" opacity="0.8"></path>` : ""}
-    ${florets}
-    ${stage === 0 ? `<ellipse cx="60" cy="113" rx="5.2" ry="3.6" fill="${flower.center}" opacity="0.78"></ellipse>` : ""}
-  `;
+  if (stage === 0) {
+    return `<ellipse cx="60" cy="${G - 3}" rx="7" ry="5" fill="${flower.bud}" opacity="0.62"/>`;
+  }
+
+  const stem = `<path d="M60 ${G} C60 ${G - 16} 60 ${G - 38} 60 ${tip + 8}" stroke="${flower.stem}" stroke-width="4.5" stroke-linecap="round" fill="none"/>`;
+
+  const ll = stage >= 2
+    ? `<path d="M59 ${lY} C${(59 - L).toFixed(1)} ${(lY - L * 0.5).toFixed(1)} ${(59 - L * 1.2).toFixed(1)} ${(lY - L * 1.1).toFixed(1)} ${(59 - L * 0.8).toFixed(1)} ${(lY - L * 1.8).toFixed(1)} C${(59 - L * 0.2).toFixed(1)} ${(lY - L * 1.3).toFixed(1)} ${(59 + L * 0.15).toFixed(1)} ${(lY - L * 0.6).toFixed(1)} 59 ${lY.toFixed(1)}Z" fill="${flower.leaf}" opacity="0.88"/>`
+    : "";
+  const rl = stage >= 2
+    ? `<path d="M61 ${(lY - L * 0.2).toFixed(1)} C${(61 + L).toFixed(1)} ${(lY - L * 0.7).toFixed(1)} ${(61 + L * 1.2).toFixed(1)} ${(lY - L * 1.3).toFixed(1)} ${(61 + L * 0.8).toFixed(1)} ${(lY - L * 2.0).toFixed(1)} C${(61 + L * 0.1).toFixed(1)} ${(lY - L * 1.5).toFixed(1)} ${(61 - L * 0.1).toFixed(1)} ${(lY - L * 0.8).toFixed(1)} 61 ${(lY - L * 0.2).toFixed(1)}Z" fill="${flower.leaf}" opacity="0.82"/>`
+    : "";
+
+  let spike = "";
+  if (stage >= 1) {
+    const floretCount = Math.min(stage + 1, 10);
+    const spikeBottom = bY + 14;
+    const spikeTop = bY - 6;
+    const spikeH = spikeBottom - spikeTop;
+    const color = stage >= 5 ? flower.petal : flower.bud;
+
+    spike = Array.from({ length: floretCount }, (_, i) => {
+      const t = i / Math.max(floretCount - 1, 1);
+      const fy = (spikeBottom - t * spikeH).toFixed(1);
+      const fw = (4.4 - t * 1.6).toFixed(1);
+      const fh = (3.8 - t * 1.1).toFixed(1);
+      const offsetX = (i % 2 === 0 ? -5.8 : 5.8) * (1 - t * 0.28);
+      const op = (0.52 + (1 - t) * 0.44).toFixed(2);
+      const lop = stage >= 6 ? (0.5 - t * 0.28).toFixed(2) : "0";
+
+      return `
+        <ellipse cx="${(60 + offsetX).toFixed(1)}" cy="${fy}" rx="${fw}" ry="${fh}" fill="${color}" opacity="${op}"/>
+        ${stage >= 5 ? `<ellipse cx="60" cy="${(Number(fy) - 1.5).toFixed(1)}" rx="${(Number(fw) * 0.72).toFixed(1)}" ry="${(Number(fh) * 0.62).toFixed(1)}" fill="${flower.petalLight}" opacity="${lop}"/>` : ""}
+      `;
+    }).join("");
+  }
+
+  return `${stem}${ll}${rl}${spike}`;
 }
 
 function renderStackedLogParts(parts) {
@@ -2665,8 +3257,20 @@ function renderSessionSheet() {
           ui.finishDraft
             ? `
               <div class="panel panel--cool stack">
-                <p class="sheet__timer">${formatLoggedDuration(ui.finishDraft.elapsedSeconds)}</p>
-                <p class="sheet__caption">実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}</p>
+                <div class="elapsed-timer-wrap">
+                  <input
+                    id="elapsed-input-field"
+                    class="elapsed-timer-input${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? " is-edited" : ""}"
+                    type="text"
+                    inputmode="decimal"
+                    autocomplete="off"
+                    data-finish-field="elapsedInput"
+                    placeholder="H:MM"
+                    value="${escapeHtml(formatElapsedForInput(ui.finishDraft.elapsedSeconds))}"
+                  />
+                  <span class="elapsed-timer-unit">${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : ""}</span>
+                </div>
+                <p class="sheet__caption">実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">⏱ タップして時間を修正（例: 1:30 または 分数）</span></p>
               </div>
               <div class="panel stack">
                 <h3 class="panel__title">記録の仕上げ</h3>
@@ -2733,6 +3337,7 @@ function openFinishDraft(planKey) {
   ui.finishDraft = {
     outcome: planKey,
     elapsedSeconds,
+    _originalElapsed: elapsedSeconds,
     plannedSeconds: state.plans[planKey].minutes * 60,
     progressText: "",
     reflection: "",
@@ -3584,6 +4189,8 @@ function buildNewGoalDraft(setup) {
     deadline: toISODate(addDays(new Date(), 90)),
     currentLevel: "",
     flowerType: base.flowerType || normalizeFlowerType("", base),
+    goalType: "goal",
+    bonsaiKey: "pine",
   };
 
   return {
@@ -3603,6 +4210,8 @@ function expandSetup(setup) {
     currentLevel: setup.currentLevel,
     studyDays: normalizeStudyDays(setup.studyDays),
     flowerType: normalizeFlowerType(setup.flowerType, setup),
+    goalType: setup.goalType === "habit" ? "habit" : "goal",
+    bonsaiKey: BONSAI_LIBRARY[setup.bonsaiKey] ? setup.bonsaiKey : "pine",
     studyMode: setup.studyMode,
     primaryStart: primary.start,
     primaryEnd: primary.end,
@@ -3709,6 +4318,8 @@ function commitSetupDraft() {
     currentLevel: "",
     studyDays: normalizeStudyDays(draft.studyDays),
     flowerType: normalizeFlowerType(draft.flowerType, draft),
+    goalType: draft.goalType === "habit" ? "habit" : "goal",
+    bonsaiKey: BONSAI_LIBRARY[draft.bonsaiKey] ? draft.bonsaiKey : "pine",
     studyMode: draft.studyMode || "flex",
     primaryWindow,
     backupWindow: primaryWindow,
@@ -3716,15 +4327,18 @@ function commitSetupDraft() {
     normalMinutes: minutes.normalMinutes,
     shortMinutes: minutes.shortMinutes,
     minimumMinutes: minutes.minimumMinutes,
-    minimumExample: draft.minimumExample.trim() || state.setup.minimumExample,
+    minimumExample: (draft.minimumExample || "").trim() || state.setup.minimumExample,
   };
 
   if (ui.setupMode === "new_goal") {
     syncActiveGoalRecord();
-    const nextRoadmap = preserveRoadmapForSetupEdit(
-      Array.isArray(draft.roadmap) ? draft.roadmap : buildInitialRoadmap(nextSetup),
-      nextSetup,
-    );
+    const isHabitSetup = nextSetup.goalType === "habit";
+    const nextRoadmap = isHabitSetup
+      ? []
+      : preserveRoadmapForSetupEdit(
+          Array.isArray(draft.roadmap) ? draft.roadmap : buildInitialRoadmap(nextSetup),
+          nextSetup,
+        );
     const newGoal = createGoalRecord({
       setup: nextSetup,
       roadmap: nextRoadmap,
@@ -3745,9 +4359,14 @@ function commitSetupDraft() {
   }
 
   const isFreshStart = state.meta.demoMode;
+  const isHabitEdit = nextSetup.goalType === "habit";
   state.setup = nextSetup;
-  state.roadmap = isFreshStart ? buildInitialRoadmap(nextSetup) : preserveRoadmapForSetupEdit(state.roadmap, nextSetup);
-  state.today = buildToday(nextSetup, state.roadmap);
+  state.roadmap = isHabitEdit
+    ? []
+    : (isFreshStart ? buildInitialRoadmap(nextSetup) : preserveRoadmapForSetupEdit(state.roadmap, nextSetup));
+  state.today = isHabitEdit
+    ? { missionTitle: nextSetup.goal, missionNote: "", recommendedPlan: "A", lastOutcome: null, lastRecordedAt: null }
+    : buildToday(nextSetup, state.roadmap);
   state.plans = buildPlans(nextSetup, state.today.missionTitle);
   state.meta.currentView = "setup";
 
@@ -3992,6 +4611,41 @@ function saveState() {
   localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
 }
 
+function exportData() {
+  syncActiveGoalRecord();
+  const dataStr = JSON.stringify(state, null, 2);
+  const blob = new Blob([dataStr], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `streakgarden-backup-${toISODate(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("データをエクスポートしました。");
+}
+
+function importData(file) {
+  if (!file) {
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      state = mergeState(parsed);
+      ensureGoalCollection();
+      saveState();
+      render();
+      showToast("データを復元しました。");
+    } catch (_err) {
+      showToast("ファイルの読み込みに失敗しました。");
+    }
+  };
+  reader.readAsText(file);
+}
+
 function restartTickers() {
   startClock();
   startSessionTicker();
@@ -4081,6 +4735,30 @@ function resolveWorkingMilestoneProgress(target, roadmapItems) {
   }
 
   return clamp(Math.max(1, Math.round(target * 0.6)), 0, 100);
+}
+
+function formatElapsedForInput(totalSeconds) {
+  const s = Math.max(0, Math.round(totalSeconds || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return `${h}:${String(m).padStart(2, "0")}`;
+}
+
+function parseElapsedInput(str) {
+  const t = (str || "").trim();
+  // "H:MM" or "HH:MM" format
+  const colonMatch = t.match(/^(\d{1,3}):(\d{1,2})$/);
+  if (colonMatch) {
+    const h = parseInt(colonMatch[1], 10);
+    const m = parseInt(colonMatch[2], 10);
+    if (m < 60) return h * 3600 + m * 60;
+  }
+  // Plain number → treated as minutes
+  const numMatch = t.match(/^(\d{1,4})$/);
+  if (numMatch) {
+    return parseInt(numMatch[1], 10) * 60;
+  }
+  return null;
 }
 
 function formatLoggedDuration(totalSeconds) {
