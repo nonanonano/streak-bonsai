@@ -135,6 +135,7 @@ let ui = {
   setupMode: "edit",
   setupSection: "goal",
   goalLibraryDraft: null,
+  deleteConfirmGoalId: null,
   roadmapDraft: null,
   reviewLogDraft: null,
   reviewLogExpanded: false,
@@ -438,6 +439,8 @@ function createGoalRecord(config = {}) {
     replan: { ...buildInitialReplan(), ...(config.replan || {}) },
     logs: normalizeLogs(config.logs),
     activeSession: config.activeSession ? cloneData(config.activeSession) : null,
+    archived: config.archived || false,
+    archivedAt: config.archivedAt || null,
   };
 }
 
@@ -455,6 +458,9 @@ function applyGoalRecord(goalRecord) {
 }
 
 function captureActiveGoalRecord(goalId = state.meta.activeGoalId) {
+  const existing = Array.isArray(state.goals)
+    ? state.goals.find((g) => g.id === goalId)
+    : null;
   return createGoalRecord({
     id: goalId,
     programStartDate: state.programStartDate,
@@ -466,6 +472,8 @@ function captureActiveGoalRecord(goalId = state.meta.activeGoalId) {
     replan: state.replan,
     logs: state.logs,
     activeSession: state.activeSession,
+    archived: existing ? existing.archived : false,
+    archivedAt: existing ? existing.archivedAt : null,
   });
 }
 
@@ -528,15 +536,18 @@ function syncActiveGoalRecord() {
 
 function listGoals() {
   ensureGoalCollection();
-  return [...state.goals].sort((left, right) => {
-    if (left.id === state.meta.activeGoalId) {
-      return -1;
-    }
-    if (right.id === state.meta.activeGoalId) {
-      return 1;
-    }
+  return [...state.goals].filter(g => !g.archived).sort((left, right) => {
+    if (left.id === state.meta.activeGoalId) return -1;
+    if (right.id === state.meta.activeGoalId) return 1;
     return 0;
   });
+}
+
+function listArchivedGoals() {
+  ensureGoalCollection();
+  return [...state.goals]
+    .filter(g => g.archived)
+    .sort((a, b) => (b.archivedAt || "").localeCompare(a.archivedAt || ""));
 }
 
 function compareGoalsByPrimaryWindow(left, right) {
@@ -725,6 +736,69 @@ function handleClick(event) {
       render();
       showToast("表示する目標を切り替えました。");
     }
+    return;
+  }
+
+  // アルバムへ移動（データ保持したまま非表示）
+  if (action === "archive-goal") {
+    const goalId = target.dataset.goalId;
+    ensureGoalCollection();
+    const goal = state.goals.find(g => g.id === goalId);
+    if (!goal) return;
+    goal.archived = true;
+    goal.archivedAt = toISODate(new Date());
+    // アーカイブ対象がアクティブ目標なら別の目標へ切り替え
+    if (goalId === state.meta.activeGoalId) {
+      const next = state.goals.find(g => !g.archived && g.id !== goalId);
+      if (next) { applyGoalRecord(next); state.meta.activeGoalId = next.id; }
+    }
+    ui.goalLibraryDraft = null;
+    ui.deleteConfirmGoalId = null;
+    saveState();
+    render();
+    showToast("アルバムに保存しました。");
+    return;
+  }
+
+  // 完全消去の確認ステップ
+  if (action === "confirm-delete-goal") {
+    ui.deleteConfirmGoalId = target.dataset.goalId;
+    render();
+    return;
+  }
+
+  if (action === "cancel-delete-goal") {
+    ui.deleteConfirmGoalId = null;
+    render();
+    return;
+  }
+
+  // 完全消去（確認後）
+  if (action === "delete-goal") {
+    const goalId = target.dataset.goalId;
+    ensureGoalCollection();
+    if (goalId === state.meta.activeGoalId) {
+      const next = state.goals.find(g => !g.archived && g.id !== goalId);
+      if (next) { applyGoalRecord(next); state.meta.activeGoalId = next.id; }
+    }
+    state.goals = state.goals.filter(g => g.id !== goalId);
+    ui.goalLibraryDraft = null;
+    ui.deleteConfirmGoalId = null;
+    saveState();
+    render();
+    showToast("目標を完全に削除しました。");
+    return;
+  }
+
+  // アルバムから完全消去
+  if (action === "purge-archived-goal") {
+    const goalId = target.dataset.goalId;
+    ensureGoalCollection();
+    state.goals = state.goals.filter(g => g.id !== goalId);
+    ui.deleteConfirmGoalId = null;
+    saveState();
+    render();
+    showToast("アルバムから削除しました。");
     return;
   }
 
@@ -1753,13 +1827,23 @@ function renderGoalLibrary() {
                     </div>
                   </div>
                 `
-                : `
-                  <p class="goal-library-card__meta">${escapeHtml(meta)}</p>
-                  ${isActive ? `<p class="goal-library-card__note">${escapeHtml(isGoalScheduledForDate(goal) ? "この目標は今日の Today に出ます。" : "今日は表示対象外です。")}</p>` : ""}
-                  <div class="goal-library-card__actions">
-                    <button type="button" class="soft-button goal-library-card__action" data-action="start-goal-library-edit" data-goal-id="${goal.id}">編集</button>
-                  </div>
-                `}
+                : ui.deleteConfirmGoalId === goal.id
+                  ? `
+                    <p class="goal-library-card__delete-warn">⚠️ この目標を完全消去しますか？元に戻せません。</p>
+                    <div class="goal-library-card__actions">
+                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="delete-goal" data-goal-id="${goal.id}">完全消去する</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="cancel-delete-goal">やめる</button>
+                    </div>
+                  `
+                  : `
+                    <p class="goal-library-card__meta">${escapeHtml(meta)}</p>
+                    ${isActive ? `<p class="goal-library-card__note">${escapeHtml(isGoalScheduledForDate(goal) ? "この目標は今日の Today に出ます。" : "今日は表示対象外です。")}</p>` : ""}
+                    <div class="goal-library-card__actions">
+                      <button type="button" class="soft-button goal-library-card__action" data-action="start-goal-library-edit" data-goal-id="${goal.id}">編集</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="archive-goal" data-goal-id="${goal.id}">アルバムへ</button>
+                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="confirm-delete-goal" data-goal-id="${goal.id}">完全消去</button>
+                    </div>
+                  `}
             </article>
           `;
         }).join("")}
@@ -2536,6 +2620,58 @@ function renderGardenView() {
       ${habitGoals.length ? renderGardenShelfSection("育てている盆栽", "習慣タイプの目標です。毎日のチェックインで成長します。", habitGoals, { emptyCopy: "まだ習慣はありません。" }) : ""}
       ${renderGardenShelfSection("今育てている花", "進行中の目標をまとめています。", growingGoals, { emptyCopy: "まだ育成中の花はありません。" })}
       ${renderAchievementGardenSection("目標達成した花", "達成した花はこの庭に植えて、咲いた記録を残していきます。", archivedGoals, { emptyCopy: "まだ達成した花はありません。" })}
+      ${renderAlbumSection()}
+    </section>
+  `;
+}
+
+function renderAlbumSection() {
+  const goals = listArchivedGoals();
+  if (!goals.length) return "";
+  const cards = goals.map(goal => {
+    const isHabit = goal.setup && goal.setup.goalType === "habit";
+    const isConfirm = ui.deleteConfirmGoalId === goal.id;
+    let artwork = "";
+    let subtitle = "";
+    if (isHabit) {
+      const growth = getBonsaiGrowth(goal.logs || []);
+      const health = getBonsaiHealth(goal.logs || [], goal.setup.studyDays);
+      artwork = renderBonsaiArtwork(goal.setup.bonsaiKey || "pine", growth.stageIndex, health, { size: "card" });
+      subtitle = `${getBonsaiTypeMeta(goal.setup.bonsaiKey).label} / ${growth.stageIndex}段階 / ${growth.executedDays}日間`;
+    } else {
+      const growth = getFlowerGrowth(goal.logs || []);
+      const flower = getGoalFlowerState(goal);
+      artwork = renderFlowerArtwork(flower.key, growth.stageIndex, { size: "card" });
+      subtitle = `${flower.label} / ${growth.stageLabel} / ${growth.executedDays}日間`;
+    }
+    const archivedDate = goal.archivedAt ? goal.archivedAt.replace(/-/g, ".") : "";
+    return `
+      <div class="album-card">
+        <div class="album-card__art">${artwork}</div>
+        <div class="album-card__body">
+          <p class="album-card__name">${escapeHtml(goal.setup.goal)}</p>
+          <p class="album-card__sub">${escapeHtml(subtitle)}</p>
+          ${archivedDate ? `<p class="album-card__date">${archivedDate} 保存</p>` : ""}
+          ${isConfirm
+            ? `<p class="album-card__warn">⚠️ 完全消去しますか？元に戻せません。</p>
+               <div class="album-card__actions">
+                 <button class="soft-button" data-action="purge-archived-goal" data-goal-id="${goal.id}">消去する</button>
+                 <button class="soft-button" data-action="cancel-delete-goal">やめる</button>
+               </div>`
+            : `<div class="album-card__actions">
+                 <button class="soft-button album-card__delete" data-action="confirm-delete-goal" data-goal-id="${goal.id}">完全消去</button>
+               </div>`}
+        </div>
+      </div>
+    `;
+  }).join("");
+  return `
+    <section class="panel stack garden-album">
+      <div>
+        <h2 class="section-title">アルバム</h2>
+        <p class="section-copy">アルバムへ移動した目標です。記録はここで見返せます。</p>
+      </div>
+      <div class="album-list">${cards}</div>
     </section>
   `;
 }
