@@ -346,6 +346,27 @@ function getBonsaiHealth(logs, studyDays) {
   return scheduled > 0 ? Math.round((completed / scheduled) * 100) : 100;
 }
 
+// 直近7回の実施予定日を●○ドットで返す（説明不要の一目瞭然UI）
+function renderStreakDots(logs, studyDays) {
+  const days = normalizeStudyDays(studyDays);
+  const today = new Date();
+  const slots = [];
+  for (let i = 0; i < 14 && slots.length < 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const dayKey = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
+    if (!days.includes(dayKey)) continue;
+    const ds = toISODate(d);
+    const log = (Array.isArray(logs) ? logs : []).find(l => l.date === ds);
+    const done = Boolean(log && log.outcome !== "miss" && log.outcome !== "none");
+    slots.unshift({ done, isToday: i === 0 });
+  }
+  // 7個未満なら左を薄いドットで埋める
+  while (slots.length < 7) slots.unshift({ done: false, isToday: false, filler: true });
+  return `<span class="streak-dots">${slots.map(s =>
+    `<span class="streak-dot${s.done ? " is-done" : ""}${s.isToday ? " is-today" : ""}${s.filler ? " is-filler" : ""}"></span>`
+  ).join("")}</span>`;
+}
+
 function createGoalId() {
   return `goal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -1824,11 +1845,7 @@ function renderTodayHabitCard(goal, index) {
         </div>
       </div>
       <div class="bonsai-health-row">
-        <span>直近の健康度</span>
-        <div class="bonsai-health-bar">
-          <div class="bonsai-health-fill" style="width:${health}%"></div>
-        </div>
-        <span>${health}%</span>
+        ${renderStreakDots(goal.logs || [], goal.setup.studyDays)}
       </div>
       <button
         type="button"
@@ -2356,7 +2373,7 @@ function renderReviewPotCard(goal) {
   const todayLog = getGoalLogByDate(goal, toISODate(new Date()));
   const missionState = getGoalMissionStateForDate(goal);
   const statusCopy = isHabit
-    ? `${bonsaiMeta.label} / ${bonsaiGrowth.stageLabel} / 健康度 ${bonsaiHealth}%`
+    ? `${bonsaiMeta.label} / ${bonsaiGrowth.stageLabel}`
     : (missionState.isClosed && todayLog
       ? buildLogSummary(todayLog)
       : `${flower.label} / ${flower.stageLabel}`);
@@ -2400,8 +2417,8 @@ function renderReviewPotCard(goal) {
             <strong>${escapeHtml(`${isHabit ? bonsaiGrowth.executedDays : flower.executedDays}日`)}</strong>
           </div>
           <div class="review-pot-card__fact">
-            <span>${isHabit ? "健康度" : "全体進捗"}</span>
-            <strong>${escapeHtml(isHabit ? `${bonsaiHealth}%` : `${roadmap.learningProgress}%`)}</strong>
+            <span>${isHabit ? "直近7回" : "全体進捗"}</span>
+            <strong>${isHabit ? renderStreakDots(goal.logs || [], goal.setup.studyDays) : escapeHtml(`${roadmap.learningProgress}%`)}</strong>
           </div>
         </div>
       </div>
@@ -2571,7 +2588,7 @@ function renderGardenShelfCard(goal, options = {}) {
             <span class="status-badge">習慣</span>
           </div>
           <p class="garden-card__meta">${escapeHtml(`${bonsaiMeta.label} / ${growth.stageLabel}`)}</p>
-          <p class="garden-card__meta">${escapeHtml(`継続 ${growth.executedDays}日 / 健康度 ${health}%`)}</p>
+          <div class="garden-card__streak">${escapeHtml(`継続 ${growth.executedDays}日`)}&ensp;${renderStreakDots(goal.logs || [], goal.setup.studyDays)}</div>
         </div>
       </div>
     `;

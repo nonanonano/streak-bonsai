@@ -3311,25 +3311,47 @@ button {
 .bonsai-health-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.82rem;
-  color: var(--muted);
   margin-bottom: 10px;
 }
 
-.bonsai-health-bar {
-  flex: 1;
-  height: 5px;
-  border-radius: 999px;
-  background: rgba(34, 32, 29, 0.08);
-  overflow: hidden;
+/* ストリークドット */
+.streak-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.bonsai-health-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #4e7a65, #78b898);
-  transition: width 0.5s ease;
+.streak-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+}
+
+.streak-dot.is-done {
+  background: rgba(100, 210, 150, 0.85);
+  box-shadow: 0 0 5px rgba(100, 210, 150, 0.4);
+}
+
+.streak-dot.is-today {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 1px;
+}
+
+.streak-dot.is-filler {
+  opacity: 0.25;
+}
+
+/* Review / Garden でインラインで使う場合 */
+.garden-card__streak {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 4px 0;
 }
 
 .focus-launch--habit {
