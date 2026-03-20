@@ -1962,12 +1962,6 @@ function renderTodayHabitCard(goal, index) {
       <div class="bonsai-health-row">
         ${renderStreakDots(goal.logs || [], goal.setup.studyDays)}
       </div>
-      <button
-        type="button"
-        class="habit-checkin-btn ${isDone ? "is-done" : ""}"
-        data-action="${isDone ? "habit-undo-checkin" : "habit-checkin"}"
-        data-goal-id="${goal.id}"
-      >${isDone ? "✓ 今日は完了！" : "今日もやった！"}</button>
     </section>
   `;
 }
