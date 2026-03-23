@@ -569,10 +569,15 @@ function listGoalsByPrimaryWindow() {
 }
 
 function listGoalsForToday(date = new Date()) {
+  const dateStr = toISODate(date);
   return listGoals()
     .filter((goal) => isGoalScheduledForDate(goal, date))
     .filter((goal) => {
-      if (goal.setup && goal.setup.goalType === "habit") return true;
+      if (goal.setup && goal.setup.goalType === "habit") {
+        // Hide habit if already completed today
+        const todayLog = (goal.logs || []).find(l => l.date === dateStr);
+        return !(todayLog && todayLog.outcome !== "miss" && todayLog.outcome !== "none");
+      }
       return !getGoalMissionStateForDate(goal, date).isClosed;
     });
 }

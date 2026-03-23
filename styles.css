@@ -3244,6 +3244,20 @@ button {
     color: var(--muted);
   }
 
+  /* Sheet panel stays light in dark mode — force dark text on its inputs */
+  .sheet__panel input,
+  .sheet__panel textarea,
+  .sheet__panel select {
+    background: rgba(34, 32, 29, 0.07);
+    color: #2c2820;
+    border-color: rgba(34, 32, 29, 0.15);
+  }
+
+  .sheet__panel input::placeholder,
+  .sheet__panel textarea::placeholder {
+    color: #7e7265;
+  }
+
   .ghost-button,
   .action-button,
   .soft-button,
