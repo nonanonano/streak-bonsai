@@ -146,6 +146,7 @@ let ui = {
   toastTimer: null,
   clockTimer: null,
   sessionTimer: null,
+  focusPausedAt: null,
 };
 
 init();
@@ -634,8 +635,22 @@ function bindEvents() {
   document.addEventListener("input", handleInput);
   document.addEventListener("keydown", handleKeydown);
   document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      pauseFocusSession();
+    } else if (state.activeSession && !ui.finishDraft) {
+      resumeFocusSession();
+    }
+  });
+
+  window.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (!document.hidden) pauseFocusSession();
+    }, 200);
+  });
+
+  window.addEventListener("focus", () => {
     if (!document.hidden && state.activeSession && !ui.finishDraft) {
-      startSessionTicker();
+      resumeFocusSession();
     }
   });
 }
@@ -3809,7 +3824,8 @@ function renderSessionSheet() {
             `
             : `
               <div class="panel panel--cool">
-                <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : formatCountdown(remaining)}</p>
+                <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : (ui.focusPausedAt ? "⏸" : formatCountdown(remaining))}</p>
+                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession.departures}回<\/p>` : ""}
               </div>
             `
         }
@@ -3875,12 +3891,53 @@ function saveFinishDraft() {
   saveState();
 }
 
+function pauseFocusSession() {
+  if (!state.activeSession || ui.finishDraft || ui.focusPausedAt) return;
+  ui.focusPausedAt = Date.now();
+  state.activeSession.departures = (state.activeSession.departures || 0) + 1;
+  if (ui.sessionTimer) { window.clearInterval(ui.sessionTimer); ui.sessionTimer = null; }
+  showFocusLostOverlay();
+  saveState();
+  render();
+}
+
+function resumeFocusSession() {
+  if (!state.activeSession || ui.finishDraft || !ui.focusPausedAt) return;
+  const pauseDuration = Date.now() - ui.focusPausedAt;
+  state.activeSession.endsAt += pauseDuration;
+  ui.focusPausedAt = null;
+  hideFocusLostOverlay();
+  const d = state.activeSession.departures || 0;
+  showToast(`作業再開！ 離脱: ${d}回`);
+  startSessionTicker();
+  saveState();
+  render();
+}
+
+function showFocusLostOverlay() {
+  let overlay = document.getElementById("focus-lost-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "focus-lost-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;z-index:9998;background:rgba(20,16,10,0.82);backdrop-filter:blur(4px);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;gap:14px";
+    overlay.innerHTML = '<div style="font-size:2.8rem">⏸<\/div><p style="font-size:1.1rem;font-weight:700;margin:0">タイマーを一時停止しました<\/p><p style="font-size:0.88rem;opacity:0.75;margin:0">このタブに戻ると再開します<\/p>';
+    document.body.appendChild(overlay);
+  }
+  overlay.hidden = false;
+}
+
+function hideFocusLostOverlay() {
+  const overlay = document.getElementById("focus-lost-overlay");
+  if (overlay) overlay.hidden = true;
+}
+
 function beginSession(planKey) {
   const now = Date.now();
   state.activeSession = {
     planKey,
     startedAt: now,
     endsAt: now + state.plans[planKey].minutes * 60 * 1000,
+    departures: 0,
   };
   ui.selectedSessionPlan = planKey;
   ui.finishDraft = null;
@@ -5181,6 +5238,7 @@ function startClock() {
 }
 
 function startSessionTicker() {
+  if (ui.focusPausedAt) return;
   // Already running correctly — don't reset the interval
   if (ui.sessionTimer && state.activeSession && !ui.finishDraft) {
     return;
