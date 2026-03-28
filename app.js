@@ -1,3 +1,10 @@
+// =========================================================
+// SUPABASE 設定
+// =========================================================
+const SUPABASE_URL = "https://kyzyyciutnkhaxadwdlx.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_8BS-Guu8UUfb3sEHRfHGRg_vTvB0FyB";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 ﻿const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -5663,6 +5670,243 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+// =========================================================
+// SUPABASE AUTH & SYNC
+// =========================================================
+
+let _appInitialized = false;
+let _syncTimer = null;
+
+// ── Supabase ↔ ローカル同期 ──────────────────────────────
+
+async function loadStateFromSupabase(userId) {
+  try {
+    const { data, error } = await sb
+      .from("user_data")
+      .select("state")
+      .eq("user_id", userId)
+      .single();
+    if (error && error.code !== "PGRST116") {
+      console.warn("Supabase load error:", error);
+      return;
+    }
+    if (data?.state && Object.keys(data.state).length > 0) {
+      state = mergeState(buildSeedState(), data.state);
+      localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+    }
+  } catch (err) {
+    console.warn("Supabase load error:", err);
+  }
+}
+
+async function pushStateToSupabase() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  syncActiveGoalRecord();
+  try {
+    await sb.from("user_data").upsert(
+      { user_id: user.id, state: JSON.parse(JSON.stringify(state)) },
+      { onConflict: "user_id" }
+    );
+  } catch (err) {
+    console.warn("Supabase sync error:", err);
+  }
+}
+
+function scheduleSyncToSupabase() {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(pushStateToSupabase, 2000);
+}
+// ── Auth UI ──────────────────────────────────────────────
+
+const _authOverlay = document.querySelector("#auth-overlay");
+const _authForm = document.querySelector("#auth-form");
+const _authEmailEl = document.querySelector("#auth-email");
+const _authPasswordEl = document.querySelector("#auth-password");
+const _authSubmitEl = document.querySelector("#auth-submit");
+const _authErrorEl = document.querySelector("#auth-error");
+const _authLoadingEl = document.querySelector("#auth-loading");
+const _authHintEl = document.querySelector("#auth-hint");
+const _authTabBtns = Array.from(document.querySelectorAll(".auth-tab"));
+let _authMode = "login";
+
+function _authShowError(msg) {
+  _authErrorEl.textContent = msg;
+  _authErrorEl.hidden = false;
+}
+
+function _authClearError() {
+  _authErrorEl.hidden = true;
+  _authErrorEl.textContent = "";
+}
+
+function _authSetLoading(on) {
+  _authLoadingEl.hidden = !on;
+  _authSubmitEl.disabled = on;
+}
+
+function _rebindSwitchBtn() {
+  const btn = document.querySelector("#auth-switch-btn");
+  if (btn) {
+    btn.addEventListener("click", () =>
+      _switchAuthMode(_authMode === "login" ? "signup" : "login")
+    );
+  }
+  const resetBtn = document.querySelector("#auth-reset-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => _switchAuthMode("reset"));
+  }
+}
+
+function _switchAuthMode(mode) {
+  _authMode = mode;
+  _authClearError();
+
+  // パスワードリセットリンクを1回だけ作成
+  if (!document.querySelector("#auth-reset-link")) {
+    const p = document.createElement("p");
+    p.className = "auth-hint";
+    p.id = "auth-reset-link";
+    p.innerHTML = `<button type="button" class="auth-switch" id="auth-reset-btn">パスワードをお忘れの方はこちら</button>`;
+    _authHintEl.insertAdjacentElement("afterend", p);
+  }
+  const resetLink = document.querySelector("#auth-reset-link");
+
+  if (mode === "login") {
+    _authSubmitEl.textContent = "ログイン";
+    _authTabBtns.forEach(b => b.classList.toggle("is-active", b.dataset.authTab === "login"));
+    _authHintEl.innerHTML = `アカウントをお持ちでないですか？ <button type="button" class="auth-switch" id="auth-switch-btn">新規登録はこちら</button>`;
+    resetLink.hidden = false;
+  } else if (mode === "signup") {
+    _authSubmitEl.textContent = "新規登録";
+    _authTabBtns.forEach(b => b.classList.toggle("is-active", b.dataset.authTab === "signup"));
+    _authHintEl.innerHTML = `すでにアカウントをお持ちの方は <button type="button" class="auth-switch" id="auth-switch-btn">ログインはこちら</button>`;
+    resetLink.hidden = true;
+  } else if (mode === "reset") {
+    _authSubmitEl.textContent = "リセットメールを送る";
+    _authTabBtns.forEach(b => b.classList.remove("is-active"));
+    _authHintEl.innerHTML = `<button type="button" class="auth-switch" id="auth-switch-btn">← ログインに戻る</button>`;
+    resetLink.hidden = true;
+  }
+  _rebindSwitchBtn();
+}
+
+// タブボタンのイベント
+_authTabBtns.forEach(btn => {
+  btn.addEventListener("click", () => _switchAuthMode(btn.dataset.authTab));
+});
+
+// フォーム送信
+_authForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  _authClearError();
+  const email = _authEmailEl.value.trim();
+  const password = _authPasswordEl.value;
+  _authSetLoading(true);
+  try {
+    if (_authMode === "login") {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    } else if (_authMode === "signup") {
+      const { error } = await sb.auth.signUp({ email, password });
+      if (error) throw error;
+      _authShowError("確認メールを送りました。メールをご確認のうえログインしてください。");
+      return;
+    } else if (_authMode === "reset") {
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      _authShowError("パスワードリセットメールを送信しました。");
+      return;
+    }
+  } catch (err) {
+    _authShowError(err.message || "エラーが発生しました");
+  } finally {
+    _authSetLoading(false);
+  }
+});
+
+// ── Auth state の監視 ─────────────────────────────────────
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    if (!_appInitialized) {
+      await loadStateFromSupabase(session.user.id);
+      _authOverlay.hidden = true;
+      _appInitialized = true;
+      init();
+    } else if (event === "SIGNED_IN") {
+      await loadStateFromSupabase(session.user.id);
+      _authOverlay.hidden = true;
+      render();
+    }
+  } else {
+    _appInitialized = false;
+    _authOverlay.removeAttribute("hidden");
+  }
+});
+
+// ── ログアウト ────────────────────────────────────────────
+
+async function signOut() {
+  clearTimeout(_syncTimer);
+  await sb.auth.signOut();
+  localStorage.removeItem(CURRENT_STORAGE_KEY);
+  state = buildSeedState();
 }
 
 
