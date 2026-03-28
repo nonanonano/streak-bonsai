@@ -3857,7 +3857,7 @@ function renderSessionSheet() {
 function openFinishDraft(planKey) {
   ui.selectedSessionPlan = planKey;
   const rawElapsed = state.activeSession
-    ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
+    ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt - (state.activeSession.totalPausedMs || 0)) / 1000))
     : state.plans[planKey].minutes * 60;
   const elapsedSeconds = Math.max(1, rawElapsed);
   const roadmap = computeRoadmap(state);
@@ -3917,6 +3917,7 @@ function resumeFocusSession() {
   if (!state.activeSession || ui.finishDraft || !ui.focusPausedAt) return;
   const pauseDuration = Date.now() - ui.focusPausedAt;
   state.activeSession.endsAt += pauseDuration;
+  state.activeSession.totalPausedMs = (state.activeSession.totalPausedMs || 0) + pauseDuration;
   ui.focusPausedAt = null;
   hideFocusLostOverlay();
   const d = state.activeSession.departures || 0;
@@ -3956,6 +3957,7 @@ function beginSession(planKey) {
     startedAt: now,
     endsAt: now + state.plans[planKey].minutes * 60 * 1000,
     departures: 0,
+    totalPausedMs: 0,
   };
   ui.selectedSessionPlan = planKey;
   ui.finishDraft = null;
@@ -3976,7 +3978,7 @@ function recordLog(outcome, reason, details = {}) {
   const date = toISODate(new Date());
   const defaultPlannedSeconds = state.plans[outcome] ? state.plans[outcome].minutes * 60 : 0;
   const sessionElapsedSeconds = state.activeSession
-    ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
+    ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt - (state.activeSession.totalPausedMs || 0)) / 1000))
     : 0;
   const elapsedSeconds = Number(details.elapsedSeconds || sessionElapsedSeconds || defaultPlannedSeconds || 0);
   const plannedSeconds = Number(details.plannedSeconds || defaultPlannedSeconds || 0);
