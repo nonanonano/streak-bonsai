@@ -5828,12 +5828,17 @@ let _syncTimer = null;
 
 async function loadStateFromSupabase(userId) {
   try {
-    const { data, error } = await sb
+    // モバイル回線対策: 7秒でタイムアウトしてローカルデータで起動
+    const fetchPromise = sb
       .from("user_data")
       .select("state")
       .eq("user_id", userId)
       .single();
-    if (error && error.code !== "PGRST116") {
+    const timeoutPromise = new Promise((resolve) =>
+      setTimeout(() => resolve({ data: null, error: { code: "TIMEOUT" } }), 7000)
+    );
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+    if (error && error.code !== "PGRST116" && error.code !== "TIMEOUT") {
       console.warn("Supabase load error:", error);
       return;
     }
@@ -5954,6 +5959,13 @@ _authForm.addEventListener("submit", async (e) => {
     if (_authMode === "login") {
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      // Credential Management API: Chromeにパスワード保存を促す
+      if (window.PasswordCredential) {
+        try {
+          const cred = new PasswordCredential({ id: email, password });
+          await navigator.credentials.store(cred);
+        } catch (_) {}
+      }
     } else if (_authMode === "signup") {
       const { error } = await sb.auth.signUp({ email, password });
       if (error) throw error;
