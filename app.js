@@ -1435,6 +1435,19 @@ function render() {
   }
   renderSessionSheet();
   startSessionTicker();
+
+  const ambientLeft = document.querySelector(".ambient--left");
+  const ambientRight = document.querySelector(".ambient--right");
+  if (ambientLeft && ambientRight) {
+    const isHabitGoal = state.setup.goalType === "habit";
+    if (isHabitGoal) {
+      ambientLeft.style.background = "radial-gradient(circle, rgba(130,190,155,0.8) 0%, rgba(130,190,155,0) 70%)";
+      ambientRight.style.background = "radial-gradient(circle, rgba(90,160,120,0.65) 0%, rgba(90,160,120,0) 70%)";
+    } else {
+      ambientLeft.style.background = "radial-gradient(circle, rgba(218,120,100,0.75) 0%, rgba(218,120,100,0) 70%)";
+      ambientRight.style.background = "radial-gradient(circle, rgba(195,90,80,0.6) 0%, rgba(195,90,80,0) 70%)";
+    }
+  }
 }
 
 function deriveShortMinutes(normalMinutes, minimumMinutes) {
@@ -2074,6 +2087,7 @@ function renderSetupView() {
     ? (isNewGoal ? "今の Today は変えずに、新しい目標を追加します。" : activeSection.copy)
     : (isNewGoal ? newGoalSectionCopy[activeSectionKey] || activeSection.copy : activeSection.copy);
   const showSaveAction = !(activeSectionKey === "goal" && !isNewGoal);
+  const isHabitMode = isNewGoal ? draft.goalType === "habit" : state.setup.goalType === "habit";
   const setupMenu = [
     renderSetupMenuItem({
       action: "start-new-goal",
@@ -2091,7 +2105,7 @@ function renderSetupView() {
       iconKey: "goal",
       active: !isNewGoal && activeSectionKey === "goal",
     }),
-    renderSetupMenuItem({
+    !isHabitMode && renderSetupMenuItem({
       action: "select-setup-section",
       section: "roadmap",
       label: "Roadmap",
@@ -2115,7 +2129,7 @@ function renderSetupView() {
       iconKey: "plan",
       active: activeSectionKey === "plan",
     }),
-  ].join("");
+  ].filter(Boolean).join("");
 
   return `
     <section class="screen screen--setup">
@@ -2414,6 +2428,7 @@ function renderRoadmapCurrentStatus(roadmap) {
 }
 
 function renderRoadmapView() {
+  if (state.setup.goalType === "habit") return renderHabitStreakRoadmap();
   const roadmap = computeRoadmap(state);
 
   return `
@@ -2437,6 +2452,57 @@ function renderRoadmapView() {
           <h2 class="section-title">全体のロードマップ</h2>
         </div>
         ${renderRoadmapMilestoneList(roadmap)}
+      </section>
+    </section>
+  `;
+}
+
+function renderHabitStreakRoadmap() {
+  const growth = getBonsaiGrowth(state.logs || []);
+  const executedDays = growth.executedDays;
+  const bonsaiMeta = getBonsaiTypeMeta(state.setup.bonsaiKey || "pine");
+  const milestones = [
+    { days: 7,   label: "7日",   desc: "最初の壁を越えた",       emoji: "🌱" },
+    { days: 21,  label: "21日",  desc: "リズムが生まれてくる",   emoji: "🪴" },
+    { days: 66,  label: "66日",  desc: "自動化の入り口",         emoji: "🌳" },
+    { days: 100, label: "100日", desc: "本物の習慣へ",           emoji: "🎋" },
+    { days: 365, label: "1年",   desc: "人生が変わった",         emoji: "⛩️" },
+  ];
+  const nextMilestone = milestones.find(m => executedDays < m.days);
+  const daysToNext = nextMilestone ? nextMilestone.days - executedDays : 0;
+  return `
+    <section class="screen">
+      <div class="hero"><div class="hero__sticky"><div class="hero__accent"></div>${renderActiveGoalContext()}</div></div>
+      <section class="panel panel--cool stack">
+        <div class="status-strip"><span class="status-badge">${escapeHtml(bonsaiMeta.label)} / ${escapeHtml(growth.stageLabel)}</span></div>
+        <div style="text-align:center;padding:8px 0 4px">
+          <p style="font-size:3rem;margin:0;line-height:1.1">${executedDays}</p>
+          <p style="font-size:0.85rem;color:var(--muted);margin:4px 0 0">実施した日数</p>
+        </div>
+        ${nextMilestone ? `<div style="font-size:0.82rem;color:var(--muted);text-align:center">次のマイルストーン「${escapeHtml(nextMilestone.label)}」まで あと <strong style="color:var(--ink)">${daysToNext}日</strong></div>` : `<div style="font-size:0.88rem;text-align:center;color:var(--accent)">🎉 すべてのマイルストーンを達成！</div>`}
+      </section>
+      <section class="panel stack">
+        <h2 class="section-title">習慣の道のり</h2>
+        <div class="stack" style="gap:10px">
+          ${milestones.map(m => {
+            const done = executedDays >= m.days;
+            const isCurrent = nextMilestone && nextMilestone.days === m.days;
+            const pct = Math.min(100, Math.round(executedDays / m.days * 100));
+            return `<div style="border-radius:14px;padding:14px 16px;background:${done ? "var(--panel-bg,rgba(255,253,246,0.9))" : "rgba(0,0,0,0.03)"};border:1.5px solid ${done ? "var(--accent,#c75e33)" : isCurrent ? "rgba(0,0,0,0.15)" : "rgba(0,0,0,0.07)"};opacity:${done || isCurrent ? "1" : "0.55"}">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isCurrent ? "8px" : "0"}">
+                <span style="font-size:1.4rem">${m.emoji}</span>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline">
+                    <strong style="font-size:0.95rem">${escapeHtml(m.label)}</strong>
+                    <span style="font-size:0.78rem;color:var(--muted)">${done ? "✓ 達成" : `${executedDays}/${m.days}日`}</span>
+                  </div>
+                  <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0">${escapeHtml(m.desc)}</p>
+                </div>
+              </div>
+              ${isCurrent ? `<div style="background:rgba(0,0,0,0.08);border-radius:99px;height:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--accent,#c75e33);border-radius:99px"></div></div>` : ""}
+            </div>`;
+          }).join("")}
+        </div>
       </section>
     </section>
   `;
