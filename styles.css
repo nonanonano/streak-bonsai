@@ -3665,14 +3665,18 @@ button {
 
 .focus-launch--habit {
   cursor: default;
+}
+
+/* 習慣カード: 詳細度を上げて確実に緑/苔色を適用 */
+.focus-launch.focus-launch--habit {
   background:
-    radial-gradient(circle at 88% 12%, rgba(220, 255, 210, 0.28), transparent 30%),
-    radial-gradient(circle at 10% 88%, rgba(40, 90, 60, 0.42), transparent 28%),
-    linear-gradient(160deg, #5a9e7a 0%, #3d8660 45%, #2e7050 100%);
+    radial-gradient(circle at 88% 12%, rgba(210, 255, 220, 0.30), transparent 30%),
+    radial-gradient(circle at 10% 88%, rgba(30, 85, 55, 0.50), transparent 28%),
+    linear-gradient(160deg, #4e9470 0%, #357856 45%, #266045 100%) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    0 22px 48px rgba(30, 80, 55, 0.28),
-    0 6px 16px rgba(30, 80, 55, 0.14);
+    0 22px 48px rgba(25, 75, 50, 0.30),
+    0 6px 16px rgba(25, 75, 50, 0.16);
 }
 
 .focus-launch:not(.focus-launch--habit) {
