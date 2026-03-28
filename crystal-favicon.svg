@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark face -->
+  <polygon points="16,4 8,16 11,28 16,28" fill="#4a7ab8" opacity="0.9"/>
+  <!-- Light face -->
+  <polygon points="16,4 24,16 21,28 16,28" fill="#7ab0e0" opacity="0.95"/>
+  <!-- Center face -->
+  <polygon points="16,4 15,16 15,28 17,28 17,16" fill="#a8d0f0" opacity="0.88"/>
+  <!-- Highlight -->
+  <line x1="16.5" y1="4" x2="17.5" y2="14" stroke="white" stroke-width="1" stroke-linecap="round" opacity="0.55"/>
+</svg>
