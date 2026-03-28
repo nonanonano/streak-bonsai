@@ -3897,8 +3897,20 @@ function pauseFocusSession() {
   state.activeSession.departures = (state.activeSession.departures || 0) + 1;
   if (ui.sessionTimer) { window.clearInterval(ui.sessionTimer); ui.sessionTimer = null; }
   showFocusLostOverlay();
+  sendFocusNotification();
   saveState();
   render();
+}
+
+function sendFocusNotification() {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    new Notification("⏸ 作業中です！", { body: "StreakBonsaiに戻ってタイマーを再開してください", icon: "./bonsai-favicon.svg" });
+  } else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then(p => {
+      if (p === "granted") new Notification("⏸ 作業中です！", { body: "StreakBonsaiに戻ってタイマーを再開してください", icon: "./bonsai-favicon.svg" });
+    });
+  }
 }
 
 function resumeFocusSession() {
@@ -3931,6 +3943,12 @@ function hideFocusLostOverlay() {
   if (overlay) overlay.hidden = true;
 }
 
+function requestNotificationPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
 function beginSession(planKey) {
   const now = Date.now();
   state.activeSession = {
@@ -3942,6 +3960,7 @@ function beginSession(planKey) {
   ui.selectedSessionPlan = planKey;
   ui.finishDraft = null;
   ui.sessionOpen = true;
+  requestNotificationPermission();
   saveState();
   startSessionTicker();
 }
