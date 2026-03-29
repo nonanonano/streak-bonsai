@@ -2410,18 +2410,17 @@ function renderRoadmapCurrentStatus(roadmap) {
           <span class="status-badge ${milestone.isComplete ? "status-badge--done" : "status-badge--accent"}">${escapeHtml(statusLabel)}</span>
           <h2 class="section-title">${escapeHtml(milestone.label)}</h2>
           <p class="section-copy">${escapeHtml(deadlineLabel)}</p>
-          <p class="roadmap-focus-card__metric-label">全体進捗 ${overallProgress}%</p>
         </div>
         <div class="roadmap-focus-card__value-block">
-          <strong class="roadmap-focus-card__value">${achievementRate}%</strong>
-          <span class="roadmap-focus-card__value-label">節目進捗</span>
+          <strong class="roadmap-focus-card__value">${overallProgress}%</strong>
+          <span class="roadmap-focus-card__value-label">全体進捗</span>
         </div>
       </div>
 
       <div class="bullet-list">
         <div class="bullet-row">
           <div class="bullet">
-            <span class="bullet__fill bullet__fill--sage" style="--fill:${achievementRate}%"></span>
+            <span class="bullet__fill bullet__fill--sage" style="--fill:${overallProgress}%"></span>
           </div>
         </div>
       </div>
