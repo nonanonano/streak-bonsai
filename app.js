@@ -637,8 +637,9 @@ function bindEvents() {
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       pauseFocusSession();
-    } else if (state.activeSession && !ui.finishDraft) {
-      resumeFocusSession();
+    } else {
+      if (state.activeSession && !ui.finishDraft) resumeFocusSession();
+      _resyncFromSupabase();
     }
   });
 
@@ -5269,7 +5270,10 @@ function mergeState(base, saved) {
 
 function saveState() {
   syncActiveGoalRecord();
+  if (!state.meta) state.meta = {};
+  state.meta.lastSavedAt = Date.now();
   localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+  if (_supabaseLoadedSuccessfully) scheduleSyncToSupabase();
 }
 
 function exportData() {
@@ -5824,12 +5828,12 @@ function escapeHtml(value) {
 
 let _appInitialized = false;
 let _syncTimer = null;
+let _supabaseLoadedSuccessfully = false;
 
 // ── Supabase ↔ ローカル同期 ──────────────────────────────
 
 async function loadStateFromSupabase(userId) {
   try {
-    // モバイル回線対策: 7秒でタイムアウトしてローカルデータで起動
     const fetchPromise = sb
       .from("user_data")
       .select("state")
@@ -5839,16 +5843,40 @@ async function loadStateFromSupabase(userId) {
       setTimeout(() => resolve({ data: null, error: { code: "TIMEOUT" } }), 7000)
     );
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-    if (error && error.code !== "PGRST116" && error.code !== "TIMEOUT") {
+    if (error?.code === "TIMEOUT") {
+      console.warn("Supabase load timeout: using local state");
+      return;
+    }
+    if (error && error.code !== "PGRST116") {
       console.warn("Supabase load error:", error);
       return;
     }
+    _supabaseLoadedSuccessfully = true;
     if (data?.state && Object.keys(data.state).length > 0) {
-      state = mergeState(buildSeedState(), data.state);
-      localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+      const supabaseTs = data.state.meta?.lastSavedAt || 0;
+      const localTs = state.meta?.lastSavedAt || 0;
+      if (supabaseTs >= localTs) {
+        state = mergeState(buildSeedState(), data.state);
+        localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+      } else {
+        scheduleSyncToSupabase();
+      }
     }
   } catch (err) {
     console.warn("Supabase load error:", err);
+  }
+}
+
+async function _resyncFromSupabase() {
+  if (!_appInitialized || state.activeSession) return;
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    const prevTs = state.meta?.lastSavedAt || 0;
+    await loadStateFromSupabase(user.id);
+    if ((state.meta?.lastSavedAt || 0) !== prevTs) render();
+  } catch (err) {
+    console.warn("Resync error:", err);
   }
 }
 
