@@ -2,7 +2,7 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f1e9dc" />
     <title>StreakBonsai</title>
     <link rel="icon" type="image/svg+xml" href="./bonsai-favicon.svg" />
@@ -64,13 +64,13 @@
             id="setup-shortcut"
             data-action="open-setup"
           >
-            設定
+            è¨­å®
           </button>
         </header>
 
         <main class="screen-frame" id="screen-root" aria-live="polite"></main>
 
-        <nav class="tabbar" id="bottom-nav" aria-label="主要画面">
+        <nav class="tabbar" id="bottom-nav" aria-label="ä¸»è¦ç»é¢">
           <button type="button" class="tabbar__item" data-action="navigate" data-view="today">
             <svg class="tabbar__icon" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
               <circle cx="12" cy="12" r="4.5"/>
@@ -131,29 +131,29 @@
     </div>
 
     <div class="auth-tabs" id="auth-tabs">
-      <button type="button" class="auth-tab is-active" data-auth-tab="login">ログイン</button>
-      <button type="button" class="auth-tab" data-auth-tab="signup">新規登録</button>
+      <button type="button" class="auth-tab is-active" data-auth-tab="login">ã­ã°ã¤ã³</button>
+      <button type="button" class="auth-tab" data-auth-tab="signup">æ°è¦ç»é²</button>
     </div>
 
     <form class="auth-form" id="auth-form" autocomplete="on">
       <div class="field">
-        <label class="field__label" for="auth-email">メールアドレス</label>
+        <label class="field__label" for="auth-email">ã¡ã¼ã«ã¢ãã¬ã¹</label>
         <input class="field__input" type="email" id="auth-email" name="email" required autocomplete="email" placeholder="you@example.com" />
       </div>
       <div class="field">
-        <label class="field__label" for="auth-password">パスワード</label>
-        <input class="field__input" type="password" id="auth-password" name="password" required autocomplete="current-password" placeholder="8文字以上" minlength="8" />
+        <label class="field__label" for="auth-password">ãã¹ã¯ã¼ã</label>
+        <input class="field__input" type="password" id="auth-password" name="password" required autocomplete="current-password" placeholder="8æå­ä»¥ä¸" minlength="8" />
       </div>
       <p class="auth-error" id="auth-error" hidden></p>
-      <button type="submit" class="action-button action-button--primary auth-submit" id="auth-submit">ログイン</button>
+      <button type="submit" class="action-button action-button--primary auth-submit" id="auth-submit">ã­ã°ã¤ã³</button>
     </form>
 
     <p class="auth-hint" id="auth-hint">
-      アカウントをお持ちでないですか？
-      <button type="button" class="auth-switch" id="auth-switch-btn">新規登録はこちら</button>
+      ã¢ã«ã¦ã³ãããæã¡ã§ãªãã§ããï¼
+      <button type="button" class="auth-switch" id="auth-switch-btn">æ°è¦ç»é²ã¯ãã¡ã</button>
     </p>
 
-    <p class="auth-loading" id="auth-loading" hidden>読み込み中...</p>
+    <p class="auth-loading" id="auth-loading" hidden>èª­ã¿è¾¼ã¿ä¸­...</p>
   </div>
 </div>
 
