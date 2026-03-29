@@ -2053,10 +2053,12 @@ function renderActiveGoalContext(options = {}) {
       <div class="goal-selector__body">
         ${goals.map((goal) => {
           const isActive = goal.id === state.meta.activeGoalId;
+          const isHabit = goal.setup?.goalType === "habit";
+          const typeClass = isHabit ? "goal-selector__option--habit" : "goal-selector__option--goal";
           return `
             <button
               type="button"
-              class="goal-selector__option ${isActive ? "is-active" : ""}"
+              class="goal-selector__option ${typeClass} ${isActive ? "is-active" : ""}"
               data-action="activate-goal"
               data-goal-id="${goal.id}"
               ${isActive ? "disabled" : ""}
@@ -2182,7 +2184,6 @@ function renderTodayView() {
 
   return `
     <section class="screen screen--today screen--today-minimal">
-      ${renderActiveGoalContext()}
       <div class="focus-goal-list">
         ${goals.length
           ? goals.map((goal, index) => renderTodayGoalCard(goal, index)).join("")
