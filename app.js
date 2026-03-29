@@ -1,58 +1,58 @@
 // =========================================================
-// SUPABASE 設定
+// SUPABASE è¨­å®
 // =========================================================
 const SUPABASE_URL = "https://kyzyyciutnkhaxadwdlx.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_8BS-Guu8UUfb3sEHRfHGRg_vTvB0FyB";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-﻿const STORAGE_KEY = "tomosu-state-v1";
+ï»¿const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
 const PLAN_RANK = { C: 1, B: 2, A: 3 };
 const PLAN_META = {
-  A: { label: "Plan A", tag: "通常" },
-  B: { label: "Plan B", tag: "短縮" },
-  C: { label: "Plan C", tag: "救済" },
+  A: { label: "Plan A", tag: "éå¸¸" },
+  B: { label: "Plan B", tag: "ç­ç¸®" },
+  C: { label: "Plan C", tag: "ææ¸" },
 };
 const REASONS = [
-  "残業で開始が遅れた",
-  "タスクが重すぎた",
-  "開始前の準備が面倒",
-  "疲労",
-  "予定変更",
-  "忘れた",
+  "æ®æ¥­ã§éå§ãéãã",
+  "ã¿ã¹ã¯ãéããã",
+  "éå§åã®æºåãé¢å",
+  "ç²å´",
+  "äºå®å¤æ´",
+  "å¿ãã",
 ];
 const REPLAN_MODES = {
-  lighten_today: "今日を軽くする",
-  reset_week: "今週を立て直す",
-  break_goal: "目標を分解する",
-  retarget_goal: "目標を更新する",
-  consult_block: "詰まりを相談する",
+  lighten_today: "ä»æ¥ãè»½ããã",
+  reset_week: "ä»é±ãç«ã¦ç´ã",
+  break_goal: "ç®æ¨ãåè§£ãã",
+  retarget_goal: "ç®æ¨ãæ´æ°ãã",
+  consult_block: "è©°ã¾ããç¸è«ãã",
 };
 const SETUP_SECTIONS = {
   goal: {
-    label: "目標編集",
-    hint: "登録済みを直す",
-    title: "目標編集",
-    copy: "登録済みの目標をここで編集します。",
+    label: "ç®æ¨ç·¨é",
+    hint: "ç»é²æ¸ã¿ãç´ã",
+    title: "ç®æ¨ç·¨é",
+    copy: "ç»é²æ¸ã¿ã®ç®æ¨ãããã§ç·¨éãã¾ãã",
   },
   roadmap: {
     label: "Roadmap",
-    hint: "節目を整える",
+    hint: "ç¯ç®ãæ´ãã",
     title: "Roadmap",
-    copy: "マイルストーンの追加と調整は設定で行います。",
+    copy: "ãã¤ã«ã¹ãã¼ã³ã®è¿½å ã¨èª¿æ´ã¯è¨­å®ã§è¡ãã¾ãã",
   },
   schedule: {
-    label: "実施時間",
-    hint: "いつ動くか",
-    title: "実施時間",
-    copy: "曜日ごとに、取りかかる時間だけをここで整えます。",
+    label: "å®æ½æé",
+    hint: "ãã¤åãã",
+    title: "å®æ½æé",
+    copy: "ææ¥ãã¨ã«ãåããããæéã ããããã§æ´ãã¾ãã",
   },
   plan: {
-    label: "プランの変更",
-    hint: "どこまで軽くするか",
-    title: "プラン",
-    copy: "通常 / 短縮 / 救済の3段階だけ調整します。",
+    label: "ãã©ã³ã®å¤æ´",
+    hint: "ã©ãã¾ã§è»½ãããã",
+    title: "ãã©ã³",
+    copy: "éå¸¸ / ç­ç¸® / ææ¸ã®3æ®µéã ãèª¿æ´ãã¾ãã",
   },
 };
 const ROADMAP_TARGETS = {
@@ -65,31 +65,31 @@ const ROADMAP_TARGETS = {
 const ROADMAP_ID_ORDER = ["goal", "checkpoint", "foundation", "week", "next"];
 const WEEKDAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const FLOWER_STAGE_THRESHOLDS = [0, 1, 2, 3, 5, 7, 10, 14, 21, 30];
-const FLOWER_STAGE_LABELS = ["種", "芽", "双葉", "茎のび", "つぼみ", "色づき", "咲き始め", "七分咲き", "満開", "押し花"];
-// 目標植物ライブラリ（梅・桜・さつき）
+const FLOWER_STAGE_LABELS = ["ç¨®", "è½", "åè", "èã®ã³", "ã¤ã¼ã¿", "è²ã¥ã", "å²ãå§ã", "ä¸åå²ã", "æºé", "æ¼ãè±"];
+// ç®æ¨æ¤ç©ã©ã¤ãã©ãªï¼æ¢ã»æ¡ã»ãã¤ãï¼
 const FLOWER_LIBRARY = {
   ume: {
-    label: "梅",
-    trait: "はじめて咲く目標",
-    copy: "短期の目標に。厳しい時期を越えて最初に咲く、達成の喜びを感じやすい植物です。",
+    label: "æ¢",
+    trait: "ã¯ããã¦å²ãç®æ¨",
+    copy: "ç­æã®ç®æ¨ã«ãå³ããææãè¶ãã¦æåã«å²ããéæã®åã³ãæããããæ¤ç©ã§ãã",
     trunk: "#6a5248", branch: "#5a4238",
     bud: "#e8b4c8", petal: "#f9f0f4", petalLight: "#fffbfe", center: "#d4526e",
     pot: "#8a7060", potRim: "#786050", soil: "#6a5040",
     stem: "#6a5248", leaf: "#4a3830",
   },
   sakura: {
-    label: "桜",
-    trait: "節目を祝う目標",
-    copy: "大きな節目や本番に。満開の瞬間が最も美しく、達成の感動が大きい植物です。",
+    label: "æ¡",
+    trait: "ç¯ç®ãç¥ãç®æ¨",
+    copy: "å¤§ããªç¯ç®ãæ¬çªã«ãæºéã®ç¬éãæãç¾ãããéæã®æåãå¤§ããæ¤ç©ã§ãã",
     trunk: "#7a6258", branch: "#6a5248",
     bud: "#f4c0d8", petal: "#f9d8e8", petalLight: "#fff4f8", center: "#e87090",
     pot: "#907060", potRim: "#7e6050", soil: "#6e5040",
     stem: "#7a6258", leaf: "#6a5248",
   },
   satsuki: {
-    label: "さつき",
-    trait: "進みが見える目標",
-    copy: "段階的な目標に。進捗率に応じて花が増えるので、頑張りがそのまま見えます。",
+    label: "ãã¤ã",
+    trait: "é²ã¿ãè¦ããç®æ¨",
+    copy: "æ®µéçãªç®æ¨ã«ãé²æçã«å¿ãã¦è±ãå¢ããã®ã§ãé å¼µãããã®ã¾ã¾è¦ãã¾ãã",
     trunk: "#6a5c48", branch: "#5a4c38",
     bud: "#d04880", petal: "#e8609a", petalLight: "#ffd8ec", center: "#a02860",
     pot: "#887060", potRim: "#766050", soil: "#665040",
@@ -99,25 +99,25 @@ const FLOWER_LIBRARY = {
 
 const BONSAI_LIBRARY = {
   pine: {
-    label: "松", trait: "積み上げる習慣",
+    label: "æ¾", trait: "ç©ã¿ä¸ããç¿æ£",
     trunk: "#5a4a3a", branch: "#4a3c2c",
     foliage: "#2e6644", foliageDark: "#1e4e32", foliageLight: "#4e8e5c",
     pot: "#8c6e58", potRim: "#7a5c48", soil: "#6a5040",
   },
   maple: {
-    label: "もみじ", trait: "変わる習慣",
+    label: "ãã¿ã", trait: "å¤ããç¿æ£",
     trunk: "#7a5840", branch: "#6a4c36",
     foliage: "#c04020", foliageDark: "#8a2c14", foliageLight: "#f08040",
     pot: "#906858", potRim: "#7e5848", soil: "#6e5038",
   },
   moss: {
-    label: "苔", trait: "整える習慣",
+    label: "è", trait: "æ´ããç¿æ£",
     trunk: "#5a7040", branch: "#4a6030",
     foliage: "#5a9040", foliageDark: "#3a6828", foliageLight: "#8abf60",
     pot: "#7a8060", potRim: "#6a7050", soil: "#5a6040",
   },
 };
-const BONSAI_STAGE_LABELS = ["鉢のみ","芽生え","幼木","成長期","形成期","樹形成","整い","老成","銘木","傑作"];
+const BONSAI_STAGE_LABELS = ["é¢ã®ã¿","è½çã","å¹¼æ¨","æé·æ","å½¢ææ","æ¨¹å½¢æ","æ´ã","èæ","éæ¨","åä½"];
 
 const screenRoot = document.querySelector("#screen-root");
 const screenFrame = document.querySelector(".screen-frame");
@@ -211,10 +211,10 @@ function normalizeLogs(logs = []) {
 
 function inferDefaultFlowerType(setup = {}) {
   const goalText = `${setup.goal || ""} ${setup.currentLevel || ""}`.toLowerCase();
-  if (/始|最初|まず|first|week|週|1週/.test(goalText)) {
+  if (/å§|æå|ã¾ã|first|week|é±|1é±/.test(goalText)) {
     return "ume";
   }
-  if (/試験|受験|発表|本番|プレゼン|面接|提出|exam|test/.test(goalText)) {
+  if (/è©¦é¨|åé¨|çºè¡¨|æ¬çª|ãã¬ã¼ã³|é¢æ¥|æåº|exam|test/.test(goalText)) {
     return "sakura";
   }
   return "satsuki";
@@ -257,16 +257,16 @@ function formatStudyDays(studyDays) {
   const days = normalizeStudyDays(studyDays);
 
   if (!days.length) {
-    return "未設定";
+    return "æªè¨­å®";
   }
   if (days.length === WEEKDAY_KEYS.length) {
-    return "毎日";
+    return "æ¯æ¥";
   }
   if (days.join(",") === "Mon,Tue,Wed,Thu,Fri") {
-    return "平日";
+    return "å¹³æ¥";
   }
   if (days.join(",") === "Sat,Sun") {
-    return "土日";
+    return "åæ¥";
   }
 
   return days.map((key) => weekdayShortLabel(key)).join(" ");
@@ -285,7 +285,7 @@ function normalizeOptionalDate(value) {
 
 function formatDeadlineBadge(deadline) {
   const normalized = normalizeOptionalDate(deadline);
-  return normalized ? `期限 ${normalized}` : "期限なし";
+  return normalized ? `æé ${normalized}` : "æéãªã";
 }
 
 function getFlowerTypeMeta(flowerType, setup = {}) {
@@ -357,7 +357,7 @@ function getBonsaiHealth(logs, studyDays) {
   return scheduled > 0 ? Math.round((completed / scheduled) * 100) : 100;
 }
 
-// 直近7回の実施予定日を●○ドットで返す（説明不要の一目瞭然UI）
+// ç´è¿7åã®å®æ½äºå®æ¥ãââãããã§è¿ãï¼èª¬æä¸è¦ã®ä¸ç®ç­ç¶UIï¼
 function renderStreakDots(logs, studyDays) {
   const days = normalizeStudyDays(studyDays);
   const today = new Date();
@@ -371,7 +371,7 @@ function renderStreakDots(logs, studyDays) {
     const done = Boolean(log && log.outcome !== "miss" && log.outcome !== "none");
     slots.unshift({ done, isToday: i === 0 });
   }
-  // 7個未満なら左を薄いドットで埋める
+  // 7åæªæºãªãå·¦ãèããããã§åãã
   while (slots.length < 7) slots.unshift({ done: false, isToday: false, filler: true });
   return `<span class="streak-dots">${slots.map(s =>
     `<span class="streak-dot${s.done ? " is-done" : ""}${s.isToday ? " is-today" : ""}${s.filler ? " is-filler" : ""}"></span>`
@@ -673,7 +673,7 @@ function handleKeydown(event) {
     if (state.activeSession) {
       ui.sessionOpen = true;
       render();
-      showToast("セッション中は画面を切り替えられません");
+      showToast("ã»ãã·ã§ã³ä¸­ã¯ç»é¢ãåãæ¿ãããã¾ãã");
       return;
     }
     state.meta.currentView = tabViews[viewIndex];
@@ -691,6 +691,9 @@ function handleKeydown(event) {
       state.meta.currentView = "today";
       render();
     } else if (ui.sessionOpen || state.activeSession) {
+      if (state.activeSession && !ui.finishDraft) {
+        pauseFocusSession();
+      }
       ui.sessionOpen = false;
       render();
     }
@@ -720,7 +723,7 @@ function handleClick(event) {
     if (state.activeSession) {
       ui.sessionOpen = true;
       render();
-      showToast("セッション中は画面を切り替えられません");
+      showToast("ã»ãã·ã§ã³ä¸­ã¯ç»é¢ãåãæ¿ãããã¾ãã");
       return;
     }
     ui.missPanelOpen = false;
@@ -738,7 +741,7 @@ function handleClick(event) {
     if (state.activeSession) {
       ui.sessionOpen = true;
       render();
-      showToast("セッション中は設定を開けません");
+      showToast("ã»ãã·ã§ã³ä¸­ã¯è¨­å®ãéãã¾ãã");
       return;
     }
     ui.setupMode = "edit";
@@ -791,12 +794,12 @@ function handleClick(event) {
     if (activateGoal(target.dataset.goalId || "")) {
       ui.goalLibraryDraft = null;
       render();
-      showToast("表示する目標を切り替えました。");
+      showToast("è¡¨ç¤ºããç®æ¨ãåãæ¿ãã¾ããã");
     }
     return;
   }
 
-  // アルバムへ移動（データ保持したまま非表示）
+  // ã¢ã«ãã ã¸ç§»åï¼ãã¼ã¿ä¿æããã¾ã¾éè¡¨ç¤ºï¼
   if (action === "archive-goal") {
     const goalId = target.dataset.goalId;
     ensureGoalCollection();
@@ -804,7 +807,7 @@ function handleClick(event) {
     if (!goal) return;
     goal.archived = true;
     goal.archivedAt = toISODate(new Date());
-    // アーカイブ対象がアクティブ目標なら別の目標へ切り替え
+    // ã¢ã¼ã«ã¤ãå¯¾è±¡ãã¢ã¯ãã£ãç®æ¨ãªãå¥ã®ç®æ¨ã¸åãæ¿ã
     if (goalId === state.meta.activeGoalId) {
       const next = state.goals.find(g => !g.archived && g.id !== goalId);
       if (next) { applyGoalRecord(next); state.meta.activeGoalId = next.id; }
@@ -813,11 +816,11 @@ function handleClick(event) {
     ui.deleteConfirmGoalId = null;
     saveState();
     render();
-    showToast("アルバムに保存しました。");
+    showToast("ã¢ã«ãã ã«ä¿å­ãã¾ããã");
     return;
   }
 
-  // 完全消去の確認ステップ
+  // å®å¨æ¶å»ã®ç¢ºèªã¹ããã
   if (action === "confirm-delete-goal") {
     ui.deleteConfirmGoalId = target.dataset.goalId;
     render();
@@ -830,7 +833,7 @@ function handleClick(event) {
     return;
   }
 
-  // 完全消去（確認後）
+  // å®å¨æ¶å»ï¼ç¢ºèªå¾ï¼
   if (action === "delete-goal") {
     const goalId = target.dataset.goalId;
     ensureGoalCollection();
@@ -843,11 +846,11 @@ function handleClick(event) {
     ui.deleteConfirmGoalId = null;
     saveState();
     render();
-    showToast("目標を完全に削除しました。");
+    showToast("ç®æ¨ãå®å¨ã«åé¤ãã¾ããã");
     return;
   }
 
-  // アルバムから完全消去
+  // ã¢ã«ãã ããå®å¨æ¶å»
   if (action === "purge-archived-goal") {
     const goalId = target.dataset.goalId;
     ensureGoalCollection();
@@ -855,7 +858,7 @@ function handleClick(event) {
     ui.deleteConfirmGoalId = null;
     saveState();
     render();
-    showToast("アルバムから削除しました。");
+    showToast("ã¢ã«ãã ããåé¤ãã¾ããã");
     return;
   }
 
@@ -873,11 +876,11 @@ function handleClick(event) {
 
   if (action === "save-goal-library-edit") {
     if (!commitGoalLibraryDraft()) {
-      showToast("目標名を入れてください。");
+      showToast("ç®æ¨åãå¥ãã¦ãã ããã");
       return;
     }
     render();
-    showToast("目標を更新しました。");
+    showToast("ç®æ¨ãæ´æ°ãã¾ããã");
     return;
   }
 
@@ -925,7 +928,7 @@ function handleClick(event) {
     const weekdayKey = target.dataset.weekday || "";
     const nextDays = toggleStudyDay(ui.setupDraft.studyDays, weekdayKey);
     if (!nextDays.length) {
-      showToast("実施曜日を1つ以上選んでください。");
+      showToast("å®æ½ææ¥ã1ã¤ä»¥ä¸é¸ãã§ãã ããã");
       return;
     }
     ui.setupDraft.studyDays = nextDays;
@@ -970,7 +973,7 @@ function handleClick(event) {
 
   if (action === "save-setup") {
     if ((state.meta.demoMode || ui.setupMode === "new_goal") && !ui.setupDraft.goal.trim()) {
-      showToast("新しい目標名を入れてください。");
+      showToast("æ°ããç®æ¨åãå¥ãã¦ãã ããã");
       return;
     }
     const saveResult = commitSetupDraft();
@@ -983,17 +986,17 @@ function handleClick(event) {
     ui.goalLibraryDraft = null;
     render();
     if (saveResult === "created" && conflicts.length) {
-      showToast(`目標を追加しました。実施時間は ${conflicts.map((item) => item.label).join(" / ")} と重なっています。`);
+      showToast(`ç®æ¨ãè¿½å ãã¾ãããå®æ½æéã¯ ${conflicts.map((item) => item.label).join(" / ")} ã¨éãªã£ã¦ãã¾ãã`);
     } else if (saveResult === "created") {
-      showToast("目標を追加しました。設定画面で確認できます。");
+      showToast("ç®æ¨ãè¿½å ãã¾ãããè¨­å®ç»é¢ã§ç¢ºèªã§ãã¾ãã");
     } else if (saveResult === "reset" && conflicts.length) {
-      showToast(`設定を保存しました。実施時間は ${conflicts.map((item) => item.label).join(" / ")} と重なっています。`);
+      showToast(`è¨­å®ãä¿å­ãã¾ãããå®æ½æéã¯ ${conflicts.map((item) => item.label).join(" / ")} ã¨éãªã£ã¦ãã¾ãã`);
     } else if (saveResult === "reset") {
-      showToast("設定を保存してプランを作り直しました。");
+      showToast("è¨­å®ãä¿å­ãã¦ãã©ã³ãä½ãç´ãã¾ããã");
     } else if (conflicts.length) {
-      showToast(`設定を保存しました。実施時間は ${conflicts.map((item) => item.label).join(" / ")} と重なっています。`);
+      showToast(`è¨­å®ãä¿å­ãã¾ãããå®æ½æéã¯ ${conflicts.map((item) => item.label).join(" / ")} ã¨éãªã£ã¦ãã¾ãã`);
     } else {
-      showToast("設定を保存しました。");
+      showToast("è¨­å®ãä¿å­ãã¾ããã");
     }
     return;
   }
@@ -1002,7 +1005,7 @@ function handleClick(event) {
     ui.selectedSessionPlan = launchPlanKey;
     ui.sessionOpen = true;
     render();
-    showToast(`${PLAN_META[launchPlanKey].label}を選びました。開始ボタンで始められます。`);
+    showToast(`${PLAN_META[launchPlanKey].label}ãé¸ã³ã¾ãããéå§ãã¿ã³ã§å§ãããã¾ãã`);
     return;
   }
 
@@ -1042,6 +1045,9 @@ function handleClick(event) {
   }
 
   if (action === "close-session") {
+    if (state.activeSession && !ui.finishDraft) {
+      pauseFocusSession();
+    }
     ui.sessionOpen = false;
     render();
     return;
@@ -1072,7 +1078,7 @@ function handleClick(event) {
   if (action === "begin-session") {
     beginSession(ui.selectedSessionPlan);
     render();
-    showToast(`${PLAN_META[ui.selectedSessionPlan].label}を開始しました。`);
+    showToast(`${PLAN_META[ui.selectedSessionPlan].label}ãéå§ãã¾ããã`);
     return;
   }
 
@@ -1099,7 +1105,7 @@ function handleClick(event) {
   if (action === "save-finish-log") {
     saveFinishDraft();
     render();
-    showToast("今日の記録を残しました。");
+    showToast("ä»æ¥ã®è¨é²ãæ®ãã¾ããã");
     return;
   }
 
@@ -1115,7 +1121,7 @@ function handleClick(event) {
     syncSelectedSessionPlan(true);
     saveState();
     render();
-    showToast(`今日は${PLAN_META[state.today.recommendedPlan].label}から始める設定にしました。`);
+    showToast(`ä»æ¥ã¯${PLAN_META[state.today.recommendedPlan].label}ããå§ããè¨­å®ã«ãã¾ããã`);
     return;
   }
 
@@ -1135,7 +1141,7 @@ function handleClick(event) {
     recordLog("miss", ui.missReasonDraft);
     ui.missPanelOpen = false;
     render();
-    showToast("未実施として記録しました。明日の復帰を主役にします。");
+    showToast("æªå®æ½ã¨ãã¦è¨é²ãã¾ãããææ¥ã®å¾©å¸°ãä¸»å½¹ã«ãã¾ãã");
     return;
   }
 
@@ -1174,7 +1180,7 @@ function handleClick(event) {
     syncTodayLastLogFields();
     saveState();
     render();
-    showToast("今日のチェックインを記録しました！");
+    showToast("ä»æ¥ã®ãã§ãã¯ã¤ã³ãè¨é²ãã¾ããï¼");
     return;
   }
 
@@ -1189,7 +1195,7 @@ function handleClick(event) {
     if (state.logs.length < before) {
       saveState();
       render();
-      showToast("チェックインを取り消しました。");
+      showToast("ãã§ãã¯ã¤ã³ãåãæ¶ãã¾ããã");
     }
     return;
   }
@@ -1236,9 +1242,9 @@ function handleClick(event) {
     const saved = commitRoadmapDraft();
     render();
     if (saved) {
-      showToast("マイルストーンを保存しました。");
+      showToast("ãã¤ã«ã¹ãã¼ã³ãä¿å­ãã¾ããã");
     } else {
-      showToast("タイトルを入れてください。");
+      showToast("ã¿ã¤ãã«ãå¥ãã¦ãã ããã");
     }
     return;
   }
@@ -1246,28 +1252,28 @@ function handleClick(event) {
   if (action === "delete-roadmap-item") {
     deleteRoadmapItem(target.dataset.roadmapId || "");
     render();
-    showToast("マイルストーンを削除しました。");
+    showToast("ãã¤ã«ã¹ãã¼ã³ãåé¤ãã¾ããã");
     return;
   }
 
     if (action === "manual-log") {
     recordLog(target.dataset.outcome, null);
     render();
-    showToast("手動で記録しました。");
+    showToast("æåã§è¨é²ãã¾ããã");
     return;
   }
 
   if (action === "undo-log-date") {
     const removed = removeLatestLogByDate(target.dataset.date || toISODate(new Date()));
     render();
-    showToast(removed ? `取り消しました: ${buildLogSummary(removed)}` : "取り消せる記録がありません。");
+    showToast(removed ? `åãæ¶ãã¾ãã: ${buildLogSummary(removed)}` : "åãæ¶ããè¨é²ãããã¾ããã");
     return;
   }
 
   if (action === "open-review-log-editor") {
     const opened = openReviewLogDraft(target.dataset.logId || "");
     render();
-    showToast(opened ? "記録を修正できます。" : "修正できる記録が見つかりません。");
+    showToast(opened ? "è¨é²ãä¿®æ­£ã§ãã¾ãã" : "ä¿®æ­£ã§ããè¨é²ãè¦ã¤ããã¾ããã");
     return;
   }
 
@@ -1286,7 +1292,7 @@ function handleClick(event) {
   if (action === "save-review-log") {
     const saved = saveReviewLogDraft();
     render();
-    showToast(saved ? "記録を更新しました。" : "実施日と実施時間を確認してください。");
+    showToast(saved ? "è¨é²ãæ´æ°ãã¾ããã" : "å®æ½æ¥ã¨å®æ½æéãç¢ºèªãã¦ãã ããã");
     return;
   }
 
@@ -1314,7 +1320,7 @@ function handleClick(event) {
     state.meta.currentView = "today";
     saveState();
     render();
-    showToast("差分を適用しました。");
+    showToast("å·®åãé©ç¨ãã¾ããã");
   }
 }
 
@@ -1402,7 +1408,7 @@ function render() {
   }
 
   todayLabel.textContent = formatHeaderDate(new Date());
-  setupShortcut.textContent = currentView === "setup" ? "閉じる" : "設定";
+  setupShortcut.textContent = currentView === "setup" ? "éãã" : "è¨­å®";
   setupShortcut.dataset.action = currentView === "setup" ? "close-setup" : "open-setup";
   if (currentView === "setup") {
     delete setupShortcut.dataset.section;
@@ -1435,7 +1441,7 @@ function render() {
     screenRoot.innerHTML = (renderMap[currentView] || renderMap.today)();
   } catch (err) {
     console.error("render error:", err);
-    screenRoot.innerHTML = `<div class="screen" style="padding:32px 24px;text-align:center;"><p style="font-size:1.1rem;margin-bottom:8px;">表示エラーが発生しました</p><p style="font-size:0.82rem;color:var(--muted)">${escapeHtml(String(err.message || err))}</p></div>`;
+    screenRoot.innerHTML = `<div class="screen" style="padding:32px 24px;text-align:center;"><p style="font-size:1.1rem;margin-bottom:8px;">è¡¨ç¤ºã¨ã©ã¼ãçºçãã¾ãã</p><p style="font-size:0.82rem;color:var(--muted)">${escapeHtml(String(err.message || err))}</p></div>`;
   }
   renderSessionSheet();
   startSessionTicker();
@@ -1585,36 +1591,36 @@ function getEditableScheduleRows(draft) {
 
 function renderEditableScheduleRow(item, draft) {
   const statusBadge = item.isActive
-    ? `<span class="status-badge status-badge--done">表示中</span>`
-    : `<span class="status-badge ${item.overlaps ? "status-badge--danger" : ""}">${item.overlaps ? "重なり" : item.sharedDays.length ? "別時間" : "別曜日"}</span>`;
+    ? `<span class="status-badge status-badge--done">è¡¨ç¤ºä¸­</span>`
+    : `<span class="status-badge ${item.overlaps ? "status-badge--danger" : ""}">${item.overlaps ? "éãªã" : item.sharedDays.length ? "å¥æé" : "å¥ææ¥"}</span>`;
 
   return `
     <article class="goal-window-row ${item.isActive ? "is-active" : ""} ${item.overlaps ? "is-conflict" : ""}">
       <div class="goal-window-row__head">
         <div class="goal-window-row__body">
           <strong class="goal-window-row__name">${escapeHtml(item.label)}</strong>
-          <div class="goal-window-row__meta">実施時間 ${escapeHtml(item.window)} / ${escapeHtml(formatStudyDays(item.studyDays))}</div>
+          <div class="goal-window-row__meta">å®æ½æé ${escapeHtml(item.window)} / ${escapeHtml(formatStudyDays(item.studyDays))}</div>
         </div>
         <div class="goal-window-row__actions">
           ${statusBadge}
           ${item.isActive
             ? ""
-            : `<button type="button" class="soft-button goal-window-row__pick" data-action="activate-goal" data-goal-id="${escapeHtml(item.id)}">編集する</button>`}
+            : `<button type="button" class="soft-button goal-window-row__pick" data-action="activate-goal" data-goal-id="${escapeHtml(item.id)}">ç·¨éãã</button>`}
         </div>
       </div>
       ${item.isActive
         ? `
           <div class="goal-window-row__editor">
-            ${renderWindowField("実施時間", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
+            ${renderWindowField("å®æ½æé", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
             <div class="field">
-              <span class="field__label">曜日</span>
+              <span class="field__label">ææ¥</span>
               <div class="weekday-choice-row goal-window-row__days">
                 ${WEEKDAY_KEYS.map((weekdayKey) => renderWeekdayChip(weekdayKey, draft.studyDays)).join("")}
               </div>
-              <p class="goal-window-row__current">現在: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
+              <p class="goal-window-row__current">ç¾å¨: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
             </div>
             <div class="goal-window-row__save">
-              <button type="button" class="action-button action-button--primary" data-action="save-setup">この内容で保存</button>
+              <button type="button" class="action-button action-button--primary" data-action="save-setup">ãã®åå®¹ã§ä¿å­</button>
             </div>
           </div>
         `
@@ -1630,17 +1636,17 @@ function renderPrimaryWindowRoster(draft) {
   const warningClass = conflicts.length && !isNewGoal ? "is-danger" : "";
   const warningText = conflicts.length
     ? (isNewGoal
-      ? "同じ実施時間の目標があります。追加後に調整できます。"
-      : `この実施時間は ${conflicts.map((item) => item.label).join(" / ")} と重なっています。`)
-    : "いまの実施時間は同じ実施曜日の目標と重なっていません。";
+      ? "åãå®æ½æéã®ç®æ¨ãããã¾ããè¿½å å¾ã«èª¿æ´ã§ãã¾ãã"
+      : `ãã®å®æ½æéã¯ ${conflicts.map((item) => item.label).join(" / ")} ã¨éãªã£ã¦ãã¾ãã`)
+    : "ãã¾ã®å®æ½æéã¯åãå®æ½ææ¥ã®ç®æ¨ã¨éãªã£ã¦ãã¾ããã";
 
   if (!isNewGoal) {
     const rows = getEditableScheduleRows(draft);
     return `
       <div class="stack setup-schedule-roster">
         <div class="setup-section-intro">
-          <h3 class="section-title">実施時間一覧</h3>
-          <p class="section-copy">この一覧から編集したい目標を開いて、そのまま実施時間と曜日を編集できます。</p>
+          <h3 class="section-title">å®æ½æéä¸è¦§</h3>
+          <p class="section-copy">ãã®ä¸è¦§ããç·¨éãããç®æ¨ãéãã¦ããã®ã¾ã¾å®æ½æéã¨ææ¥ãç·¨éã§ãã¾ãã</p>
         </div>
         <div class="goal-window-list goal-window-list--editable">
           ${rows.map((item) => renderEditableScheduleRow(item, draft)).join("")}
@@ -1653,8 +1659,8 @@ function renderPrimaryWindowRoster(draft) {
   return `
     <div class="stack setup-schedule-roster">
       <div class="setup-section-intro">
-        <h3 class="section-title">ほかの目標の実施時間</h3>
-        <p class="section-copy">同じ実施時間を避けると、1日に抱える入口の多さが見えます。</p>
+        <h3 class="section-title">ã»ãã®ç®æ¨ã®å®æ½æé</h3>
+        <p class="section-copy">åãå®æ½æéãé¿ããã¨ã1æ¥ã«æ±ããå¥å£ã®å¤ããè¦ãã¾ãã</p>
       </div>
       ${roster.length
         ? `
@@ -1664,17 +1670,17 @@ function renderPrimaryWindowRoster(draft) {
                 <div class="goal-window-row__head">
                   <div class="goal-window-row__body">
                     <strong class="goal-window-row__name">${escapeHtml(item.label)}</strong>
-                    <div class="goal-window-row__meta">実施時間 ${escapeHtml(item.window)} / ${escapeHtml(formatStudyDays(item.studyDays))}</div>
+                    <div class="goal-window-row__meta">å®æ½æé ${escapeHtml(item.window)} / ${escapeHtml(formatStudyDays(item.studyDays))}</div>
                   </div>
                   <div class="goal-window-row__actions">
-                    <span class="status-badge ${item.overlaps && !isNewGoal ? "status-badge--danger" : ""}">${item.overlaps ? (isNewGoal ? "後で調整" : "重なり") : (item.sharedDays.length ? "別時間" : "別曜日")}</span>
+                    <span class="status-badge ${item.overlaps && !isNewGoal ? "status-badge--danger" : ""}">${item.overlaps ? (isNewGoal ? "å¾ã§èª¿æ´" : "éãªã") : (item.sharedDays.length ? "å¥æé" : "å¥ææ¥")}</span>
                   </div>
                 </div>
               </div>
             `).join("")}
           </div>
         `
-        : `<p class="section-copy">まだ他の目標はありません。</p>`}
+        : `<p class="section-copy">ã¾ã ä»ã®ç®æ¨ã¯ããã¾ããã</p>`}
       <p class="setup-warning ${warningClass}">${escapeHtml(warningText)}</p>
     </div>
   `;
@@ -1693,14 +1699,14 @@ function renderSetupSectionBody(section, draft) {
       <div class="stack setup-schedule">
         ${renderPrimaryWindowRoster(draft)}
         <div class="field">
-          <span class="field__label">曜日</span>
-          <p class="section-copy">Today には、今日の曜日に合う目標だけ表示します。</p>
+          <span class="field__label">ææ¥</span>
+          <p class="section-copy">Today ã«ã¯ãä»æ¥ã®ææ¥ã«åãç®æ¨ã ãè¡¨ç¤ºãã¾ãã</p>
           <div class="weekday-choice-row">
             ${WEEKDAY_KEYS.map((weekdayKey) => renderWeekdayChip(weekdayKey, draft.studyDays)).join("")}
           </div>
-          <p class="section-copy">現在: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
+          <p class="section-copy">ç¾å¨: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
         </div>
-        ${renderWindowField("実施時間", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
+        ${renderWindowField("å®æ½æé", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
       </div>
     `;
   }
@@ -1709,8 +1715,8 @@ function renderSetupSectionBody(section, draft) {
     return `
       <div class="stack">
         <div class="setup-section-intro">
-          <h3 class="section-title">マイルストーン</h3>
-          <p class="section-copy">Roadmap 画面は表示だけにして、編集はここでまとめます。</p>
+          <h3 class="section-title">ãã¤ã«ã¹ãã¼ã³</h3>
+          <p class="section-copy">Roadmap ç»é¢ã¯è¡¨ç¤ºã ãã«ãã¦ãç·¨éã¯ããã§ã¾ã¨ãã¾ãã</p>
         </div>
         ${renderRoadmapMilestoneList(buildEditableRoadmapPreview(), { editable: true })}
       </div>
@@ -1720,9 +1726,9 @@ function renderSetupSectionBody(section, draft) {
   if (section === "plan") {
     return `
       <div class="plan-list">
-        ${renderEditablePlanCard("A", "normalMinutes", draft.normalMinutes, "いつもの標準プラン")}
-        ${renderEditablePlanCard("B", "shortMinutes", draft.shortMinutes, "少し軽くする短縮プラン")}
-        ${renderEditablePlanCard("C", "minimumMinutes", draft.minimumMinutes, "最低限だけ進める救済プラン")}
+        ${renderEditablePlanCard("A", "normalMinutes", draft.normalMinutes, "ãã¤ãã®æ¨æºãã©ã³")}
+        ${renderEditablePlanCard("B", "shortMinutes", draft.shortMinutes, "å°ãè»½ãããç­ç¸®ãã©ã³")}
+        ${renderEditablePlanCard("C", "minimumMinutes", draft.minimumMinutes, "æä½éã ãé²ããææ¸ãã©ã³")}
       </div>
     `;
   }
@@ -1738,34 +1744,34 @@ function renderSetupSectionBody(section, draft) {
   const isHabitDraft = draft.goalType === "habit";
   return `
     <div class="stack">
-      <p class="section-copy">保存すると、今の Today は変えずに新しい目標だけ追加します。</p>
+      <p class="section-copy">ä¿å­ããã¨ãä»ã® Today ã¯å¤ããã«æ°ããç®æ¨ã ãè¿½å ãã¾ãã</p>
       <div class="field">
-        <span class="field__label">種類</span>
+        <span class="field__label">ç¨®é¡</span>
         <div class="goal-type-toggle">
           <button type="button" class="goal-type-btn ${!isHabitDraft ? "is-active" : ""}" data-action="select-goal-type" data-goal-type="goal">
-            <span class="goal-type-btn__icon">🎯</span>
-            <span class="goal-type-btn__label">目標達成</span>
+            <span class="goal-type-btn__icon">ð¯</span>
+            <span class="goal-type-btn__label">ç®æ¨éæ</span>
           </button>
           <button type="button" class="goal-type-btn ${isHabitDraft ? "is-active" : ""}" data-action="select-goal-type" data-goal-type="habit">
-            <span class="goal-type-btn__icon">🌿</span>
-            <span class="goal-type-btn__label">習慣</span>
+            <span class="goal-type-btn__icon">ð¿</span>
+            <span class="goal-type-btn__label">ç¿æ£</span>
           </button>
         </div>
       </div>
       <label class="field">
-        <span class="field__label">目標</span>
+        <span class="field__label">ç®æ¨</span>
         <input class="field__control" data-setup-field="goal" type="text" value="${escapeHtml(draft.goal)}" />
       </label>
       ${!isHabitDraft ? `
         <div class="field">
-          <span class="field__label">期限（空欄で期限なし）</span>
+          <span class="field__label">æéï¼ç©ºæ¬ã§æéãªãï¼</span>
           <input class="field__control" data-setup-field="deadline" type="date" value="${escapeHtml(draft.deadline)}" />
         </div>
         ${renderFlowerPicker(draft.flowerType, "select-setup-flower")}
-        <p class="section-copy">下の設定メニューから Roadmap / 実施時間 / プランもこのまま決められます。</p>
+        <p class="section-copy">ä¸ã®è¨­å®ã¡ãã¥ã¼ãã Roadmap / å®æ½æé / ãã©ã³ããã®ã¾ã¾æ±ºãããã¾ãã</p>
       ` : `
         ${renderBonsaiPicker(draft.bonsaiKey)}
-        <p class="section-copy">習慣タイプは Roadmap が不要です。毎日のチェックインで盆栽が育ちます。</p>
+        <p class="section-copy">ç¿æ£ã¿ã¤ãã¯ Roadmap ãä¸è¦ã§ããæ¯æ¥ã®ãã§ãã¯ã¤ã³ã§çæ ½ãè²ã¡ã¾ãã</p>
       `}
     </div>
   `;
@@ -1861,13 +1867,13 @@ function renderGoalLibrary() {
   const goals = listGoalsByPrimaryWindow();
   const editingGoalId = ui.goalLibraryDraft ? ui.goalLibraryDraft.goalId : "";
   const intro = ui.setupMode === "new_goal"
-    ? "保存すると一覧に追加されます。Today は今の目標のままです。"
-    : "登録済みの目標をここで編集します。表示する目標は設定メニュー下の選択タブで切り替えます。";
+    ? "ä¿å­ããã¨ä¸è¦§ã«è¿½å ããã¾ããToday ã¯ä»ã®ç®æ¨ã®ã¾ã¾ã§ãã"
+    : "ç»é²æ¸ã¿ã®ç®æ¨ãããã§ç·¨éãã¾ããè¡¨ç¤ºããç®æ¨ã¯è¨­å®ã¡ãã¥ã¼ä¸ã®é¸æã¿ãã§åãæ¿ãã¾ãã";
 
   return `
     <div class="stack">
       <div class="setup-section-intro goal-library__intro">
-        <h3 class="section-title">登録済みの目標</h3>
+        <h3 class="section-title">ç»é²æ¸ã¿ã®ç®æ¨</h3>
         <p class="section-copy">${escapeHtml(intro)}</p>
       </div>
       <div class="goal-library">
@@ -1879,62 +1885,62 @@ function renderGoalLibrary() {
           const flower = isHabitGoal ? null : getGoalFlowerState(goal);
           const bonsaiMeta = isHabitGoal ? getBonsaiTypeMeta(goal.setup.bonsaiKey) : null;
           const meta = isHabitGoal
-            ? `習慣 / ${bonsaiMeta.label}`
-            : `${formatDeadlineBadge(deadlineText)} / 植物 ${flower.label}`;
+            ? `ç¿æ£ / ${bonsaiMeta.label}`
+            : `${formatDeadlineBadge(deadlineText)} / æ¤ç© ${flower.label}`;
           return `
             <article class="goal-library-card ${isActive ? "is-active" : ""}">
               <div class="goal-library-card__head">
                 <strong>${escapeHtml(isEditing ? ui.goalLibraryDraft.goal : goal.setup.goal)}</strong>
-                <span class="status-badge ${isActive ? "status-badge--done" : ""}">${isActive ? "表示中" : "保存済み"}</span>
+                <span class="status-badge ${isActive ? "status-badge--done" : ""}">${isActive ? "è¡¨ç¤ºä¸­" : "ä¿å­æ¸ã¿"}</span>
               </div>
               ${isEditing
                 ? `
                   <div class="goal-library-card__editor">
                     <div class="field">
-                      <span class="field__label">種類</span>
+                      <span class="field__label">ç¨®é¡</span>
                       <div class="goal-type-toggle goal-type-toggle--compact">
                         <button type="button" class="goal-type-btn ${ui.goalLibraryDraft.goalType !== "habit" ? "is-active" : ""}" data-action="select-goal-library-type" data-goal-type="goal">
-                          <span class="goal-type-btn__icon">🎯</span>
-                          <span class="goal-type-btn__label">目標達成</span>
+                          <span class="goal-type-btn__icon">ð¯</span>
+                          <span class="goal-type-btn__label">ç®æ¨éæ</span>
                         </button>
                         <button type="button" class="goal-type-btn ${ui.goalLibraryDraft.goalType === "habit" ? "is-active" : ""}" data-action="select-goal-library-type" data-goal-type="habit">
-                          <span class="goal-type-btn__icon">🌿</span>
-                          <span class="goal-type-btn__label">習慣</span>
+                          <span class="goal-type-btn__icon">ð¿</span>
+                          <span class="goal-type-btn__label">ç¿æ£</span>
                         </button>
                       </div>
                     </div>
                     <label class="field">
-                      <span class="field__label">目標</span>
+                      <span class="field__label">ç®æ¨</span>
                       <input class="field__control" data-goal-library-field="goal" type="text" value="${escapeHtml(ui.goalLibraryDraft.goal)}" />
                     </label>
                     ${ui.goalLibraryDraft.goalType === "habit"
                       ? renderBonsaiPicker(ui.goalLibraryDraft.bonsaiKey, "select-goal-library-bonsai")
                       : `<label class="field">
-                          <span class="field__label">期限（空欄で期限なし）</span>
+                          <span class="field__label">æéï¼ç©ºæ¬ã§æéãªãï¼</span>
                           <input class="field__control" data-goal-library-field="deadline" type="date" value="${escapeHtml(ui.goalLibraryDraft.deadline)}" />
                         </label>
                         ${renderFlowerPicker(ui.goalLibraryDraft.flowerType, "select-goal-library-flower", { compact: true })}`}
                     <div class="goal-library-card__actions">
-                      <button type="button" class="soft-button goal-library-card__action" data-action="save-goal-library-edit">保存</button>
-                      <button type="button" class="soft-button goal-library-card__action" data-action="cancel-goal-library-edit">閉じる</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="save-goal-library-edit">ä¿å­</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="cancel-goal-library-edit">éãã</button>
                     </div>
                   </div>
                 `
                 : ui.deleteConfirmGoalId === goal.id
                   ? `
-                    <p class="goal-library-card__delete-warn">⚠️ この目標を完全消去しますか？元に戻せません。</p>
+                    <p class="goal-library-card__delete-warn">â ï¸ ãã®ç®æ¨ãå®å¨æ¶å»ãã¾ããï¼åã«æ»ãã¾ããã</p>
                     <div class="goal-library-card__actions">
-                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="delete-goal" data-goal-id="${goal.id}">完全消去する</button>
-                      <button type="button" class="soft-button goal-library-card__action" data-action="cancel-delete-goal">やめる</button>
+                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="delete-goal" data-goal-id="${goal.id}">å®å¨æ¶å»ãã</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="cancel-delete-goal">ããã</button>
                     </div>
                   `
                   : `
                     <p class="goal-library-card__meta">${escapeHtml(meta)}</p>
-                    ${isActive ? `<p class="goal-library-card__note">${escapeHtml(isGoalScheduledForDate(goal) ? "この目標は今日の Today に出ます。" : "今日は表示対象外です。")}</p>` : ""}
+                    ${isActive ? `<p class="goal-library-card__note">${escapeHtml(isGoalScheduledForDate(goal) ? "ãã®ç®æ¨ã¯ä»æ¥ã® Today ã«åºã¾ãã" : "ä»æ¥ã¯è¡¨ç¤ºå¯¾è±¡å¤ã§ãã")}</p>` : ""}
                     <div class="goal-library-card__actions">
-                      <button type="button" class="soft-button goal-library-card__action" data-action="start-goal-library-edit" data-goal-id="${goal.id}">編集</button>
-                      <button type="button" class="soft-button goal-library-card__action" data-action="archive-goal" data-goal-id="${goal.id}">アルバムへ</button>
-                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="confirm-delete-goal" data-goal-id="${goal.id}">完全消去</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="start-goal-library-edit" data-goal-id="${goal.id}">ç·¨é</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="archive-goal" data-goal-id="${goal.id}">ã¢ã«ãã ã¸</button>
+                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="confirm-delete-goal" data-goal-id="${goal.id}">å®å¨æ¶å»</button>
                     </div>
                   `}
             </article>
@@ -1963,11 +1969,11 @@ function renderTodayGoalCard(goal, index) {
       <div class="focus-launch__halo" aria-hidden="true"></div>
       <div class="focus-launch__goal-meta">
         <div class="focus-launch__status-row">
-          <span class="status-badge ${escapeHtml(missionState.badgeClass || "")}">${escapeHtml(missionState.isClosed ? "実施済み" : missionState.badge)}</span>
+          <span class="status-badge ${escapeHtml(missionState.badgeClass || "")}">${escapeHtml(missionState.isClosed ? "å®æ½æ¸ã¿" : missionState.badge)}</span>
         </div>
         <div class="focus-launch__goal-timing">
           <span class="focus-launch__goal-deadline">${escapeHtml(formatDeadlineBadge(goal.setup.deadline))}</span>
-          <span class="focus-launch__goal-slot">実施時間 ${escapeHtml(goal.setup.primaryWindow)}</span>
+          <span class="focus-launch__goal-slot">å®æ½æé ${escapeHtml(goal.setup.primaryWindow)}</span>
         </div>
       </div>
       <div class="focus-launch__title-row">
@@ -1982,7 +1988,7 @@ function renderTodayGoalCard(goal, index) {
             (planKey) => `
               <button type="button" class="pill-button focus-plan-button ${selectedPlanKey === planKey ? "is-active" : ""}" data-action="launch-session-plan" data-goal-id="${goal.id}" data-plan="${planKey}">
                 <span class="focus-plan-button__label">${PLAN_META[planKey].label}</span>
-                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}分</span>
+                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}å</span>
               </button>
             `,
           )
@@ -2011,12 +2017,12 @@ function renderTodayHabitCard(goal, index) {
       <div class="focus-launch__halo" aria-hidden="true"></div>
       <div class="focus-launch__goal-meta">
         <div class="focus-launch__status-row">
-          <span class="status-badge ${isDone ? "status-badge--done" : "status-badge--accent"}">${isDone ? "完了済み" : "未完了"}</span>
-          <span class="status-badge">習慣</span>
+          <span class="status-badge ${isDone ? "status-badge--done" : "status-badge--accent"}">${isDone ? "å®äºæ¸ã¿" : "æªå®äº"}</span>
+          <span class="status-badge">ç¿æ£</span>
         </div>
         <div class="focus-launch__goal-timing">
           <span class="focus-launch__goal-slot">${escapeHtml(bonsaiMeta.label)} / ${escapeHtml(growth.stageLabel)}</span>
-          ${(() => { const w = goal.setup.primaryWindow || (goal.setup.primaryStart && goal.setup.primaryEnd ? `${goal.setup.primaryStart}-${goal.setup.primaryEnd}` : ""); return w ? `<span class="focus-launch__goal-slot">実施時間 ${escapeHtml(w)}</span>` : ""; })()}
+          ${(() => { const w = goal.setup.primaryWindow || (goal.setup.primaryStart && goal.setup.primaryEnd ? `${goal.setup.primaryStart}-${goal.setup.primaryEnd}` : ""); return w ? `<span class="focus-launch__goal-slot">å®æ½æé ${escapeHtml(w)}</span>` : ""; })()}
         </div>
       </div>
       <div class="focus-launch__title-row">
@@ -2031,7 +2037,7 @@ function renderTodayHabitCard(goal, index) {
             (planKey) => `
               <button type="button" class="pill-button focus-plan-button ${selectedPlanKey === planKey ? "is-active" : ""}" data-action="launch-session-plan" data-goal-id="${goal.id}" data-plan="${planKey}">
                 <span class="focus-plan-button__label">${PLAN_META[planKey].label}</span>
-                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}分</span>
+                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}å</span>
               </button>
             `,
           )
@@ -2050,8 +2056,8 @@ function renderActiveGoalContext(options = {}) {
   return `
     <details class="goal-selector">
       <summary>
-        <span class="hero__context goal-selector__current">対象目標: ${escapeHtml(state.setup.goal)}</span>
-        <span class="goal-selector__button">選択</span>
+        <span class="hero__context goal-selector__current">å¯¾è±¡ç®æ¨: ${escapeHtml(state.setup.goal)}</span>
+        <span class="goal-selector__button">é¸æ</span>
       </summary>
       <div class="goal-selector__body">
         ${goals.map((goal) => {
@@ -2067,7 +2073,7 @@ function renderActiveGoalContext(options = {}) {
               ${isActive ? "disabled" : ""}
             >
               <span class="goal-selector__option-title">${escapeHtml(goal.setup.goal)}</span>
-              <span class="goal-selector__option-state">${isActive ? "表示中" : "選ぶ"}</span>
+              <span class="goal-selector__option-state">${isActive ? "è¡¨ç¤ºä¸­" : "é¸ã¶"}</span>
             </button>
           `;
         }).join("")}
@@ -2082,15 +2088,15 @@ function renderSetupView() {
   const isNewGoal = ui.setupMode === "new_goal";
   const activeSectionKey = SETUP_SECTIONS[ui.setupSection] ? ui.setupSection : "goal";
   const activeSection = SETUP_SECTIONS[activeSectionKey];
-  const saveLabel = state.meta.demoMode || isNewGoal ? "この内容で始める" : "変更を保存する";
-  const sectionTitle = activeSectionKey === "goal" ? (isNewGoal ? "目標追加" : "目標編集") : activeSection.title;
+  const saveLabel = state.meta.demoMode || isNewGoal ? "ãã®åå®¹ã§å§ãã" : "å¤æ´ãä¿å­ãã";
+  const sectionTitle = activeSectionKey === "goal" ? (isNewGoal ? "ç®æ¨è¿½å " : "ç®æ¨ç·¨é") : activeSection.title;
   const newGoalSectionCopy = {
-    roadmap: "追加する目標のマイルストーンをここで決めます。",
-    schedule: "追加する目標の実施曜日と実施時間をここで決めます。",
-    plan: "追加する目標の Plan A / B / C をここで決めます。",
+    roadmap: "è¿½å ããç®æ¨ã®ãã¤ã«ã¹ãã¼ã³ãããã§æ±ºãã¾ãã",
+    schedule: "è¿½å ããç®æ¨ã®å®æ½ææ¥ã¨å®æ½æéãããã§æ±ºãã¾ãã",
+    plan: "è¿½å ããç®æ¨ã® Plan A / B / C ãããã§æ±ºãã¾ãã",
   };
   const sectionCopy = activeSectionKey === "goal"
-    ? (isNewGoal ? "今の Today は変えずに、新しい目標を追加します。" : activeSection.copy)
+    ? (isNewGoal ? "ä»ã® Today ã¯å¤ããã«ãæ°ããç®æ¨ãè¿½å ãã¾ãã" : activeSection.copy)
     : (isNewGoal ? newGoalSectionCopy[activeSectionKey] || activeSection.copy : activeSection.copy);
   const showSaveAction = !(activeSectionKey === "goal" && !isNewGoal);
   const isHabitMode = isNewGoal ? draft.goalType === "habit" : state.setup.goalType === "habit";
@@ -2098,16 +2104,16 @@ function renderSetupView() {
     renderSetupMenuItem({
       action: "start-new-goal",
       section: "goal",
-      label: "目標追加",
-      hint: "別の目標を増やす",
+      label: "ç®æ¨è¿½å ",
+      hint: "å¥ã®ç®æ¨ãå¢ãã",
       iconKey: "add",
       active: isNewGoal && activeSectionKey === "goal",
     }),
     renderSetupMenuItem({
       action: "edit-current-goal",
       section: "goal",
-      label: "目標編集",
-      hint: "登録済みを直す",
+      label: "ç®æ¨ç·¨é",
+      hint: "ç»é²æ¸ã¿ãç´ã",
       iconKey: "goal",
       active: !isNewGoal && activeSectionKey === "goal",
     }),
@@ -2115,23 +2121,23 @@ function renderSetupView() {
       action: "select-setup-section",
       section: "roadmap",
       label: "Roadmap",
-      hint: "節目を整える",
+      hint: "ç¯ç®ãæ´ãã",
       iconKey: "roadmap",
       active: activeSectionKey === "roadmap",
     }),
     renderSetupMenuItem({
       action: "select-setup-section",
       section: "schedule",
-      label: "実施時間",
-      hint: "いつやるか",
+      label: "å®æ½æé",
+      hint: "ãã¤ããã",
       iconKey: "schedule",
       active: activeSectionKey === "schedule",
     }),
     renderSetupMenuItem({
       action: "select-setup-section",
       section: "plan",
-      label: "プラン",
-      hint: "A / B / C の幅",
+      label: "ãã©ã³",
+      hint: "A / B / C ã®å¹",
       iconKey: "plan",
       active: activeSectionKey === "plan",
     }),
@@ -2143,12 +2149,12 @@ function renderSetupView() {
         <aside class="setup-nav setup-nav--menu">
           <div class="setup-nav__lead">
             <p class="setup-nav__eyebrow">Settings</p>
-            <strong>変えたいものを選ぶ</strong>
+            <strong>å¤ããããã®ãé¸ã¶</strong>
           </div>
           <div class="setup-nav__list">${setupMenu}</div>
           <div class="setup-nav__data-actions">
-            <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">エクスポート</button>
-            <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">インポート</button>
+            <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">ã¨ã¯ã¹ãã¼ã</button>
+            <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">ã¤ã³ãã¼ã</button>
           </div>
         </aside>
 
@@ -2164,7 +2170,7 @@ function renderSetupView() {
           <div class="setup-stage__header">
             ${renderSetupSectionIcon(activeSectionKey)}
             <div class="setup-stage__copy">
-              ${isNewGoal ? '<span class="status-badge status-badge--accent">追加中</span>' : ""}
+              ${isNewGoal ? '<span class="status-badge status-badge--accent">è¿½å ä¸­</span>' : ""}
               <h2 class="panel__title">${escapeHtml(sectionTitle)}</h2>
             </div>
           </div>
@@ -2192,9 +2198,9 @@ function renderTodayView() {
           ? goals.map((goal, index) => renderTodayGoalCard(goal, index)).join("")
           : `
             <section class="panel panel--warm stack">
-              <span class="status-badge">今日は${escapeHtml(weekdayLabel(todayKey))}</span>
-              <h2 class="section-title">今日は表示する目標がありません</h2>
-              <p class="section-copy">実施曜日が ${escapeHtml(weekdayLabel(todayKey))} の目標だけを Today に表示しています。設定の実施時間から曜日を変更できます。</p>
+              <span class="status-badge">ä»æ¥ã¯${escapeHtml(weekdayLabel(todayKey))}</span>
+              <h2 class="section-title">ä»æ¥ã¯è¡¨ç¤ºããç®æ¨ãããã¾ãã</h2>
+              <p class="section-copy">å®æ½ææ¥ã ${escapeHtml(weekdayLabel(todayKey))} ã®ç®æ¨ã ãã Today ã«è¡¨ç¤ºãã¦ãã¾ããè¨­å®ã®å®æ½æéããææ¥ãå¤æ´ã§ãã¾ãã</p>
             </section>
           `}
       </div>
@@ -2215,9 +2221,9 @@ function getTodayMissionState(currentState, todayLog) {
     return {
       panelClass: "panel--focus",
       badgeClass: "status-badge--accent",
-      badge: "未完了",
-      title: "まだ今日の1本は終わっていません。",
-      detail: "終わるまでは、この1本だけを優先すれば十分です。",
+      badge: "æªå®äº",
+      title: "ã¾ã ä»æ¥ã®1æ¬ã¯çµãã£ã¦ãã¾ããã",
+      detail: "çµããã¾ã§ã¯ããã®1æ¬ã ããåªåããã°ååã§ãã",
       showPendingCue: true,
       isClosed: false,
     };
@@ -2227,9 +2233,9 @@ function getTodayMissionState(currentState, todayLog) {
     return {
       panelClass: "panel--focus",
       badgeClass: "status-badge--accent",
-      badge: "目標更新後",
-      title: "目標を更新したので、新しい1本はまだ未着手です。",
-      detail: `前の記録: ${buildLogSummary(todayLog)}`,
+      badge: "ç®æ¨æ´æ°å¾",
+      title: "ç®æ¨ãæ´æ°ããã®ã§ãæ°ãã1æ¬ã¯ã¾ã æªçæã§ãã",
+      detail: `åã®è¨é²: ${buildLogSummary(todayLog)}`,
       showPendingCue: true,
       isClosed: false,
     };
@@ -2239,8 +2245,8 @@ function getTodayMissionState(currentState, todayLog) {
     return {
       panelClass: "panel--miss",
       badgeClass: "status-badge--danger",
-      badge: "未実施",
-      title: "今日はまだ閉じられていません。",
+      badge: "æªå®æ½",
+      title: "ä»æ¥ã¯ã¾ã éãããã¦ãã¾ããã",
       detail: buildLogSummary(todayLog),
       showPendingCue: true,
       isClosed: false,
@@ -2250,8 +2256,8 @@ function getTodayMissionState(currentState, todayLog) {
   return {
     panelClass: "panel--done",
     badgeClass: "status-badge--done",
-    badge: "完了済み",
-    title: "今日の1本は記録済みです。",
+    badge: "å®äºæ¸ã¿",
+    title: "ä»æ¥ã®1æ¬ã¯è¨é²æ¸ã¿ã§ãã",
     detail: buildLogSummary(todayLog),
     showPendingCue: false,
     isClosed: true,
@@ -2305,8 +2311,8 @@ function computeCatchUpRecommendation(currentState) {
 function renderRoadmapMilestoneCard(milestone, index, options = {}) {
   const editable = Boolean(options.editable);
   const isGoal = Boolean(options.isGoal);
-  const deadlineLabel = milestone.deadline ? `期限 ${milestone.deadline}` : "";
-  const targetLabel = Number.isFinite(Number(milestone.target)) ? `全体目安 ${Math.round(Number(milestone.target))}%` : "";
+  const deadlineLabel = milestone.deadline ? `æé ${milestone.deadline}` : "";
+  const targetLabel = Number.isFinite(Number(milestone.target)) ? `å¨ä½ç®å® ${Math.round(Number(milestone.target))}%` : "";
 
   return `
     <article class="milestone ${milestone.isActive ? "is-active" : ""} ${milestone.isComplete ? "is-complete" : ""} ${isGoal ? "is-goal" : ""}" data-step="${index + 1}">
@@ -2320,8 +2326,8 @@ function renderRoadmapMilestoneCard(milestone, index, options = {}) {
         ${deadlineLabel ? `<div class="milestone__meta">${escapeHtml(deadlineLabel)}</div>` : ""}
         ${editable ? `
           <div class="milestone__actions milestone__actions--compact">
-            <button type="button" class="ghost-button" data-action="open-roadmap-editor" data-roadmap-id="${escapeHtml(milestone.id)}">修正</button>
-            <button type="button" class="ghost-button" data-action="delete-roadmap-item" data-roadmap-id="${escapeHtml(milestone.id)}">削除</button>
+            <button type="button" class="ghost-button" data-action="open-roadmap-editor" data-roadmap-id="${escapeHtml(milestone.id)}">ä¿®æ­£</button>
+            <button type="button" class="ghost-button" data-action="delete-roadmap-item" data-roadmap-id="${escapeHtml(milestone.id)}">åé¤</button>
           </div>
         ` : ""}
       </div>
@@ -2338,7 +2344,7 @@ function renderRoadmapInsertSlot(afterId = "") {
   const afterAttr = afterId ? ` data-after-id="${escapeHtml(afterId)}"` : "";
   return `
     <article class="milestone milestone--insert" data-step="+">
-      <button type="button" class="milestone-add-button" data-action="open-roadmap-editor" aria-label="マイルストーンを追加"${afterAttr}></button>
+      <button type="button" class="milestone-add-button" data-action="open-roadmap-editor" aria-label="ãã¤ã«ã¹ãã¼ã³ãè¿½å "${afterAttr}></button>
     </article>
   `;
 }
@@ -2353,7 +2359,7 @@ function renderRoadmapMilestoneList(roadmap, options = {}) {
           ${renderRoadmapInsertSlot("")}
         </div>
       `
-      : `<p class="preview-empty">まだマイルストーンはありません。</p>`;
+      : `<p class="preview-empty">ã¾ã ãã¤ã«ã¹ãã¼ã³ã¯ããã¾ããã</p>`;
   }
 
   if (editable) {
@@ -2370,7 +2376,7 @@ function renderRoadmapMilestoneList(roadmap, options = {}) {
     `;
   }
 
-  // 閲覧モード: スタート→ゴールの順で表示（データは逆順）
+  // é²è¦§ã¢ã¼ã: ã¹ã¿ã¼ãâã´ã¼ã«ã®é ã§è¡¨ç¤ºï¼ãã¼ã¿ã¯éé ï¼
   const reversed = [...roadmap.milestones].reverse();
   const goalIndex = reversed.length - 1;
 
@@ -2395,7 +2401,7 @@ function getRoadmapMilestoneForDisplay(roadmap) {
 function renderRoadmapCurrentStatus(roadmap) {
   const milestone = getRoadmapMilestoneForDisplay(roadmap);
   if (!milestone) {
-    return `<p class="preview-empty">まだマイルストーンはありません。</p>`;
+    return `<p class="preview-empty">ã¾ã ãã¤ã«ã¹ãã¼ã³ã¯ããã¾ããã</p>`;
   }
 
   const overallProgress = clamp(Math.round(Number(roadmap.learningProgress) || 0), 0, 100);
@@ -2403,8 +2409,8 @@ function renderRoadmapCurrentStatus(roadmap) {
   const achievementRate = milestone.isComplete
     ? 100
     : clamp(Math.round((overallProgress / target) * 100), 0, 100);
-  const statusLabel = milestone.isComplete ? "到達済み" : "進行中";
-  const deadlineLabel = milestone.deadline ? `期限 ${milestone.deadline}` : "期限なし";
+  const statusLabel = milestone.isComplete ? "å°éæ¸ã¿" : "é²è¡ä¸­";
+  const deadlineLabel = milestone.deadline ? `æé ${milestone.deadline}` : "æéãªã";
 
   return `
     <article class="roadmap-focus-card">
@@ -2416,7 +2422,7 @@ function renderRoadmapCurrentStatus(roadmap) {
         </div>
         <div class="roadmap-focus-card__value-block">
           <strong class="roadmap-focus-card__value">${overallProgress}%</strong>
-          <span class="roadmap-focus-card__value-label">全体進捗</span>
+          <span class="roadmap-focus-card__value-label">å¨ä½é²æ</span>
         </div>
       </div>
 
@@ -2446,14 +2452,14 @@ function renderRoadmapView() {
 
       <section class="panel panel--cool stack">
         <div class="status-strip">
-          <span class="status-badge">${roadmap.daysRemaining == null ? "期限なし" : `残り ${formatRemainingSpan(roadmap.daysRemaining)}`}</span>
+          <span class="status-badge">${roadmap.daysRemaining == null ? "æéãªã" : `æ®ã ${formatRemainingSpan(roadmap.daysRemaining)}`}</span>
         </div>
         <div>
-          <h2 class="section-title">現在の達成状況</h2>
+          <h2 class="section-title">ç¾å¨ã®éæç¶æ³</h2>
         </div>
         ${renderRoadmapCurrentStatus(roadmap)}
         <div>
-          <h2 class="section-title">全体のロードマップ</h2>
+          <h2 class="section-title">å¨ä½ã®ã­ã¼ãããã</h2>
         </div>
         ${renderRoadmapMilestoneList(roadmap)}
       </section>
@@ -2466,11 +2472,11 @@ function renderHabitStreakRoadmap() {
   const executedDays = growth.executedDays;
   const bonsaiMeta = getBonsaiTypeMeta(state.setup.bonsaiKey || "pine");
   const milestones = [
-    { days: 7,   label: "7日",   desc: "最初の壁を越えた",       emoji: "🌱" },
-    { days: 21,  label: "21日",  desc: "リズムが生まれてくる",   emoji: "🪴" },
-    { days: 66,  label: "66日",  desc: "自動化の入り口",         emoji: "🌳" },
-    { days: 100, label: "100日", desc: "本物の習慣へ",           emoji: "🎋" },
-    { days: 365, label: "1年",   desc: "人生が変わった",         emoji: "⛩️" },
+    { days: 7,   label: "7æ¥",   desc: "æåã®å£ãè¶ãã",       emoji: "ð±" },
+    { days: 21,  label: "21æ¥",  desc: "ãªãºã ãçã¾ãã¦ãã",   emoji: "ðª´" },
+    { days: 66,  label: "66æ¥",  desc: "èªååã®å¥ãå£",         emoji: "ð³" },
+    { days: 100, label: "100æ¥", desc: "æ¬ç©ã®ç¿æ£ã¸",           emoji: "ð" },
+    { days: 365, label: "1å¹´",   desc: "äººçãå¤ãã£ã",         emoji: "â©ï¸" },
   ];
   const nextMilestone = milestones.find(m => executedDays < m.days);
   const daysToNext = nextMilestone ? nextMilestone.days - executedDays : 0;
@@ -2481,12 +2487,12 @@ function renderHabitStreakRoadmap() {
         <div class="status-strip"><span class="status-badge">${escapeHtml(bonsaiMeta.label)} / ${escapeHtml(growth.stageLabel)}</span></div>
         <div style="text-align:center;padding:8px 0 4px">
           <p style="font-size:3rem;margin:0;line-height:1.1">${executedDays}</p>
-          <p style="font-size:0.85rem;color:var(--muted);margin:4px 0 0">実施した日数</p>
+          <p style="font-size:0.85rem;color:var(--muted);margin:4px 0 0">å®æ½ããæ¥æ°</p>
         </div>
-        ${nextMilestone ? `<div style="font-size:0.82rem;color:var(--muted);text-align:center">次のマイルストーン「${escapeHtml(nextMilestone.label)}」まで あと <strong style="color:var(--ink)">${daysToNext}日</strong></div>` : `<div style="font-size:0.88rem;text-align:center;color:var(--accent)">🎉 すべてのマイルストーンを達成！</div>`}
+        ${nextMilestone ? `<div style="font-size:0.82rem;color:var(--muted);text-align:center">æ¬¡ã®ãã¤ã«ã¹ãã¼ã³ã${escapeHtml(nextMilestone.label)}ãã¾ã§ ãã¨ <strong style="color:var(--ink)">${daysToNext}æ¥</strong></div>` : `<div style="font-size:0.88rem;text-align:center;color:var(--accent)">ð ãã¹ã¦ã®ãã¤ã«ã¹ãã¼ã³ãéæï¼</div>`}
       </section>
       <section class="panel stack">
-        <h2 class="section-title">習慣の道のり</h2>
+        <h2 class="section-title">ç¿æ£ã®éã®ã</h2>
         <div class="stack" style="gap:10px">
           ${milestones.map(m => {
             const done = executedDays >= m.days;
@@ -2498,7 +2504,7 @@ function renderHabitStreakRoadmap() {
                 <div style="flex:1">
                   <div style="display:flex;justify-content:space-between;align-items:baseline">
                     <strong style="font-size:0.95rem">${escapeHtml(m.label)}</strong>
-                    <span style="font-size:0.78rem;color:var(--muted)">${done ? "✓ 達成" : `${executedDays}/${m.days}日`}</span>
+                    <span style="font-size:0.78rem;color:var(--muted)">${done ? "â éæ" : `${executedDays}/${m.days}æ¥`}</span>
                   </div>
                   <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0">${escapeHtml(m.desc)}</p>
                 </div>
@@ -2524,26 +2530,26 @@ function renderRoadmapEditor(stepLabel = "+") {
     <article class="milestone milestone--editor" data-step="${escapeHtml(String(stepLabel))}">
       <section class="panel panel--warm stack milestone-editor">
         <div>
-          <h2 class="panel__title">${isEdit ? "マイルストーンを修正" : "マイルストーンを追加"}</h2>
+          <h2 class="panel__title">${isEdit ? "ãã¤ã«ã¹ãã¼ã³ãä¿®æ­£" : "ãã¤ã«ã¹ãã¼ã³ãè¿½å "}</h2>
         </div>
         <label class="field">
-          <span class="field__label">タイトル</span>
-          <input class="field__control" data-roadmap-field="label" type="text" value="${escapeHtml(draft.label || "")}" placeholder="模試で70% / 3分野を一周 など" />
+          <span class="field__label">ã¿ã¤ãã«</span>
+          <input class="field__control" data-roadmap-field="label" type="text" value="${escapeHtml(draft.label || "")}" placeholder="æ¨¡è©¦ã§70% / 3åéãä¸å¨ ãªã©" />
         </label>
         <div class="field-grid field-grid--two">
           <label class="field">
-            <span class="field__label">期限</span>
+            <span class="field__label">æé</span>
             <input class="field__control" data-roadmap-field="deadline" type="date" value="${escapeHtml(draft.deadline || "")}" ${isGoalItem ? "disabled" : ""} />
           </label>
           <label class="field">
-            <span class="field__label">到達目安 (%)</span>
+            <span class="field__label">å°éç®å® (%)</span>
             <input class="field__control" data-roadmap-field="target" type="number" min="0" max="100" value="${escapeHtml(String(draft.target ?? 0))}" />
           </label>
         </div>
-        ${isGoalItem ? '<p class="section-copy">最終期限は目標編集で変更します。</p>' : ''}
+        ${isGoalItem ? '<p class="section-copy">æçµæéã¯ç®æ¨ç·¨éã§å¤æ´ãã¾ãã</p>' : ''}
         <div class="action-row milestone-editor__actions">
-          <button type="button" class="action-button action-button--primary" data-action="save-roadmap-item">${isEdit ? "修正を保存" : "追加する"}</button>
-          <button type="button" class="soft-button" data-action="cancel-roadmap-editor">閉じる</button>
+          <button type="button" class="action-button action-button--primary" data-action="save-roadmap-item">${isEdit ? "ä¿®æ­£ãä¿å­" : "è¿½å ãã"}</button>
+          <button type="button" class="soft-button" data-action="cancel-roadmap-editor">éãã</button>
         </div>
       </section>
     </article>
@@ -2568,8 +2574,8 @@ function renderReviewView() {
 
       <section class="panel stack">
         <div class="metric-grid">
-          ${renderMetricCard("7日実行率", metrics.executionRate)}
-          ${renderMetricCard("トータル勉強時間", formatLoggedDuration(totalStudySeconds), "")}
+          ${renderMetricCard("7æ¥å®è¡ç", metrics.executionRate)}
+          ${renderMetricCard("ãã¼ã¿ã«åå¼·æé", formatLoggedDuration(totalStudySeconds), "")}
         </div>
       </section>
 
@@ -2639,17 +2645,17 @@ function renderReviewPotCard(goal) {
       <div class="review-pot-card">
         <div class="review-pot-card__copy">
           <div class="status-strip">
-            <span class="status-badge status-badge--done">選択中</span>
+            <span class="status-badge status-badge--done">é¸æä¸­</span>
             ${isHabit
-              ? `<span class="status-badge">習慣</span>`
-              : `<span class="status-badge ${isGoalAchieved(goal) ? "status-badge--done" : "status-badge--accent"}">${isGoalAchieved(goal) ? "達成済み" : "育成中"}</span>`}
+              ? `<span class="status-badge">ç¿æ£</span>`
+              : `<span class="status-badge ${isGoalAchieved(goal) ? "status-badge--done" : "status-badge--accent"}">${isGoalAchieved(goal) ? "éææ¸ã¿" : "è²æä¸­"}</span>`}
           </div>
           <div class="stack stack--tight">
             <h2 class="section-title">${escapeHtml(goal.setup.goal)}</h2>
             <p class="section-copy">${escapeHtml(statusCopy)}</p>
             ${todayLog && isExecutionOutcome(todayLog.outcome)
               ? `<div class="review-pot-card__actions">
-                  <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(todayLog.logId)}">この記録を修正</button>
+                  <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(todayLog.logId)}">ãã®è¨é²ãä¿®æ­£</button>
                 </div>`
               : ""}
           </div>
@@ -2665,15 +2671,15 @@ function renderReviewPotCard(goal) {
         </div>
         <div class="review-pot-card__facts">
           <div class="review-pot-card__fact">
-            <span>${isHabit ? "成長段階" : "咲き方"}</span>
+            <span>${isHabit ? "æé·æ®µé" : "å²ãæ¹"}</span>
             <strong>${escapeHtml(isHabit ? bonsaiGrowth.stageLabel : flower.stageLabel)}</strong>
           </div>
           <div class="review-pot-card__fact">
-            <span>${isHabit ? "継続日数" : "育成日数"}</span>
-            <strong>${escapeHtml(`${isHabit ? bonsaiGrowth.executedDays : flower.executedDays}日`)}</strong>
+            <span>${isHabit ? "ç¶ç¶æ¥æ°" : "è²ææ¥æ°"}</span>
+            <strong>${escapeHtml(`${isHabit ? bonsaiGrowth.executedDays : flower.executedDays}æ¥`)}</strong>
           </div>
           <div class="review-pot-card__fact">
-            <span>${isHabit ? "直近7回" : "全体進捗"}</span>
+            <span>${isHabit ? "ç´è¿7å" : "å¨ä½é²æ"}</span>
             <strong>${isHabit ? renderStreakDots(goal.logs || [], goal.setup.studyDays) : escapeHtml(`${roadmap.learningProgress}%`)}</strong>
           </div>
         </div>
@@ -2690,7 +2696,7 @@ function renderReviewLogEditPanel() {
   const collapsedCount = 5;
   const shouldCollapse = allLogs.length > collapsedCount;
   const visibleLogs = ui.reviewLogExpanded ? allLogs : allLogs.slice(0, collapsedCount);
-  const toggleLabel = ui.reviewLogExpanded ? "前の記録を閉じる" : "さらに前の記録を見る";
+  const toggleLabel = ui.reviewLogExpanded ? "åã®è¨é²ãéãã" : "ããã«åã®è¨é²ãè¦ã";
 
   const activeEntry = ui.reviewLogDraft ? getLogEntryById(ui.reviewLogDraft.logId) : null;
   if (ui.reviewLogDraft && !activeEntry) {
@@ -2700,7 +2706,7 @@ function renderReviewLogEditPanel() {
   return `
     <section class="panel stack">
       <div>
-        <h2 class="section-title">記録を修正</h2>
+        <h2 class="section-title">è¨é²ãä¿®æ­£</h2>
       </div>
       ${activeEntry ? renderReviewLogEditor(activeEntry) : ""}
       <div class="review-log-list">
@@ -2722,27 +2728,27 @@ function renderReviewLogEditor(entry) {
   return `
     <div class="review-log-editor">
       <div class="status-strip">
-        <span class="status-badge status-badge--accent">修正中</span>
+        <span class="status-badge status-badge--accent">ä¿®æ­£ä¸­</span>
         <span class="status-badge">${escapeHtml(outcomeLabel(entry.outcome))}</span>
       </div>
       <div class="field-grid field-grid--two">
         <label class="field">
-          <span class="field__label">実施日</span>
+          <span class="field__label">å®æ½æ¥</span>
           <input class="field__control" data-review-log-field="date" type="date" value="${escapeHtml(draft.date)}" />
         </label>
         <div class="field">
-          <span class="field__label">実施時間</span>
+          <span class="field__label">å®æ½æé</span>
           <div class="review-log-duration">
             <input class="field__control" data-review-log-field="elapsedHours" type="number" min="0" inputmode="numeric" value="${escapeHtml(draft.elapsedHours)}" />
-            <span>時間</span>
+            <span>æé</span>
             <input class="field__control" data-review-log-field="elapsedMinutes" type="number" min="0" inputmode="numeric" value="${escapeHtml(draft.elapsedMinutes)}" />
-            <span>分</span>
+            <span>å</span>
           </div>
         </div>
       </div>
       <div class="review-log-editor__actions">
-        <button type="button" class="action-button action-button--primary" data-action="save-review-log">保存する</button>
-        <button type="button" class="soft-button" data-action="cancel-review-log-edit">閉じる</button>
+        <button type="button" class="action-button action-button--primary" data-action="save-review-log">ä¿å­ãã</button>
+        <button type="button" class="soft-button" data-action="cancel-review-log-edit">éãã</button>
       </div>
     </div>
   `;
@@ -2751,9 +2757,9 @@ function renderReviewLogEditor(entry) {
 function renderReviewLogCard(entry) {
   const isEditing = ui.reviewLogDraft && ui.reviewLogDraft.logId === entry.logId;
   const detailParts = [
-    entry.milestoneLabel ? `節目 ${entry.milestoneLabel}` : "",
-    entry.progressText ? `到達 ${entry.progressText}` : "",
-    entry.reflection ? `メモ ${entry.reflection}` : "",
+    entry.milestoneLabel ? `ç¯ç® ${entry.milestoneLabel}` : "",
+    entry.progressText ? `å°é ${entry.progressText}` : "",
+    entry.reflection ? `ã¡ã¢ ${entry.reflection}` : "",
   ].filter(Boolean);
 
   return `
@@ -2761,9 +2767,9 @@ function renderReviewLogCard(entry) {
       <div class="review-log-card__head">
         <div>
           <strong class="review-log-card__title">${escapeHtml(formatReviewLogDate(entry.date))}</strong>
-          <p class="review-log-card__meta">${escapeHtml(`${outcomeLabel(entry.outcome)} / 実行 ${formatLoggedDuration(getLoggedSeconds(entry))}`)}</p>
+          <p class="review-log-card__meta">${escapeHtml(`${outcomeLabel(entry.outcome)} / å®è¡ ${formatLoggedDuration(getLoggedSeconds(entry))}`)}</p>
         </div>
-        <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(entry.logId)}">修正</button>
+        <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(entry.logId)}">ä¿®æ­£</button>
       </div>
       ${detailParts.length ? `<p class="review-log-card__detail">${escapeHtml(detailParts.join(" / "))}</p>` : ""}
     </article>
@@ -2783,15 +2789,15 @@ function renderGardenView() {
         <div class="hero__sticky">
           <div class="hero__accent"></div>
           <div class="status-strip">
-            <span class="status-badge">育成中 ${growingGoals.length}</span>
-            <span class="status-badge status-badge--done">達成済み ${archivedGoals.length}</span>
+            <span class="status-badge">è²æä¸­ ${growingGoals.length}</span>
+            <span class="status-badge status-badge--done">éææ¸ã¿ ${archivedGoals.length}</span>
           </div>
         </div>
       </div>
 
-      ${habitGoals.length ? renderGardenShelfSection("育てている盆栽", "習慣タイプの目標です。毎日のチェックインで成長します。", habitGoals, { emptyCopy: "まだ習慣はありません。" }) : ""}
-      ${renderGardenShelfSection("今育てている花", "進行中の目標をまとめています。", growingGoals, { emptyCopy: "まだ育成中の花はありません。" })}
-      ${renderAchievementGardenSection("目標達成した花", "達成した花はこの庭に植えて、咲いた記録を残していきます。", archivedGoals, { emptyCopy: "まだ達成した花はありません。" })}
+      ${habitGoals.length ? renderGardenShelfSection("è²ã¦ã¦ããçæ ½", "ç¿æ£ã¿ã¤ãã®ç®æ¨ã§ããæ¯æ¥ã®ãã§ãã¯ã¤ã³ã§æé·ãã¾ãã", habitGoals, { emptyCopy: "ã¾ã ç¿æ£ã¯ããã¾ããã" }) : ""}
+      ${renderGardenShelfSection("ä»è²ã¦ã¦ããè±", "é²è¡ä¸­ã®ç®æ¨ãã¾ã¨ãã¦ãã¾ãã", growingGoals, { emptyCopy: "ã¾ã è²æä¸­ã®è±ã¯ããã¾ããã" })}
+      ${renderAchievementGardenSection("ç®æ¨éæããè±", "éæããè±ã¯ãã®åº­ã«æ¤ãã¦ãå²ããè¨é²ãæ®ãã¦ããã¾ãã", archivedGoals, { emptyCopy: "ã¾ã éæããè±ã¯ããã¾ããã" })}
       ${renderAlbumSection()}
     </section>
   `;
@@ -2809,12 +2815,12 @@ function renderAlbumSection() {
       const growth = getBonsaiGrowth(goal.logs || []);
       const health = getBonsaiHealth(goal.logs || [], goal.setup.studyDays);
       artwork = renderBonsaiArtwork(goal.setup.bonsaiKey || "pine", growth.stageIndex, health, { size: "card" });
-      subtitle = `${getBonsaiTypeMeta(goal.setup.bonsaiKey).label} / ${growth.stageIndex}段階 / ${growth.executedDays}日間`;
+      subtitle = `${getBonsaiTypeMeta(goal.setup.bonsaiKey).label} / ${growth.stageIndex}æ®µé / ${growth.executedDays}æ¥é`;
     } else {
       const growth = getFlowerGrowth(goal.logs || []);
       const flower = getGoalFlowerState(goal);
       artwork = renderFlowerArtwork(flower.key, growth.stageIndex, { size: "card" });
-      subtitle = `${flower.label} / ${growth.stageLabel} / ${growth.executedDays}日間`;
+      subtitle = `${flower.label} / ${growth.stageLabel} / ${growth.executedDays}æ¥é`;
     }
     const archivedDate = goal.archivedAt ? goal.archivedAt.replace(/-/g, ".") : "";
     return `
@@ -2823,15 +2829,15 @@ function renderAlbumSection() {
         <div class="album-card__body">
           <p class="album-card__name">${escapeHtml(goal.setup.goal)}</p>
           <p class="album-card__sub">${escapeHtml(subtitle)}</p>
-          ${archivedDate ? `<p class="album-card__date">${archivedDate} 保存</p>` : ""}
+          ${archivedDate ? `<p class="album-card__date">${archivedDate} ä¿å­</p>` : ""}
           ${isConfirm
-            ? `<p class="album-card__warn">⚠️ 完全消去しますか？元に戻せません。</p>
+            ? `<p class="album-card__warn">â ï¸ å®å¨æ¶å»ãã¾ããï¼åã«æ»ãã¾ããã</p>
                <div class="album-card__actions">
-                 <button class="soft-button" data-action="purge-archived-goal" data-goal-id="${goal.id}">消去する</button>
-                 <button class="soft-button" data-action="cancel-delete-goal">やめる</button>
+                 <button class="soft-button" data-action="purge-archived-goal" data-goal-id="${goal.id}">æ¶å»ãã</button>
+                 <button class="soft-button" data-action="cancel-delete-goal">ããã</button>
                </div>`
             : `<div class="album-card__actions">
-                 <button class="soft-button album-card__delete" data-action="confirm-delete-goal" data-goal-id="${goal.id}">完全消去</button>
+                 <button class="soft-button album-card__delete" data-action="confirm-delete-goal" data-goal-id="${goal.id}">å®å¨æ¶å»</button>
                </div>`}
         </div>
       </div>
@@ -2840,8 +2846,8 @@ function renderAlbumSection() {
   return `
     <section class="panel stack garden-album">
       <div>
-        <h2 class="section-title">アルバム</h2>
-        <p class="section-copy">アルバムへ移動した目標です。記録はここで見返せます。</p>
+        <h2 class="section-title">ã¢ã«ãã </h2>
+        <p class="section-copy">ã¢ã«ãã ã¸ç§»åããç®æ¨ã§ããè¨é²ã¯ããã§è¦è¿ãã¾ãã</p>
       </div>
       <div class="album-list">${cards}</div>
     </section>
@@ -2856,7 +2862,7 @@ function renderGardenShelfSection(title, copy, goals, options = {}) {
           <h2 class="section-title">${escapeHtml(title)}</h2>
           <p class="section-copy">${escapeHtml(copy)}</p>
         </div>
-        <p class="preview-empty">${escapeHtml(options.emptyCopy || "まだありません。")}</p>
+        <p class="preview-empty">${escapeHtml(options.emptyCopy || "ã¾ã ããã¾ããã")}</p>
       </section>
     `;
   }
@@ -2893,10 +2899,10 @@ function renderGardenShelfCard(goal, options = {}) {
         <div class="garden-card__body">
           <div class="garden-card__head">
             <strong class="garden-card__title">${escapeHtml(goal.setup.goal)}</strong>
-            <span class="status-badge">習慣</span>
+            <span class="status-badge">ç¿æ£</span>
           </div>
           <p class="garden-card__meta">${escapeHtml(`${bonsaiMeta.label} / ${growth.stageLabel}`)}</p>
-          <div class="garden-card__streak">${escapeHtml(`継続 ${growth.executedDays}日`)}&ensp;${renderStreakDots(goal.logs || [], goal.setup.studyDays)}</div>
+          <div class="garden-card__streak">${escapeHtml(`ç¶ç¶ ${growth.executedDays}æ¥`)}&ensp;${renderStreakDots(goal.logs || [], goal.setup.studyDays)}</div>
         </div>
       </div>
     `;
@@ -2918,10 +2924,10 @@ function renderGardenShelfCard(goal, options = {}) {
       <div class="garden-card__body">
         <div class="garden-card__head">
           <strong class="garden-card__title">${escapeHtml(goal.setup.goal)}</strong>
-          <span class="status-badge ${completed ? "status-badge--done" : ""}">${completed ? "達成済み" : "育成中"}</span>
+          <span class="status-badge ${completed ? "status-badge--done" : ""}">${completed ? "éææ¸ã¿" : "è²æä¸­"}</span>
         </div>
         <p class="garden-card__meta">${escapeHtml(`${flower.label} / ${flower.stageLabel}`)}</p>
-        <p class="garden-card__meta">${escapeHtml(`育成 ${flower.executedDays}日 / 進捗 ${roadmap.learningProgress}%`)}</p>
+        <p class="garden-card__meta">${escapeHtml(`è²æ ${flower.executedDays}æ¥ / é²æ ${roadmap.learningProgress}%`)}</p>
       </div>
     </div>
   `;
@@ -2935,7 +2941,7 @@ function renderAchievementGardenSection(title, copy, goals, options = {}) {
           <h2 class="section-title">${escapeHtml(title)}</h2>
           <p class="section-copy">${escapeHtml(copy)}</p>
         </div>
-        <p class="preview-empty">${escapeHtml(options.emptyCopy || "まだありません。")}</p>
+        <p class="preview-empty">${escapeHtml(options.emptyCopy || "ã¾ã ããã¾ããã")}</p>
       </section>
     `;
   }
@@ -2961,7 +2967,7 @@ function renderAchievementGardenPlanter(goals, bedIndex, totalBeds = 1) {
   const sceneZoom = totalBeds > 1 ? 118 : 100;
 
   return `
-    <section class="garden-planter ${totalBeds > 1 ? "garden-planter--stacked" : ""}" style="--plot-count:${goals.length}; --scene-position:${scenePosition}%; --scene-zoom:${sceneZoom}%;" aria-label="${escapeHtml(`達成花壇 ${bedIndex + 1}`)}">
+    <section class="garden-planter ${totalBeds > 1 ? "garden-planter--stacked" : ""}" style="--plot-count:${goals.length}; --scene-position:${scenePosition}%; --scene-zoom:${sceneZoom}%;" aria-label="${escapeHtml(`éæè±å£ ${bedIndex + 1}`)}">
       <div class="garden-planter__grid">
         ${goals.map((goal) => renderAchievementGardenPlot(goal)).join("")}
       </div>
@@ -2977,7 +2983,7 @@ function renderAchievementGardenPlot(goal) {
   return `
     <article class="garden-plot ${isActive ? "is-active" : ""}">
       <details class="garden-plot__details">
-        <summary class="garden-plot__touch" aria-label="${escapeHtml(`${goal.setup.goal} の詳細を表示`)}">
+        <summary class="garden-plot__touch" aria-label="${escapeHtml(`${goal.setup.goal} ã®è©³ç´°ãè¡¨ç¤º`)}">
           <div class="garden-plot__flower">
             ${renderFlowerArtwork(flower.key, flower.stageIndex, { size: "garden", showSoil: false })}
           </div>
@@ -2985,7 +2991,7 @@ function renderAchievementGardenPlot(goal) {
         <div class="garden-plot__tooltip" role="note">
           <div class="garden-plot__label">${escapeHtml(goal.setup.goal)}</div>
           <div class="garden-plot__meta">${escapeHtml(`${flower.label} / ${flower.stageLabel}`)}</div>
-          <div class="garden-plot__meta">${escapeHtml(`育成 ${flower.executedDays}日 / 進捗 ${roadmap.learningProgress}%`)}</div>
+          <div class="garden-plot__meta">${escapeHtml(`è²æ ${flower.executedDays}æ¥ / é²æ ${roadmap.learningProgress}%`)}</div>
         </div>
       </details>
     </article>
@@ -3004,12 +3010,12 @@ function renderReplanView() {
       <div class="hero">
         <div class="hero__accent"></div>
         ${renderActiveGoalContext()}
-        <h1 class="hero__title">自由雑談ではなく、立て直しに集中する</h1>
+        <h1 class="hero__title">èªç±éè«ã§ã¯ãªããç«ã¦ç´ãã«éä¸­ãã</h1>
       </div>
 
       <section class="stack">
         <div>
-          <h2 class="section-title">よくある修正</h2>
+          <h2 class="section-title">ããããä¿®æ­£</h2>
         </div>
         <div class="mode-grid">
           ${Object.entries(REPLAN_MODES)
@@ -3027,23 +3033,23 @@ function renderReplanView() {
       ${isRetargetMode ? `
         <section class="panel stack">
           <div>
-            <h2 class="panel__title">目標とRoadmapを更新</h2>
+            <h2 class="panel__title">ç®æ¨ã¨Roadmapãæ´æ°</h2>
           </div>
           <label class="field">
-            <span class="field__label">目標</span>
+            <span class="field__label">ç®æ¨</span>
             <input class="field__control" data-replan-field="goalDraft" type="text" value="${escapeHtml(state.replan.goalDraft || "")}" />
           </label>
           <label class="field">
-            <span class="field__label">今日のミッション</span>
+            <span class="field__label">ä»æ¥ã®ããã·ã§ã³</span>
             <input class="field__control" data-replan-field="missionDraft" type="text" value="${escapeHtml(state.replan.missionDraft || "")}" />
           </label>
           <div class="field-grid field-grid--two">
             <label class="field">
-              <span class="field__label">今週の到達点</span>
+              <span class="field__label">ä»é±ã®å°éç¹</span>
               <input class="field__control" data-replan-field="weekDraft" type="text" value="${escapeHtml(state.replan.weekDraft || "")}" />
             </label>
             <label class="field">
-              <span class="field__label">次の一歩</span>
+              <span class="field__label">æ¬¡ã®ä¸æ­©</span>
               <input class="field__control" data-replan-field="nextDraft" type="text" value="${escapeHtml(state.replan.nextDraft || "")}" />
             </label>
           </div>
@@ -3052,40 +3058,40 @@ function renderReplanView() {
 
       <section class="panel stack">
         <div>
-          <h2 class="panel__title">相談内容</h2>
+          <h2 class="panel__title">ç¸è«åå®¹</h2>
         </div>
         <label class="field">
-          <textarea data-replan-field="text" placeholder="${isRetargetMode ? "例: ChatGPTと問題を出し合う勉強に寄せたい" : "困っていることを短く書く"}">${escapeHtml(state.replan.text || "")}</textarea>
+          <textarea data-replan-field="text" placeholder="${isRetargetMode ? "ä¾: ChatGPTã¨åé¡ãåºãåãåå¼·ã«å¯ããã" : "å°ã£ã¦ãããã¨ãç­ãæ¸ã"}">${escapeHtml(state.replan.text || "")}</textarea>
         </label>
-        <button type="button" class="action-button" data-action="generate-replan">差分を作る</button>
+        <button type="button" class="action-button" data-action="generate-replan">å·®åãä½ã</button>
       </section>
 
       <section class="panel stack">
         <div>
-          <h2 class="panel__title">差分プレビュー</h2>
+          <h2 class="panel__title">å·®åãã¬ãã¥ã¼</h2>
         </div>
         ${
           preview.length
             ? `<ul class="preview-list">${preview.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-            : `<p class="preview-empty">モードを選んで「差分を作る」を押すと、ここに変更案が出ます。</p>`
+            : `<p class="preview-empty">ã¢ã¼ããé¸ãã§ãå·®åãä½ãããæ¼ãã¨ãããã«å¤æ´æ¡ãåºã¾ãã</p>`
         }
       </section>
 
       <div class="action-row">
-        <button type="button" class="soft-button" data-action="navigate" data-view="today">戻る</button>
-        <button type="button" class="action-button action-button--primary" data-action="apply-replan">この変更を適用</button>
+        <button type="button" class="soft-button" data-action="navigate" data-view="today">æ»ã</button>
+        <button type="button" class="action-button action-button--primary" data-action="apply-replan">ãã®å¤æ´ãé©ç¨</button>
       </div>
     </section>
   `;
 }
 
-function renderPlanCard(planKey, plan, recommendedPlan, recommendedLabel = "推奨") {
+function renderPlanCard(planKey, plan, recommendedPlan, recommendedLabel = "æ¨å¥¨") {
   return `
     <article class="plan-card ${recommendedPlan === planKey ? "is-recommended" : ""}">
       <div class="plan-card__head">
         <div>
           <div class="plan-card__label">${PLAN_META[planKey].label} (${PLAN_META[planKey].tag})</div>
-          <div class="plan-card__meta">${plan.minutes}分</div>
+          <div class="plan-card__meta">${plan.minutes}å</div>
         </div>
         ${recommendedPlan === planKey ? `<span class="status-badge status-badge--accent">${escapeHtml(recommendedLabel)}</span>` : ""}
       </div>
@@ -3106,7 +3112,7 @@ function renderEditablePlanCard(planKey, fieldName, value, hint) {
       </div>
       <label class="plan-card__editor">
         <input class="field__control" data-setup-field="${fieldName}" type="number" min="${min}" max="${max}" value="${escapeHtml(String(value))}" />
-        <span class="plan-card__unit">分</span>
+        <span class="plan-card__unit">å</span>
       </label>
     </article>
   `;
@@ -3127,8 +3133,8 @@ function renderBonsaiPicker(selectedKey, actionName = "select-setup-bonsai") {
   const currentKey = BONSAI_LIBRARY[selectedKey] ? selectedKey : "pine";
   return `
     <div class="field">
-      <span class="field__label">育てる盆栽</span>
-      <p class="section-copy">盆栽の種類を選びます。日々のチェックインで育っていきます。</p>
+      <span class="field__label">è²ã¦ãçæ ½</span>
+      <p class="section-copy">çæ ½ã®ç¨®é¡ãé¸ã³ã¾ããæ¥ãã®ãã§ãã¯ã¤ã³ã§è²ã£ã¦ããã¾ãã</p>
       <div class="bonsai-picker">
         ${Object.entries(BONSAI_LIBRARY).map(([key, bonsai]) => `
           <button type="button" class="bonsai-picker-item ${currentKey === key ? "is-active" : ""}" data-action="${actionName}" data-bonsai-key="${key}" aria-pressed="${currentKey === key ? "true" : "false"}">
@@ -3147,8 +3153,8 @@ function renderFlowerPicker(selectedType, actionName, options = {}) {
 
   return `
     <div class="field">
-      <span class="field__label">育てる植物</span>
-      <p class="section-copy">目標の種類に合った植物を選びます。咲く木として成長します。</p>
+      <span class="field__label">è²ã¦ãæ¤ç©</span>
+      <p class="section-copy">ç®æ¨ã®ç¨®é¡ã«åã£ãæ¤ç©ãé¸ã³ã¾ããå²ãæ¨ã¨ãã¦æé·ãã¾ãã</p>
       <div class="flower-choice-grid">
         ${Object.entries(FLOWER_LIBRARY)
           .map(([key, flower]) => `
@@ -3360,7 +3366,7 @@ function renderFlowerArtwork(flowerType, stageIndex, options = {}) {
 }
 
 // ============================================================
-// 目標植物 SVGレンダラー（梅・桜・さつき）
+// ç®æ¨æ¤ç© SVGã¬ã³ãã©ã¼ï¼æ¢ã»æ¡ã»ãã¤ãï¼
 // ============================================================
 
 function renderUmeBonsaiSvg(flower, stage, stageRatio) {
@@ -3503,7 +3509,7 @@ function renderSatsukiSvg(flower, stage, stageRatio) {
 }
 
 // ============================================================
-// 習慣植物 SVGレンダラー（もみじ・苔）
+// ç¿æ£æ¤ç© SVGã¬ã³ãã©ã¼ï¼ãã¿ãã»èï¼
 // ============================================================
 
 function renderMapleBonsaiSvg(b, stage, stageRatio, health) {
@@ -3593,7 +3599,7 @@ function renderMossSvg(b, stage, stageRatio, health) {
 }
 
 // ============================================================
-// 旧フラワー SVGレンダラー（互換性のため保持）
+// æ§ãã©ã¯ã¼ SVGã¬ã³ãã©ã¼ï¼äºææ§ã®ããä¿æï¼
 // ============================================================
 
 function renderTulipFlowerSvg(flower, stage, stageRatio) {
@@ -3675,18 +3681,18 @@ function renderSunflowerFlowerSvg(flower, stage, stageRatio) {
 
   let blossom = "";
   if (stage < 3) {
-    // 種〜茎のび: 土の上に小さな丸い芽/蕾
+    // ç¨®ãèã®ã³: åã®ä¸ã«å°ããªä¸¸ãè½/è¾
     const r = 3.5 + stage * 1.5;
     blossom = `<circle cx="60" cy="${bY + 5}" r="${r}" fill="${flower.bud}" opacity="0.82"/>`;
   } else if (stage < 6) {
-    // つぼみ〜色づき: 花弁なし、膨らんだ丸い蕾だけ
+    // ã¤ã¼ã¿ãè²ã¥ã: è±å¼ãªããè¨ããã ä¸¸ãè¾ã ã
     const r = 5 + (stage - 3) * 3.5;
     blossom = `
       <circle cx="60" cy="${bY.toFixed(1)}" r="${(r + 2).toFixed(1)}" fill="${flower.center}" opacity="0.22"/>
       <circle cx="60" cy="${bY.toFixed(1)}" r="${r.toFixed(1)}" fill="${flower.bud}" opacity="0.9"/>
     `;
   } else {
-    // 咲き始め以降: 花弁が開く
+    // å²ãå§ãä»¥é: è±å¼ãéã
     const petalCount = Math.round(10 + (stage - 6) * 1.5);
     const centerR = 7 + (stage - 6) * 2.2;
     const petalL = 12 + (stage - 6) * 4 + stageRatio * 4;
@@ -3793,7 +3799,7 @@ function renderWindowField(label, startKey, endKey, startValue, endValue) {
       <span class="field__label">${label}</span>
       <div class="time-pair">
         <input class="field__control time-pair__input" data-setup-field="${startKey}" type="text" inputmode="numeric" autocomplete="off" placeholder="05:30" value="${escapeHtml(startValue)}" />
-        <span>〜</span>
+        <span>ã</span>
         <input class="field__control time-pair__input" data-setup-field="${endKey}" type="text" inputmode="numeric" autocomplete="off" placeholder="06:00" value="${escapeHtml(endValue)}" />
       </div>
     </div>
@@ -3814,7 +3820,7 @@ function renderSessionSheet() {
   const overtime = state.activeSession && remaining <= 0;
   const milestoneOptions = normalizeRoadmapItems(state.roadmap, state.setup)
     .map(
-      (item) => `<option value="${escapeHtml(item.id)}" ${ui.finishDraft && ui.finishDraft.milestoneId === item.id ? "selected" : ""}>${escapeHtml(item.label)} / 目安 ${item.target}%</option>`,
+      (item) => `<option value="${escapeHtml(item.id)}" ${ui.finishDraft && ui.finishDraft.milestoneId === item.id ? "selected" : ""}>${escapeHtml(item.label)} / ç®å® ${item.target}%</option>`,
     )
     .join("");
 
@@ -3829,7 +3835,7 @@ function renderSessionSheet() {
             .map(
               (key) => `
                 <button type="button" class="pill-button ${displayPlanKey === key ? "is-active" : ""}" data-action="select-session-plan" data-plan="${key}">
-                  ${PLAN_META[key].label}<br /><span class="muted">${state.plans[key].minutes}分</span>
+                  ${PLAN_META[key].label}<br /><span class="muted">${state.plans[key].minutes}å</span>
                 </button>
               `,
             )
@@ -3848,43 +3854,43 @@ function renderSessionSheet() {
                     inputmode="decimal"
                     autocomplete="off"
                     data-finish-field="elapsedInput"
-                    placeholder="分"
+                    placeholder="å"
                     value="${escapeHtml(formatElapsedForInput(ui.finishDraft.elapsedSeconds))}"
                   />
-                  <span class="elapsed-timer-unit">${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : "分:秒"}</span>
+                  <span class="elapsed-timer-unit">${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : "å:ç§"}</span>
                 </div>
-                <p class="sheet__caption">実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">⏱ タップして修正（例: 10 または 1:30）</span></p>
+                <p class="sheet__caption">å®è¡æé / äºå® ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">â± ã¿ãããã¦ä¿®æ­£ï¼ä¾: 10 ã¾ãã¯ 1:30ï¼</span></p>
               </div>
               <div class="panel stack">
-                <h3 class="panel__title">記録の仕上げ</h3>
+                <h3 class="panel__title">è¨é²ã®ä»ä¸ã</h3>
                 ${state.setup.goalType !== "habit" ? `
                 <div class="field-grid field-grid--two">
                   <label class="field">
-                    <span class="field__label">進んだマイルストーン</span>
+                    <span class="field__label">é²ãã ãã¤ã«ã¹ãã¼ã³</span>
                     <select class="field__control" data-finish-field="milestoneId">
-                      <option value="">今回は更新しない</option>
+                      <option value="">ä»åã¯æ´æ°ããªã</option>
                       ${milestoneOptions}
                     </select>
                   </label>
                   <label class="field">
-                    <span class="field__label">その節目の扱い</span>
+                    <span class="field__label">ãã®ç¯ç®ã®æ±ã</span>
                     <select class="field__control" data-finish-field="milestoneStatus">
-                      <option value="working" ${ui.finishDraft.milestoneStatus === "working" ? "selected" : ""}>まだ途中</option>
-                      <option value="complete" ${ui.finishDraft.milestoneStatus === "complete" ? "selected" : ""}>ここまで完了</option>
+                      <option value="working" ${ui.finishDraft.milestoneStatus === "working" ? "selected" : ""}>ã¾ã éä¸­</option>
+                      <option value="complete" ${ui.finishDraft.milestoneStatus === "complete" ? "selected" : ""}>ããã¾ã§å®äº</option>
                     </select>
                   </label>
                 </div>` : ""}
                 <label class="field">
-                  <span class="field__label">ひとこと</span>
-                  <textarea data-finish-field="reflection" placeholder="任意。気づきがあれば一言だけ">${escapeHtml(ui.finishDraft.reflection)}</textarea>
+                  <span class="field__label">ã²ã¨ãã¨</span>
+                  <textarea data-finish-field="reflection" placeholder="ä»»æãæ°ã¥ããããã°ä¸è¨ã ã">${escapeHtml(ui.finishDraft.reflection)}</textarea>
                 </label>
               </div>
             `
             : `
               <div class="panel panel--cool">
                 ${state.setup.goal ? `<p style="font-size:0.8rem;font-weight:600;opacity:0.6;text-align:center;margin:0 0 2px;letter-spacing:0.02em">${escapeHtml(state.setup.goal)}</p>` : ""}
-                <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : (ui.focusPausedAt ? "⏸" : formatCountdown(remaining))}</p>
-                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession.departures}回<\/p>` : ""}
+                <p class="sheet__timer" id="session-timer-value">${overtime ? "æéã§ã" : (ui.focusPausedAt ? "â¸" : formatCountdown(remaining))}</p>
+                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">é¢è± ${state.activeSession.departures}å<\/p>` : ""}
               </div>
             `
         }
@@ -3893,18 +3899,18 @@ function renderSessionSheet() {
           ${
             ui.finishDraft
               ? `
-                <button type="button" class="action-button action-button--primary" data-action="save-finish-log">記録して閉じる</button>
-                <button type="button" class="soft-button" data-action="cancel-finish">タイマーに戻る</button>
+                <button type="button" class="action-button action-button--primary" data-action="save-finish-log">è¨é²ãã¦éãã</button>
+                <button type="button" class="soft-button" data-action="cancel-finish">ã¿ã¤ãã¼ã«æ»ã</button>
               `
               : state.activeSession
                 ? `
-                  <button type="button" class="action-button action-button--primary" data-action="complete-session">完了を記録する</button>
-                  <button type="button" class="action-button" data-action="downgrade-session">もっと軽くして着地する</button>
-                  <button type="button" class="soft-button" data-action="close-session">閉じる</button>
+                  <button type="button" class="action-button action-button--primary" data-action="complete-session">å®äºãè¨é²ãã</button>
+                  <button type="button" class="action-button" data-action="downgrade-session">ãã£ã¨è»½ããã¦çå°ãã</button>
+                  <button type="button" class="soft-button" data-action="close-session">éãã</button>
                 `
                 : `
-                  <button type="button" class="action-button action-button--primary" data-action="begin-session">このプランで始める</button>
-                  <button type="button" class="soft-button" data-action="close-session">あとで</button>
+                  <button type="button" class="action-button action-button--primary" data-action="begin-session">ãã®ãã©ã³ã§å§ãã</button>
+                  <button type="button" class="soft-button" data-action="close-session">ãã¨ã§</button>
                 `
           }
         </div>
@@ -3964,10 +3970,10 @@ function pauseFocusSession() {
 function sendFocusNotification() {
   if (!("Notification" in window)) return;
   if (Notification.permission === "granted") {
-    new Notification("⏸ 作業中です！", { body: "StreakBonsaiに戻ってタイマーを再開してください", icon: "./bonsai-favicon.svg" });
+    new Notification("â¸ ä½æ¥­ä¸­ã§ãï¼", { body: "StreakBonsaiã«æ»ã£ã¦ã¿ã¤ãã¼ãåéãã¦ãã ãã", icon: "./bonsai-favicon.svg" });
   } else if (Notification.permission !== "denied") {
     Notification.requestPermission().then(p => {
-      if (p === "granted") new Notification("⏸ 作業中です！", { body: "StreakBonsaiに戻ってタイマーを再開してください", icon: "./bonsai-favicon.svg" });
+      if (p === "granted") new Notification("â¸ ä½æ¥­ä¸­ã§ãï¼", { body: "StreakBonsaiã«æ»ã£ã¦ã¿ã¤ãã¼ãåéãã¦ãã ãã", icon: "./bonsai-favicon.svg" });
     });
   }
 }
@@ -3980,7 +3986,7 @@ function resumeFocusSession() {
   ui.focusPausedAt = null;
   hideFocusLostOverlay();
   const d = state.activeSession.departures || 0;
-  showToast(`作業再開！ 離脱: ${d}回`);
+  showToast(`ä½æ¥­åéï¼ é¢è±: ${d}å`);
   startSessionTicker();
   saveState();
   render();
@@ -3992,7 +3998,7 @@ function showFocusLostOverlay() {
     overlay = document.createElement("div");
     overlay.id = "focus-lost-overlay";
     overlay.style.cssText = "position:fixed;inset:0;z-index:9998;background:rgba(20,16,10,0.82);backdrop-filter:blur(4px);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;gap:14px";
-    overlay.innerHTML = '<div style="font-size:2.8rem">⏸<\/div><p style="font-size:1.1rem;font-weight:700;margin:0">タイマーを一時停止しました<\/p><p style="font-size:0.88rem;opacity:0.75;margin:0">このタブに戻ると再開します<\/p>';
+    overlay.innerHTML = '<div style="font-size:2.8rem">â¸<\/div><p style="font-size:1.1rem;font-weight:700;margin:0">ã¿ã¤ãã¼ãä¸æåæ­¢ãã¾ãã<\/p><p style="font-size:0.88rem;opacity:0.75;margin:0">ãã®ã¿ãã«æ»ãã¨åéãã¾ã<\/p>';
     document.body.appendChild(overlay);
   }
   overlay.hidden = false;
@@ -4162,7 +4168,7 @@ function computeRoadmap(currentState) {
   const milestones = stagedMilestones.map((item) => ({
     ...item,
     isActive: Boolean(currentMilestone && item.id === currentMilestone.id),
-    state: item.isComplete ? "到達済み" : currentMilestone && item.id === currentMilestone.id ? "いまここ" : "これから",
+    state: item.isComplete ? "å°éæ¸ã¿" : currentMilestone && item.id === currentMilestone.id ? "ãã¾ãã" : "ãããã",
   }));
 
   return {
@@ -4208,10 +4214,10 @@ function inferWindowState(currentState) {
 
   if (minute < primary.start) {
     return {
-      badge: "次は実施時間",
-      windowLabel: `実施時間 ${currentState.setup.primaryWindow}`,
-      actionLabel: `実施時間に ${PLAN_META[baselinePlan].label} から今日の1本を終えます`,
-      copy: "まだ実施時間前です。時間になったら始めれば十分です。",
+      badge: "æ¬¡ã¯å®æ½æé",
+      windowLabel: `å®æ½æé ${currentState.setup.primaryWindow}`,
+      actionLabel: `å®æ½æéã« ${PLAN_META[baselinePlan].label} ããä»æ¥ã®1æ¬ãçµãã¾ã`,
+      copy: "ã¾ã å®æ½æéåã§ããæéã«ãªã£ããå§ããã°ååã§ãã",
       tone: "accent",
       planCap: baselinePlan,
     };
@@ -4219,20 +4225,20 @@ function inferWindowState(currentState) {
 
   if (minute <= primary.end) {
     return {
-      badge: "いま実施時間",
+      badge: "ãã¾å®æ½æé",
       windowLabel: currentState.setup.primaryWindow,
-      actionLabel: `いま始めるなら ${PLAN_META[baselinePlan].label} で今日の1本を終える`,
-      copy: "今日の1本を進める時間帯です。",
+      actionLabel: `ãã¾å§ãããªã ${PLAN_META[baselinePlan].label} ã§ä»æ¥ã®1æ¬ãçµãã`,
+      copy: "ä»æ¥ã®1æ¬ãé²ããæéå¸¯ã§ãã",
       tone: "accent",
       planCap: baselinePlan,
     };
   }
 
   return {
-    badge: "実施時間後",
-    windowLabel: `実施時間 ${currentState.setup.primaryWindow}`,
-    actionLabel: `ここから始めるなら ${PLAN_META.C.label} で記録を残せば十分です`,
-    copy: "実施時間は終わりました。今日は最小単位でつなげれば十分です。",
+    badge: "å®æ½æéå¾",
+    windowLabel: `å®æ½æé ${currentState.setup.primaryWindow}`,
+    actionLabel: `ããããå§ãããªã ${PLAN_META.C.label} ã§è¨é²ãæ®ãã°ååã§ã`,
+    copy: "å®æ½æéã¯çµããã¾ãããä»æ¥ã¯æå°åä½ã§ã¤ãªããã°ååã§ãã",
     tone: "default",
     planCap: "C",
   };
@@ -4242,24 +4248,24 @@ function generateReviewSuggestions(metrics, currentState) {
   const reasons = topReasons(currentState.logs, 3).map((item) => item.reason);
   const suggestions = [];
 
-  if (reasons.some((reason) => reason.includes("残業"))) {
-    suggestions.push("火曜は最初からPlan Bにする");
+  if (reasons.some((reason) => reason.includes("æ®æ¥­"))) {
+    suggestions.push("ç«æã¯æåããPlan Bã«ãã");
   }
 
   if (metrics.rescueRate >= 20 || currentState.planTuning.rescuePrimaryDays.length > 0) {
-    suggestions.push("金曜は救済枠を主枠扱いにする");
+    suggestions.push("éæã¯ææ¸æ ãä¸»æ æ±ãã«ãã");
   }
 
-  if (reasons.some((reason) => reason.includes("準備"))) {
-    suggestions.push("開始前の準備は2分ウォームアップに分ける");
-  } else if (reasons.some((reason) => reason.includes("タスク"))) {
-    suggestions.push("夜は暗記系、朝は演習系に分ける");
+  if (reasons.some((reason) => reason.includes("æºå"))) {
+    suggestions.push("éå§åã®æºåã¯2åã¦ã©ã¼ã ã¢ããã«åãã");
+  } else if (reasons.some((reason) => reason.includes("ã¿ã¹ã¯"))) {
+    suggestions.push("å¤ã¯æè¨ç³»ãæã¯æ¼ç¿ç³»ã«åãã");
   } else {
-    suggestions.push("次の1本は“前半だけ”までに切っておく");
+    suggestions.push("æ¬¡ã®1æ¬ã¯âååã ãâã¾ã§ã«åã£ã¦ãã");
   }
 
   while (suggestions.length < 3) {
-    suggestions.push("今週の到達点は1段だけ小さくする");
+    suggestions.push("ä»é±ã®å°éç¹ã¯1æ®µã ãå°ãããã");
   }
 
   return suggestions.slice(0, 3);
@@ -4272,51 +4278,51 @@ function generateReplanPreview(mode, text, currentState) {
   const nextItem = getNextRoadmapItem(roadmap);
   const todayPlan = getRecommendedPlan(currentState);
   const nextPlan = nextPlanDown(todayPlan);
-  const heavyReason = normalized.includes("残業") || normalized.includes("忙");
-  const fatigueReason = normalized.includes("疲") || normalized.includes("眠");
-  const prepReason = normalized.includes("準備") || normalized.includes("面倒");
+  const heavyReason = normalized.includes("æ®æ¥­") || normalized.includes("å¿");
+  const fatigueReason = normalized.includes("ç²") || normalized.includes("ç ");
+  const prepReason = normalized.includes("æºå") || normalized.includes("é¢å");
 
   if (mode === "retarget_goal") {
     const retargeted = buildRetargetResult(currentState);
     const nextWeek = getWeekRoadmapItem(retargeted.roadmap);
     const nextRoadmapStep = getNextRoadmapItem(retargeted.roadmap);
     return [
-      `目標を「${currentState.setup.goal}」 -> 「${retargeted.setup.goal}」に更新`,
-      `今日のミッションを「${currentState.today.missionTitle}」 -> 「${retargeted.today.missionTitle}」に更新`,
-      `今週の到達点を「${weekItem ? weekItem.label : "今週の到達点"}」 -> 「${nextWeek ? nextWeek.label : "今週の到達点"}」に更新`,
-      `次の一歩を「${nextItem ? nextItem.label : "次の一歩"}」 -> 「${nextRoadmapStep ? nextRoadmapStep.label : "次の一歩"}」に更新`,
-      "残りのRoadmapは目標と現在地から自動で作り直します。",
+      `ç®æ¨ãã${currentState.setup.goal}ã -> ã${retargeted.setup.goal}ãã«æ´æ°`,
+      `ä»æ¥ã®ããã·ã§ã³ãã${currentState.today.missionTitle}ã -> ã${retargeted.today.missionTitle}ãã«æ´æ°`,
+      `ä»é±ã®å°éç¹ãã${weekItem ? weekItem.label : "ä»é±ã®å°éç¹"}ã -> ã${nextWeek ? nextWeek.label : "ä»é±ã®å°éç¹"}ãã«æ´æ°`,
+      `æ¬¡ã®ä¸æ­©ãã${nextItem ? nextItem.label : "æ¬¡ã®ä¸æ­©"}ã -> ã${nextRoadmapStep ? nextRoadmapStep.label : "æ¬¡ã®ä¸æ­©"}ãã«æ´æ°`,
+      "æ®ãã®Roadmapã¯ç®æ¨ã¨ç¾å¨å°ããèªåã§ä½ãç´ãã¾ãã",
     ];
   }
 
   if (mode === "lighten_today") {
     return [
-      `今日の開始プランを ${PLAN_META[todayPlan].label} -> ${PLAN_META[nextPlan].label} に変更`,
-      `今日のミッションを「${currentState.today.missionTitle}」 -> 「${shortenMission(currentState.today.missionTitle)}」に短縮`,
-      heavyReason ? `今日は主枠を追わず、予備枠 ${currentState.setup.backupWindow} を優先表示` : `救済の定義を「${currentState.plans.C.description}」のまま固定`,
+      `ä»æ¥ã®éå§ãã©ã³ã ${PLAN_META[todayPlan].label} -> ${PLAN_META[nextPlan].label} ã«å¤æ´`,
+      `ä»æ¥ã®ããã·ã§ã³ãã${currentState.today.missionTitle}ã -> ã${shortenMission(currentState.today.missionTitle)}ãã«ç­ç¸®`,
+      heavyReason ? `ä»æ¥ã¯ä¸»æ ãè¿½ãããäºåæ  ${currentState.setup.backupWindow} ãåªåè¡¨ç¤º` : `ææ¸ã®å®ç¾©ãã${currentState.plans.C.description}ãã®ã¾ã¾åºå®`,
     ];
   }
 
   if (mode === "reset_week") {
     return [
-      `${weekdayLabel("Tue")}の開始プランを Plan A -> Plan B に変更`,
-      `${weekdayLabel("Fri")}は救済枠 ${currentState.setup.rescueWindow} を主枠扱いにする`,
-      `今週の到達点を「${weekItem ? weekItem.label : "今週の到達点"}」 -> 「今週: ${lighterWeeklyFocus(weekItem ? weekItem.label : "今週: 前半")}」に修正`,
+      `${weekdayLabel("Tue")}ã®éå§ãã©ã³ã Plan A -> Plan B ã«å¤æ´`,
+      `${weekdayLabel("Fri")}ã¯ææ¸æ  ${currentState.setup.rescueWindow} ãä¸»æ æ±ãã«ãã`,
+      `ä»é±ã®å°éç¹ãã${weekItem ? weekItem.label : "ä»é±ã®å°éç¹"}ã -> ãä»é±: ${lighterWeeklyFocus(weekItem ? weekItem.label : "ä»é±: åå")}ãã«ä¿®æ­£`,
     ];
   }
 
   if (mode === "break_goal") {
     return [
-      `次の一歩を「${nextItem ? nextItem.label : "次の一歩"}」 -> 「次: ${microStepFromMission(currentState.today.missionTitle)}」に変更`,
-      `今週の到達点を「${weekItem ? weekItem.label : "今週の到達点"}」 -> 「今週: 前半だけ完了」に分解`,
-      `最小学習例に「${warmupExample(currentState.setup.minimumExample)}」を追加`,
+      `æ¬¡ã®ä¸æ­©ãã${nextItem ? nextItem.label : "æ¬¡ã®ä¸æ­©"}ã -> ãæ¬¡: ${microStepFromMission(currentState.today.missionTitle)}ãã«å¤æ´`,
+      `ä»é±ã®å°éç¹ãã${weekItem ? weekItem.label : "ä»é±ã®å°éç¹"}ã -> ãä»é±: ååã ãå®äºãã«åè§£`,
+      `æå°å­¦ç¿ä¾ã«ã${warmupExample(currentState.setup.minimumExample)}ããè¿½å `,
     ];
   }
 
   return [
-    heavyReason ? `残業が続く前提で、${weekdayLabel("Tue")}と${weekdayLabel("Thu")}を最初からPlan Bに変更` : "詰まりが出やすい曜日をPlan B始まりに変更",
-    fatigueReason ? `通常学習時間を ${currentState.setup.normalMinutes}分 -> ${Math.max(10, currentState.setup.normalMinutes - 5)}分 に調整` : "開始ハードルを下げるため、最小単位を守ったまま主枠の負荷だけ下げる",
-    prepReason ? `開始前2分のウォームアップ「${warmupExample(currentState.setup.minimumExample)}」を追加` : "今日のミッションの前に2分のウォームアップを追加",
+    heavyReason ? `æ®æ¥­ãç¶ãåæã§ã${weekdayLabel("Tue")}ã¨${weekdayLabel("Thu")}ãæåããPlan Bã«å¤æ´` : "è©°ã¾ããåºãããææ¥ãPlan Bå§ã¾ãã«å¤æ´",
+    fatigueReason ? `éå¸¸å­¦ç¿æéã ${currentState.setup.normalMinutes}å -> ${Math.max(10, currentState.setup.normalMinutes - 5)}å ã«èª¿æ´` : "éå§ãã¼ãã«ãä¸ãããããæå°åä½ãå®ã£ãã¾ã¾ä¸»æ ã®è² è·ã ãä¸ãã",
+    prepReason ? `éå§å2åã®ã¦ã©ã¼ã ã¢ããã${warmupExample(currentState.setup.minimumExample)}ããè¿½å ` : "ä»æ¥ã®ããã·ã§ã³ã®åã«2åã®ã¦ã©ã¼ã ã¢ãããè¿½å ",
   ];
 }
 
@@ -4338,7 +4344,7 @@ function applyReplan(mode, preview) {
   if (mode === "lighten_today") {
     state.today.recommendedPlan = nextPlanDown(getRecommendedPlan(state));
     state.today.missionTitle = shortenMission(state.today.missionTitle);
-    state.today.missionNote = `今日は軽量版でつなぐ日です。${state.today.missionNote}`;
+    state.today.missionNote = `ä»æ¥ã¯è»½éçã§ã¤ãªãæ¥ã§ãã${state.today.missionNote}`;
     state.plans = buildPlans(state.setup, state.today.missionTitle);
     return;
   }
@@ -4347,7 +4353,7 @@ function applyReplan(mode, preview) {
     state.planTuning.defaultPlanByDay.Tue = "B";
     state.planTuning.rescuePrimaryDays = Array.from(new Set([...state.planTuning.rescuePrimaryDays, "Fri"]));
     state.roadmap = state.roadmap.map((item) =>
-      item.id === "week" ? { ...item, label: `今週: ${lighterWeeklyFocus(item.label)}` } : item,
+      item.id === "week" ? { ...item, label: `ä»é±: ${lighterWeeklyFocus(item.label)}` } : item,
     );
     return;
   }
@@ -4355,10 +4361,10 @@ function applyReplan(mode, preview) {
   if (mode === "break_goal") {
     state.roadmap = state.roadmap.map((item) => {
       if (item.id === "week") {
-        return { ...item, label: "今週: 前半だけ完了" };
+        return { ...item, label: "ä»é±: ååã ãå®äº" };
       }
       if (item.id === "next") {
-        return { ...item, label: `次: ${microStepFromMission(state.today.missionTitle)}` };
+        return { ...item, label: `æ¬¡: ${microStepFromMission(state.today.missionTitle)}` };
       }
       return item;
     });
@@ -4420,15 +4426,15 @@ function buildPlans(setup, missionTitle) {
   return {
     A: {
       minutes: normalMinutes,
-      description: `${baseMission} + 1分だけ振り返る`,
+      description: `${baseMission} + 1åã ãæ¯ãè¿ã`,
     },
     B: {
       minutes: shortMinutes,
-      description: `${shortenMission(baseMission)}だけ進める`,
+      description: `${shortenMission(baseMission)}ã ãé²ãã`,
     },
     C: {
       minutes: minimumMinutes,
-      description: `${warmupExample(setup.minimumExample)}だけやる`,
+      description: `${warmupExample(setup.minimumExample)}ã ããã`,
     },
   };
 }
@@ -4440,8 +4446,8 @@ function buildInitialRoadmap(setup) {
     { id: "goal", kind: "system", target: ROADMAP_TARGETS.goal, label: shortenGoal(setup.goal), deadline: setup.deadline, note: "" },
     { id: "checkpoint", kind: "system", target: ROADMAP_TARGETS.checkpoint, label: profile.checkpointLabel, deadline: "", note: "" },
     { id: "foundation", kind: "system", target: ROADMAP_TARGETS.foundation, label: profile.foundationLabel, deadline: "", note: "" },
-    { id: "week", kind: "system", target: ROADMAP_TARGETS.week, label: `今週: ${profile.weeklyFocus}`, deadline: "", note: "" },
-    { id: "next", kind: "system", target: ROADMAP_TARGETS.next, label: `次: ${profile.nextStepLabel}`, deadline: "", note: "" },
+    { id: "week", kind: "system", target: ROADMAP_TARGETS.week, label: `ä»é±: ${profile.weeklyFocus}`, deadline: "", note: "" },
+    { id: "next", kind: "system", target: ROADMAP_TARGETS.next, label: `æ¬¡: ${profile.nextStepLabel}`, deadline: "", note: "" },
   ]);
 }
 
@@ -4460,9 +4466,9 @@ function buildSeedState() {
   const today = new Date();
   const deadline = addDays(today, 114);
   const setup = {
-    goal: "3か月後に簿記2級に合格",
+    goal: "3ãæå¾ã«ç°¿è¨2ç´ã«åæ ¼",
     deadline: toISODate(deadline),
-    currentLevel: "商簿 60% / 工簿 10%",
+    currentLevel: "åç°¿ 60% / å·¥ç°¿ 10%",
     flowerType: "sunflower",
     studyMode: "night",
     primaryWindow: "21:30-22:00",
@@ -4471,7 +4477,7 @@ function buildSeedState() {
     normalMinutes: 30,
     shortMinutes: 10,
     minimumMinutes: 2,
-    minimumExample: "単語5個 / 1問だけ解く / 1ページだけ読む",
+    minimumExample: "åèª5å / 1åã ãè§£ã / 1ãã¼ã¸ã ãèª­ã",
   };
   const goalId = createGoalId();
   const goalRecord = createGoalRecord({
@@ -4505,17 +4511,17 @@ function buildSeedState() {
 function buildSeedLogs(today) {
   const patterns = [
     { outcome: "A", reason: null },
-    { outcome: "miss", reason: "開始前の準備が面倒" },
-    { outcome: "B", reason: "疲労" },
+    { outcome: "miss", reason: "éå§åã®æºåãé¢å" },
+    { outcome: "B", reason: "ç²å´" },
     { outcome: "A", reason: null },
-    { outcome: "C", reason: "残業で開始が遅れた" },
+    { outcome: "C", reason: "æ®æ¥­ã§éå§ãéãã" },
     { outcome: "A", reason: null },
-    { outcome: "miss", reason: "予定変更" },
+    { outcome: "miss", reason: "äºå®å¤æ´" },
     { outcome: "A", reason: null },
-    { outcome: "miss", reason: "残業で開始が遅れた" },
-    { outcome: "B", reason: "タスクが重すぎた" },
+    { outcome: "miss", reason: "æ®æ¥­ã§éå§ãéãã" },
+    { outcome: "B", reason: "ã¿ã¹ã¯ãéããã" },
     { outcome: "A", reason: null },
-    { outcome: "C", reason: "疲労" },
+    { outcome: "C", reason: "ç²å´" },
     { outcome: "A", reason: null },
     { outcome: "A", reason: null },
   ];
@@ -4524,7 +4530,7 @@ function buildSeedLogs(today) {
     date: toISODate(addDays(today, index - (patterns.length - 1))),
     outcome: pattern.outcome,
     reason: pattern.reason,
-    missionTitle: "直接原価計算の例題を1セット解く",
+    missionTitle: "ç´æ¥åä¾¡è¨ç®ã®ä¾é¡ã1ã»ããè§£ã",
     recordedAt: new Date().toISOString(),
   }));
 }
@@ -4582,7 +4588,7 @@ function normalizeRoadmapItems(items, setup) {
   if (Array.isArray(items)) {
     return orderRoadmapItems(items.map((item, index) => ({
       id: typeof item.id === "string" && item.id ? item.id : `custom-${index + 1}`,
-      label: String(item.label || `マイルストーン ${index + 1}`),
+      label: String(item.label || `ãã¤ã«ã¹ãã¼ã³ ${index + 1}`),
       deadline: deriveRoadmapDeadline(item, setup),
       note: String(item.note || ""),
       target: Number.isFinite(Number(item.target)) ? Number(item.target) : (ROADMAP_TARGETS[item.id] ?? Math.max(0, 100 - (index * 12))),
@@ -4595,7 +4601,7 @@ function normalizeRoadmapItems(items, setup) {
 
 function getWeekRoadmapItem(roadmap) {
   return roadmap.find((item) => item.id === "week")
-    || roadmap.find((item) => String(item.label || "").startsWith("今週:"))
+    || roadmap.find((item) => String(item.label || "").startsWith("ä»é±:"))
     || roadmap[roadmap.length - 2]
     || roadmap[0]
     || null;
@@ -4603,7 +4609,7 @@ function getWeekRoadmapItem(roadmap) {
 
 function getNextRoadmapItem(roadmap) {
   return roadmap.find((item) => item.id === "next")
-    || roadmap.find((item) => String(item.label || "").startsWith("次:"))
+    || roadmap.find((item) => String(item.label || "").startsWith("æ¬¡:"))
     || roadmap[roadmap.length - 1]
     || roadmap[0]
     || null;
@@ -4815,8 +4821,8 @@ function commitGoalLibraryDraft() {
       goalDraft: nextSetup.goal,
       currentLevelDraft: "",
       missionDraft: nextToday.missionTitle,
-      weekDraft: stripRoadmapPrefix(weekly?.label || "", "今週:"),
-      nextDraft: stripRoadmapPrefix(nextStep?.label || "", "次:"),
+      weekDraft: stripRoadmapPrefix(weekly?.label || "", "ä»é±:"),
+      nextDraft: stripRoadmapPrefix(nextStep?.label || "", "æ¬¡:"),
     },
     logs: goal.logs,
     activeSession: goal.activeSession,
@@ -4892,8 +4898,8 @@ function syncRetargetDraftFromState() {
   state.replan.goalDraft = state.setup.goal;
   state.replan.currentLevelDraft = "";
   state.replan.missionDraft = state.today.missionTitle;
-  state.replan.weekDraft = stripRoadmapPrefix(weekly?.label || "", "今週:");
-  state.replan.nextDraft = stripRoadmapPrefix(nextStep?.label || "", "次:");
+  state.replan.weekDraft = stripRoadmapPrefix(weekly?.label || "", "ä»é±:");
+  state.replan.nextDraft = stripRoadmapPrefix(nextStep?.label || "", "æ¬¡:");
 }
 
 function buildRetargetResult(currentState) {
@@ -4905,18 +4911,18 @@ function buildRetargetResult(currentState) {
   const currentCustomMilestones = normalizeRoadmapItems(currentState.roadmap, currentState.setup)
     .filter((item) => item.kind === "custom");
   let nextRoadmap = orderRoadmapItems([...buildInitialRoadmap(nextSetup), ...currentCustomMilestones]);
-  const weekDraft = stripRoadmapPrefix(currentState.replan.weekDraft || "", "今週:");
-  const nextDraft = stripRoadmapPrefix(currentState.replan.nextDraft || "", "次:");
+  const weekDraft = stripRoadmapPrefix(currentState.replan.weekDraft || "", "ä»é±:");
+  const nextDraft = stripRoadmapPrefix(currentState.replan.nextDraft || "", "æ¬¡:");
 
   if (weekDraft) {
     nextRoadmap = nextRoadmap.map((item) => (
-      item.id === "week" ? { ...item, label: `今週: ${weekDraft}` } : item
+      item.id === "week" ? { ...item, label: `ä»é±: ${weekDraft}` } : item
     ));
   }
 
   if (nextDraft) {
     nextRoadmap = nextRoadmap.map((item) => (
-      item.id === "next" ? { ...item, label: `次: ${nextDraft}` } : item
+      item.id === "next" ? { ...item, label: `æ¬¡: ${nextDraft}` } : item
     ));
   }
 
@@ -4939,7 +4945,7 @@ function composeMissionNote(roadmap) {
   const items = Array.isArray(roadmap) ? roadmap : [];
   const weekly = getWeekRoadmapItem(items);
   const nextStep = getNextRoadmapItem(items);
-  return `${weekly ? weekly.label : "今週の到達点"}から逆算した1本です。${nextStep ? nextStep.label : "次の一歩はRoadmapで追加できます。"}`;
+  return `${weekly ? weekly.label : "ä»é±ã®å°éç¹"}ããéç®ãã1æ¬ã§ãã${nextStep ? nextStep.label : "æ¬¡ã®ä¸æ­©ã¯Roadmapã§è¿½å ã§ãã¾ãã"}`;
 }
 
 function stripRoadmapPrefix(value, prefix) {
@@ -4953,12 +4959,12 @@ function commitSetupDraft() {
   const primaryEnd = normalizeTimeValue(draft.primaryEnd);
 
   if (!primaryStart || !primaryEnd) {
-    showToast("実施時間は 05:30 のように入力してください。");
+    showToast("å®æ½æéã¯ 05:30 ã®ããã«å¥åãã¦ãã ããã");
     return null;
   }
 
   if (parseWindow(`${primaryStart}-${primaryEnd}`).start >= parseWindow(`${primaryStart}-${primaryEnd}`).end) {
-    showToast("実施時間の終了は開始より後にしてください。");
+    showToast("å®æ½æéã®çµäºã¯éå§ããå¾ã«ãã¦ãã ããã");
     return null;
   }
 
@@ -5283,7 +5289,7 @@ function exportData() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast("データをエクスポートしました。");
+  showToast("ãã¼ã¿ãã¨ã¯ã¹ãã¼ããã¾ããã");
 }
 
 function importData(file) {
@@ -5298,9 +5304,9 @@ function importData(file) {
       ensureGoalCollection();
       saveState();
       render();
-      showToast("データを復元しました。");
+      showToast("ãã¼ã¿ãå¾©åãã¾ããã");
     } catch (_err) {
-      showToast("ファイルの読み込みに失敗しました。");
+      showToast("ãã¡ã¤ã«ã®èª­ã¿è¾¼ã¿ã«å¤±æãã¾ããã");
     }
   };
   reader.readAsText(file);
@@ -5326,7 +5332,7 @@ function startClock() {
 
 function startSessionTicker() {
   if (ui.focusPausedAt) return;
-  // Already running correctly — don't reset the interval
+  // Already running correctly â don't reset the interval
   if (ui.sessionTimer && state.activeSession && !ui.finishDraft) {
     return;
   }
@@ -5347,7 +5353,7 @@ function startSessionTicker() {
     }
 
     const remaining = getRemainingMs(state.activeSession.endsAt);
-    timerValue.textContent = remaining <= 0 ? "時間です" : formatCountdown(remaining);
+    timerValue.textContent = remaining <= 0 ? "æéã§ã" : formatCountdown(remaining);
   };
 
   updateTimerValue();
@@ -5362,13 +5368,13 @@ function startSessionTicker() {
     const remaining = getRemainingMs(state.activeSession.endsAt);
     const timerValue = sessionSheet.querySelector("#session-timer-value");
     if (timerValue) {
-      timerValue.textContent = remaining <= 0 ? "時間です" : formatCountdown(remaining);
+      timerValue.textContent = remaining <= 0 ? "æéã§ã" : formatCountdown(remaining);
     }
 
     if (remaining <= 0) {
       window.clearInterval(ui.sessionTimer);
       ui.sessionTimer = null;
-      showToast("予定時間です。完了か軽量着地を選べます。");
+      showToast("äºå®æéã§ããå®äºãè»½éçå°ãé¸ã¹ã¾ãã");
     }
   }, 1000);
 }
@@ -5413,14 +5419,14 @@ function formatElapsedForInput(totalSeconds) {
 
 function parseElapsedInput(str) {
   const t = (str || "").trim();
-  // "M:SS" format → minutes:seconds
+  // "M:SS" format â minutes:seconds
   const colonMatch = t.match(/^(\d{1,3}):(\d{2})$/);
   if (colonMatch) {
     const m = parseInt(colonMatch[1], 10);
     const s = parseInt(colonMatch[2], 10);
     if (s < 60) return m * 60 + s;
   }
-  // Plain number → treated as minutes
+  // Plain number â treated as minutes
   const numMatch = t.match(/^(\d{1,4})$/);
   if (numMatch) {
     return parseInt(numMatch[1], 10) * 60;
@@ -5435,15 +5441,15 @@ function formatLoggedDuration(totalSeconds) {
   const seconds = safeSeconds % 60;
 
   if (hours > 0) {
-    return `${hours}時間${String(minutes).padStart(2, "0")}分`;
+    return `${hours}æé${String(minutes).padStart(2, "0")}å`;
   }
   if (minutes > 0 && seconds === 0) {
-    return `${minutes}分`;
+    return `${minutes}å`;
   }
   if (minutes > 0) {
-    return `${minutes}分${String(seconds).padStart(2, "0")}秒`;
+    return `${minutes}å${String(seconds).padStart(2, "0")}ç§`;
   }
-  return `${seconds}秒`;
+  return `${seconds}ç§`;
 }
 
 function formatRemainingSpan(totalDays) {
@@ -5452,30 +5458,30 @@ function formatRemainingSpan(totalDays) {
   const days = safeDays % 30;
 
   if (months <= 0) {
-    return `${days}日`;
+    return `${days}æ¥`;
   }
   if (days === 0) {
-    return `${months}か月`;
+    return `${months}ãæ`;
   }
-  return `${months}か月${days}日`;
+  return `${months}ãæ${days}æ¥`;
 }
 function buildLogSummary(entry) {
   const parts = [outcomeLabel(entry.outcome)];
   const loggedSeconds = getLoggedSeconds(entry);
   if (loggedSeconds > 0) {
-    parts.push(`実行 ${formatLoggedDuration(loggedSeconds)}`);
+    parts.push(`å®è¡ ${formatLoggedDuration(loggedSeconds)}`);
   }
   if (entry.milestoneLabel) {
-    parts.push(`節目 ${entry.milestoneLabel}${entry.milestoneStatus === "complete" ? " 完了" : " 途中"}`);
+    parts.push(`ç¯ç® ${entry.milestoneLabel}${entry.milestoneStatus === "complete" ? " å®äº" : " éä¸­"}`);
   }
   if (entry.progressText) {
-    parts.push(`到達 ${entry.progressText}`);
+    parts.push(`å°é ${entry.progressText}`);
   }
   if (entry.reflection) {
-    parts.push(`メモ ${entry.reflection}`);
+    parts.push(`ã¡ã¢ ${entry.reflection}`);
   }
   if (entry.reason) {
-    parts.push(`理由 ${entry.reason}`);
+    parts.push(`çç± ${entry.reason}`);
   }
   return parts.join(" / ");
 }
@@ -5504,7 +5510,7 @@ function showToast(message) {
 }
 function isBlankCurrentLevel(currentLevel) {
   const text = (currentLevel || "").trim();
-  return !text || /^(何も(していない|してない|なし)|なし|未着手|未設定|ゼロ|0|0%)?[。.\s]*$/.test(text);
+  return !text || /^(ä½ã(ãã¦ããªã|ãã¦ãªã|ãªã)|ãªã|æªçæ|æªè¨­å®|ã¼ã­|0|0%)?[ã.\s]*$/.test(text);
 }
 
 function getGoalProfile(setup) {
@@ -5512,47 +5518,47 @@ function getGoalProfile(setup) {
   const weakArea = detectWeakArea(setup.currentLevel);
   const blankLevel = isBlankCurrentLevel(setup.currentLevel);
 
-  if (goal.includes("簿記")) {
+  if (goal.includes("ç°¿è¨")) {
     return {
-      track: "簿記2級 / 工業簿記",
-      missionTitle: "直接原価計算の例題を1セット解く",
-      foundationLabel: `${weakArea}を一周`,
-      weeklyFocus: weakArea.includes("工") ? "CVP理解" : `${weakArea}の基礎`,
-      checkpointLabel: "模試で70%",
-      nextStepLabel: "例題1セット",
+      track: "ç°¿è¨2ç´ / å·¥æ¥­ç°¿è¨",
+      missionTitle: "ç´æ¥åä¾¡è¨ç®ã®ä¾é¡ã1ã»ããè§£ã",
+      foundationLabel: `${weakArea}ãä¸å¨`,
+      weeklyFocus: weakArea.includes("å·¥") ? "CVPçè§£" : `${weakArea}ã®åºç¤`,
+      checkpointLabel: "æ¨¡è©¦ã§70%",
+      nextStepLabel: "ä¾é¡1ã»ãã",
     };
   }
 
-  if (goal.includes("ITパスポート")) {
+  if (goal.includes("ITãã¹ãã¼ã")) {
     return {
-      track: "ITパスポート / 基礎",
-      missionTitle: blankLevel ? "用語を10個だけ確認して過去問を3問だけ触る" : "過去問を5問だけ解いて、知らない用語を拾う",
-      foundationLabel: blankLevel ? "3分野の全体像を一周" : `${weakArea}を一周`,
-      weeklyFocus: blankLevel ? "ストラテジ系の基礎" : `${weakArea}の基礎`,
-      checkpointLabel: "模試で700点",
-      nextStepLabel: "過去問3問",
+      track: "ITãã¹ãã¼ã / åºç¤",
+      missionTitle: blankLevel ? "ç¨èªã10åã ãç¢ºèªãã¦éå»åã3åã ãè§¦ã" : "éå»åã5åã ãè§£ãã¦ãç¥ããªãç¨èªãæ¾ã",
+      foundationLabel: blankLevel ? "3åéã®å¨ä½åãä¸å¨" : `${weakArea}ãä¸å¨`,
+      weeklyFocus: blankLevel ? "ã¹ãã©ãã¸ç³»ã®åºç¤" : `${weakArea}ã®åºç¤`,
+      checkpointLabel: "æ¨¡è©¦ã§700ç¹",
+      nextStepLabel: "éå»å3å",
     };
   }
 
-  if (goal.includes("英語")) {
+  if (goal.includes("è±èª")) {
     return {
-      track: "英語 / 読解",
-      missionTitle: "長文を1題だけ読み、要点を3行でまとめる",
-      foundationLabel: blankLevel ? "基礎単語を一周" : `${weakArea}を一周`,
-      weeklyFocus: blankLevel ? "長文の基礎" : `${weakArea}の基礎`,
-      checkpointLabel: "模試で70%",
-      nextStepLabel: "長文1題",
+      track: "è±èª / èª­è§£",
+      missionTitle: "é·æã1é¡ã ãèª­ã¿ãè¦ç¹ã3è¡ã§ã¾ã¨ãã",
+      foundationLabel: blankLevel ? "åºç¤åèªãä¸å¨" : `${weakArea}ãä¸å¨`,
+      weeklyFocus: blankLevel ? "é·æã®åºç¤" : `${weakArea}ã®åºç¤`,
+      checkpointLabel: "æ¨¡è©¦ã§70%",
+      nextStepLabel: "é·æ1é¡",
     };
   }
 
-  const goalLabel = goal.replace(/に合格する|を達成する|合格|達成/g, "").trim() || "目標";
+  const goalLabel = goal.replace(/ã«åæ ¼ãã|ãéæãã|åæ ¼|éæ/g, "").trim() || "ç®æ¨";
   return {
     track: blankLevel ? goalLabel : `${goalLabel} / ${weakArea}`,
-    missionTitle: blankLevel ? `${goalLabel}に向けて最初の1ユニットに触る` : `${weakArea}の最初の1ユニットに触る`,
-    foundationLabel: blankLevel ? "基礎を一周" : `${weakArea}を一周`,
-    weeklyFocus: blankLevel ? "基礎に触る" : `${weakArea}の基礎`,
-    checkpointLabel: goal.includes("合格") ? "中間チェックを通過" : "中間地点まで進める",
-    nextStepLabel: "最初の1ユニット",
+    missionTitle: blankLevel ? `${goalLabel}ã«åãã¦æåã®1ã¦ãããã«è§¦ã` : `${weakArea}ã®æåã®1ã¦ãããã«è§¦ã`,
+    foundationLabel: blankLevel ? "åºç¤ãä¸å¨" : `${weakArea}ãä¸å¨`,
+    weeklyFocus: blankLevel ? "åºç¤ã«è§¦ã" : `${weakArea}ã®åºç¤`,
+    checkpointLabel: goal.includes("åæ ¼") ? "ä¸­éãã§ãã¯ãéé" : "ä¸­éå°ç¹ã¾ã§é²ãã",
+    nextStepLabel: "æåã®1ã¦ããã",
   };
 }
 
@@ -5566,29 +5572,29 @@ function inferMissionTitle(setup) {
 
 function detectWeakArea(currentLevel) {
   if (isBlankCurrentLevel(currentLevel)) {
-    return "基礎";
+    return "åºç¤";
   }
 
   const segments = currentLevel.split("/").map((item) => item.trim()).filter(Boolean);
   if (!segments.length) {
-    return "基礎";
+    return "åºç¤";
   }
 
   const scoredSegments = segments
     .map((segment) => {
       const match = segment.match(/(\d+)/);
       return match
-        ? { label: segment.replace(/\d+%?/, "").trim() || "基礎", score: Number(match[1]) }
+        ? { label: segment.replace(/\d+%?/, "").trim() || "åºç¤", score: Number(match[1]) }
         : null;
     })
     .filter(Boolean);
 
   if (!scoredSegments.length) {
-    return "基礎";
+    return "åºç¤";
   }
 
   scoredSegments.sort((left, right) => left.score - right.score);
-  return scoredSegments[0].label || "基礎";
+  return scoredSegments[0].label || "åºç¤";
 }
 
 function parseCurrentLevel(currentLevel) {
@@ -5604,51 +5610,51 @@ function parseCurrentLevel(currentLevel) {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 function shortReason(reason) {
-  if (reason.includes("残業")) return "残業";
-  if (reason.includes("タスク")) return "重い";
-  if (reason.includes("準備")) return "準備";
-  if (reason.includes("予定")) return "予定";
-  if (reason.includes("疲")) return "疲労";
+  if (reason.includes("æ®æ¥­")) return "æ®æ¥­";
+  if (reason.includes("ã¿ã¹ã¯")) return "éã";
+  if (reason.includes("æºå")) return "æºå";
+  if (reason.includes("äºå®")) return "äºå®";
+  if (reason.includes("ç²")) return "ç²å´";
   return reason;
 }
 
 function shortenMission(mission) {
-  if (mission.includes("1セット")) {
-    return mission.replace("1セット", "前半");
+  if (mission.includes("1ã»ãã")) {
+    return mission.replace("1ã»ãã", "åå");
   }
-  if (mission.includes("解く")) {
-    return mission.replace("解く", "前半だけ解く");
+  if (mission.includes("è§£ã")) {
+    return mission.replace("è§£ã", "ååã ãè§£ã");
   }
-  if (mission.includes("読む")) {
-    return mission.replace("読む", "最初だけ読む");
+  if (mission.includes("èª­ã")) {
+    return mission.replace("èª­ã", "æåã ãèª­ã");
   }
-  return `${mission}の前半だけ`;
+  return `${mission}ã®ååã ã`;
 }
 
 function lighterWeeklyFocus(label) {
-  const clean = label.replace(/^今週:\s*/, "");
-  if (clean.includes("理解")) {
-    return clean.replace("理解", "前半");
+  const clean = label.replace(/^ä»é±:\s*/, "");
+  if (clean.includes("çè§£")) {
+    return clean.replace("çè§£", "åå");
   }
-  return `${clean}の前半`;
+  return `${clean}ã®åå`;
 }
 
 function microStepFromMission(mission) {
-  if (mission.includes("例題")) {
-    return "例題1問だけ";
+  if (mission.includes("ä¾é¡")) {
+    return "ä¾é¡1åã ã";
   }
-  if (mission.includes("長文")) {
-    return "最初の1段落だけ";
+  if (mission.includes("é·æ")) {
+    return "æåã®1æ®µè½ã ã";
   }
-  return `${mission}の最初だけ`;
+  return `${mission}ã®æåã ã`;
 }
 
 function warmupExample(example) {
-  if (!example) return "机を開いて2分だけ準備する";
-  if (example.includes("1問")) {
-    return "公式を1つだけ見返す";
+  if (!example) return "æºãéãã¦2åã ãæºåãã";
+  if (example.includes("1å")) {
+    return "å¬å¼ã1ã¤ã ãè¦è¿ã";
   }
-  return "机を開いて2分だけ準備する";
+  return "æºãéãã¦2åã ãæºåãã";
 }
 
 function joinExamples(current, addition) {
@@ -5657,62 +5663,62 @@ function joinExamples(current, addition) {
 
 function shortenGoal(goal, limit = 16) {
   const safeGoal = String(goal || "");
-  return safeGoal.length > limit ? `${safeGoal.slice(0, limit)}…` : safeGoal;
+  return safeGoal.length > limit ? `${safeGoal.slice(0, limit)}â¦` : safeGoal;
 }
 
 function outcomeLabel(outcome) {
-  if (outcome === "A") return "Plan Aで完了";
-  if (outcome === "B") return "Plan Bで短縮";
-  if (outcome === "C") return "Plan Cで救済";
-  if (outcome === "miss") return "未実施";
-  return "未記録";
+  if (outcome === "A") return "Plan Aã§å®äº";
+  if (outcome === "B") return "Plan Bã§ç­ç¸®";
+  if (outcome === "C") return "Plan Cã§ææ¸";
+  if (outcome === "miss") return "æªå®æ½";
+  return "æªè¨é²";
 }
 
 function logSymbol(outcome) {
   if (outcome === "A") return "A";
   if (outcome === "B") return "B";
   if (outcome === "C") return "C";
-  if (outcome === "miss") return "未";
+  if (outcome === "miss") return "æª";
   return "-";
 }
 
 function logSmallLabel(outcome) {
-  if (outcome === "A") return "主";
-  if (outcome === "B") return "予";
-  if (outcome === "C") return "救";
-  if (outcome === "miss") return "休";
+  if (outcome === "A") return "ä¸»";
+  if (outcome === "B") return "äº";
+  if (outcome === "C") return "æ";
+  if (outcome === "miss") return "ä¼";
   return "";
 }
 
 function weekdayLabel(key) {
   const map = {
-    Mon: "月曜",
-    Tue: "火曜",
-    Wed: "水曜",
-    Thu: "木曜",
-    Fri: "金曜",
-    Sat: "土曜",
-    Sun: "日曜",
+    Mon: "ææ",
+    Tue: "ç«æ",
+    Wed: "æ°´æ",
+    Thu: "æ¨æ",
+    Fri: "éæ",
+    Sat: "åæ",
+    Sun: "æ¥æ",
   };
   return map[key] || key;
 }
 
 function weekdayShortLabel(key) {
   const map = {
-    Mon: "月",
-    Tue: "火",
-    Wed: "水",
-    Thu: "木",
-    Fri: "金",
-    Sat: "土",
-    Sun: "日",
+    Mon: "æ",
+    Tue: "ç«",
+    Wed: "æ°´",
+    Thu: "æ¨",
+    Fri: "é",
+    Sat: "å",
+    Sun: "æ¥",
   };
   return map[key] || key;
 }
 
 function shortWeekday(dateString) {
   const date = new Date(dateString);
-  return ["日", "月", "火", "水", "木", "金", "土"][date.getDay()];
+  return ["æ¥", "æ", "ç«", "æ°´", "æ¨", "é", "å"][date.getDay()];
 }
 
 function weekdayKeyFromDate(date) {
@@ -5737,7 +5743,7 @@ function splitWindow(windowValue) {
 }
 
 function normalizeTimeValue(value) {
-  const raw = String(value || "").trim().replace(/[：]/g, ":");
+  const raw = String(value || "").trim().replace(/[ï¼]/g, ":");
   if (!raw) {
     return "";
   }
@@ -5825,7 +5831,7 @@ let _appInitialized = false;
 let _syncTimer = null;
 let _supabaseLoadedSuccessfully = false;
 
-// ── Supabase ↔ ローカル同期 ──────────────────────────────
+// ââ Supabase â ã­ã¼ã«ã«åæ ââââââââââââââââââââââââââââââ
 
 async function loadStateFromSupabase(userId) {
   try {
@@ -5905,7 +5911,7 @@ function scheduleSyncToSupabase() {
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(pushStateToSupabase, 2000);
 }
-// ── Auth UI ──────────────────────────────────────────────
+// ââ Auth UI ââââââââââââââââââââââââââââââââââââââââââââââ
 
 const _authOverlay = document.querySelector("#auth-overlay");
 const _authForm = document.querySelector("#auth-form");
@@ -5950,41 +5956,41 @@ function _switchAuthMode(mode) {
   _authMode = mode;
   _authClearError();
 
-  // パスワードリセットリンクを1回だけ作成
+  // ãã¹ã¯ã¼ããªã»ãããªã³ã¯ã1åã ãä½æ
   if (!document.querySelector("#auth-reset-link")) {
     const p = document.createElement("p");
     p.className = "auth-hint";
     p.id = "auth-reset-link";
-    p.innerHTML = `<button type="button" class="auth-switch" id="auth-reset-btn">パスワードをお忘れの方はこちら</button>`;
+    p.innerHTML = `<button type="button" class="auth-switch" id="auth-reset-btn">ãã¹ã¯ã¼ãããå¿ãã®æ¹ã¯ãã¡ã</button>`;
     _authHintEl.insertAdjacentElement("afterend", p);
   }
   const resetLink = document.querySelector("#auth-reset-link");
 
   if (mode === "login") {
-    _authSubmitEl.textContent = "ログイン";
+    _authSubmitEl.textContent = "ã­ã°ã¤ã³";
     _authTabBtns.forEach(b => b.classList.toggle("is-active", b.dataset.authTab === "login"));
-    _authHintEl.innerHTML = `アカウントをお持ちでないですか？ <button type="button" class="auth-switch" id="auth-switch-btn">新規登録はこちら</button>`;
+    _authHintEl.innerHTML = `ã¢ã«ã¦ã³ãããæã¡ã§ãªãã§ããï¼ <button type="button" class="auth-switch" id="auth-switch-btn">æ°è¦ç»é²ã¯ãã¡ã</button>`;
     resetLink.hidden = false;
   } else if (mode === "signup") {
-    _authSubmitEl.textContent = "新規登録";
+    _authSubmitEl.textContent = "æ°è¦ç»é²";
     _authTabBtns.forEach(b => b.classList.toggle("is-active", b.dataset.authTab === "signup"));
-    _authHintEl.innerHTML = `すでにアカウントをお持ちの方は <button type="button" class="auth-switch" id="auth-switch-btn">ログインはこちら</button>`;
+    _authHintEl.innerHTML = `ãã§ã«ã¢ã«ã¦ã³ãããæã¡ã®æ¹ã¯ <button type="button" class="auth-switch" id="auth-switch-btn">ã­ã°ã¤ã³ã¯ãã¡ã</button>`;
     resetLink.hidden = true;
   } else if (mode === "reset") {
-    _authSubmitEl.textContent = "リセットメールを送る";
+    _authSubmitEl.textContent = "ãªã»ããã¡ã¼ã«ãéã";
     _authTabBtns.forEach(b => b.classList.remove("is-active"));
-    _authHintEl.innerHTML = `<button type="button" class="auth-switch" id="auth-switch-btn">← ログインに戻る</button>`;
+    _authHintEl.innerHTML = `<button type="button" class="auth-switch" id="auth-switch-btn">â ã­ã°ã¤ã³ã«æ»ã</button>`;
     resetLink.hidden = true;
   }
   _rebindSwitchBtn();
 }
 
-// タブボタンのイベント
+// ã¿ããã¿ã³ã®ã¤ãã³ã
 _authTabBtns.forEach(btn => {
   btn.addEventListener("click", () => _switchAuthMode(btn.dataset.authTab));
 });
 
-// フォーム送信
+// ãã©ã¼ã éä¿¡
 _authForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   _authClearError();
@@ -5995,7 +6001,7 @@ _authForm.addEventListener("submit", async (e) => {
     if (_authMode === "login") {
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // Credential Management API: Chromeにパスワード保存を促す
+      // Credential Management API: Chromeã«ãã¹ã¯ã¼ãä¿å­ãä¿ã
       if (window.PasswordCredential) {
         try {
           const cred = new PasswordCredential({ id: email, password });
@@ -6005,24 +6011,24 @@ _authForm.addEventListener("submit", async (e) => {
     } else if (_authMode === "signup") {
       const { error } = await sb.auth.signUp({ email, password });
       if (error) throw error;
-      _authShowError("確認メールを送りました。メールをご確認のうえログインしてください。");
+      _authShowError("ç¢ºèªã¡ã¼ã«ãéãã¾ãããã¡ã¼ã«ããç¢ºèªã®ããã­ã°ã¤ã³ãã¦ãã ããã");
       return;
     } else if (_authMode === "reset") {
       const { error } = await sb.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
       });
       if (error) throw error;
-      _authShowError("パスワードリセットメールを送信しました。");
+      _authShowError("ãã¹ã¯ã¼ããªã»ããã¡ã¼ã«ãéä¿¡ãã¾ããã");
       return;
     }
   } catch (err) {
-    _authShowError(err.message || "エラーが発生しました");
+    _authShowError(err.message || "ã¨ã©ã¼ãçºçãã¾ãã");
   } finally {
     _authSetLoading(false);
   }
 });
 
-// ── Auth state の監視 ─────────────────────────────────────
+// ââ Auth state ã®ç£è¦ âââââââââââââââââââââââââââââââââââââ
 
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
@@ -6044,7 +6050,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
   }
 });
 
-// ── ログアウト ────────────────────────────────────────────
+// ââ ã­ã°ã¢ã¦ã ââââââââââââââââââââââââââââââââââââââââââââ
 
 async function signOut() {
   clearTimeout(_syncTimer);
