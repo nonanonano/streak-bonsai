@@ -373,6 +373,18 @@ button {
   white-space: nowrap;
 }
 
+/* 習慣：緑の左ボーダー */
+.goal-selector__option--habit {
+  border-left: 3px solid rgba(53, 120, 86, 0.55);
+  background: rgba(225, 245, 232, 0.7);
+}
+
+/* 目標：赤の左ボーダー */
+.goal-selector__option--goal {
+  border-left: 3px solid rgba(168, 80, 64, 0.45);
+  background: rgba(252, 235, 228, 0.7);
+}
+
 .goal-selector__option.is-active,
 .goal-selector__option:disabled {
   border-color: rgba(96, 121, 111, 0.2);
