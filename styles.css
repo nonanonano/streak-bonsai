@@ -308,7 +308,7 @@ button {
 }
 
 .goal-selector__button::after {
-  content: "Ã¢ÂÂ¾";
+  content: "ÃÂ¢ÃÂÃÂ¾";
   font-size: 0.68rem;
   color: var(--accent);
 }
@@ -319,7 +319,7 @@ button {
 }
 
 .goal-selector[open] .goal-selector__button::after {
-  content: "Ã¢ÂÂ´";
+  content: "ÃÂ¢ÃÂÃÂ´";
 }
 
 .goal-selector__body {
@@ -373,13 +373,13 @@ button {
   white-space: nowrap;
 }
 
-/* Ã§Â¿ÂÃ¦ÂÂ£Ã¯Â¼ÂÃ§Â·ÂÃ£ÂÂ®Ã¥Â·Â¦Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂÃ£ÂÂ¼ */
+/* ÃÂ§ÃÂ¿ÃÂÃÂ¦ÃÂÃÂ£ÃÂ¯ÃÂ¼ÃÂÃÂ§ÃÂ·ÃÂÃÂ£ÃÂÃÂ®ÃÂ¥ÃÂ·ÃÂ¦ÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂ¼ÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂ¼ */
 .goal-selector__option--habit {
   border-left: 3px solid rgba(53, 120, 86, 0.55);
   background: rgba(225, 245, 232, 0.7);
 }
 
-/* Ã§ÂÂ®Ã¦Â¨ÂÃ¯Â¼ÂÃ¨ÂµÂ¤Ã£ÂÂ®Ã¥Â·Â¦Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂÃ£ÂÂ¼ */
+/* ÃÂ§ÃÂÃÂ®ÃÂ¦ÃÂ¨ÃÂÃÂ¯ÃÂ¼ÃÂÃÂ¨ÃÂµÃÂ¤ÃÂ£ÃÂÃÂ®ÃÂ¥ÃÂ·ÃÂ¦ÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂ¼ÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂ¼ */
 .goal-selector__option--goal {
   border-left: 3px solid rgba(168, 80, 64, 0.45);
   background: rgba(252, 235, 228, 0.7);
@@ -1122,6 +1122,11 @@ button {
   text-align: center;
   font-weight: 800;
   cursor: pointer;
+}
+
+.soft-button--danger {
+  color: var(--danger);
+  border-color: rgba(176, 64, 64, 0.18);
 }
 
 .action-button--primary {
@@ -2119,7 +2124,7 @@ button {
   line-height: 1.6;
 }
 
-/* Elapsed timer input Ã¢ÂÂ replaces the old two-element (display + edit row) approach */
+/* Elapsed timer input ÃÂ¢ÃÂÃÂ replaces the old two-element (display + edit row) approach */
 .elapsed-timer-wrap {
   display: flex;
   align-items: baseline;
@@ -3277,7 +3282,7 @@ button {
     color: var(--muted);
   }
 
-  /* Sheet panel always stays light Ã¢ÂÂ force dark text for all content inside */
+  /* Sheet panel always stays light ÃÂ¢ÃÂÃÂ force dark text for all content inside */
   .sheet__panel {
     color: #2c2820;
   }
@@ -3293,7 +3298,7 @@ button {
     border-color: rgba(34, 32, 29, 0.06);
   }
 
-  /* Sheet panel stays light in dark mode Ã¢ÂÂ force dark text on its inputs */
+  /* Sheet panel stays light in dark mode ÃÂ¢ÃÂÃÂ force dark text on its inputs */
   .sheet__panel input,
   .sheet__panel textarea,
   .sheet__panel select,
@@ -3328,13 +3333,13 @@ button {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 14px 32px rgba(0, 0, 0, 0.4);
   }
 
-  /* Review log editor Ã¢ÂÂ has a hardcoded light gradient that must be darkened */
+  /* Review log editor ÃÂ¢ÃÂÃÂ has a hardcoded light gradient that must be darkened */
   .review-log-editor {
     background: rgba(44, 37, 28, 0.92);
     border-color: rgba(185, 78, 40, 0.18);
   }
 
-  /* Panel variants that override .panel's dark bg Ã¢ÂÂ restore dark surfaces */
+  /* Panel variants that override .panel's dark bg ÃÂ¢ÃÂÃÂ restore dark surfaces */
   .panel--focus {
     background: linear-gradient(150deg, rgba(48, 32, 22, 0.94) 0%, rgba(54, 30, 18, 0.9) 100%);
     border-color: rgba(200, 92, 51, 0.22);
@@ -3352,7 +3357,7 @@ button {
     border-color: rgba(86, 112, 104, 0.18);
   }
 
-  /* Banners Ã¢ÂÂ light cream in light mode, need dark surface in dark mode */
+  /* Banners ÃÂ¢ÃÂÃÂ light cream in light mode, need dark surface in dark mode */
   .banner {
     background: linear-gradient(135deg, rgba(54, 36, 26, 0.92), rgba(46, 32, 22, 0.88));
     border-color: rgba(185, 78, 40, 0.22);
@@ -3363,7 +3368,7 @@ button {
     border-color: rgba(185, 78, 40, 0.28);
   }
 
-  /* Active plan button Ã¢ÂÂ light cream with dark text in light mode */
+  /* Active plan button ÃÂ¢ÃÂÃÂ light cream with dark text in light mode */
   .focus-plan-button.is-active {
     background: rgba(78, 122, 101, 0.26);
     border-color: rgba(78, 122, 101, 0.4);
@@ -3379,7 +3384,7 @@ button {
     border-color: rgba(185, 78, 40, 0.22);
   }
 
-  /* ---- Cards with own light backgrounds Ã¢ÂÂ give them dark surfaces in dark mode ---- */
+  /* ---- Cards with own light backgrounds ÃÂ¢ÃÂÃÂ give them dark surfaces in dark mode ---- */
   .review-log-card,
   .review-pot-card__fact,
   .roadmap-focus-card,
@@ -3492,13 +3497,13 @@ button {
   .log-pill[data-outcome="C"] { border-color: rgba(78, 122, 101, 0.28); }
   .log-pill[data-outcome="miss"] { border-color: rgba(168, 66, 64, 0.28); }
 
-  /* Settings menu panel Ã¢ÂÂ replace bright sage gradient with dark surface */
+  /* Settings menu panel ÃÂ¢ÃÂÃÂ replace bright sage gradient with dark surface */
   .setup-nav--menu {
     background: linear-gradient(180deg, rgba(50, 70, 62, 0.92) 0%, rgba(38, 54, 46, 0.90) 100%);
     box-shadow: 0 18px 34px rgba(0, 0, 0, 0.36);
   }
 
-  /* Active settings tab Ã¢ÂÂ swap light cream for dark highlight */
+  /* Active settings tab ÃÂ¢ÃÂÃÂ swap light cream for dark highlight */
   .setup-tab.is-active {
     color: var(--ink);
   }
@@ -3629,7 +3634,7 @@ button {
   margin-bottom: 10px;
 }
 
-/* Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂªÃ£ÂÂ¼Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ */
+/* ÃÂ£ÃÂÃÂ¹ÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂªÃÂ£ÃÂÃÂ¼ÃÂ£ÃÂÃÂ¯ÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂ */
 .streak-dots {
   display: flex;
   align-items: center;
@@ -3659,7 +3664,7 @@ button {
   opacity: 0.25;
 }
 
-/* Review / Garden Ã£ÂÂ§Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ©Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ§Ã¤Â½Â¿Ã£ÂÂÃ¥Â Â´Ã¥ÂÂ */
+/* Review / Garden ÃÂ£ÃÂÃÂ§ÃÂ£ÃÂÃÂ¤ÃÂ£ÃÂÃÂ³ÃÂ£ÃÂÃÂ©ÃÂ£ÃÂÃÂ¤ÃÂ£ÃÂÃÂ³ÃÂ£ÃÂÃÂ§ÃÂ¤ÃÂ½ÃÂ¿ÃÂ£ÃÂÃÂÃÂ¥ÃÂ ÃÂ´ÃÂ¥ÃÂÃÂ */
 .garden-card__streak {
   display: flex;
   align-items: center;
@@ -3673,7 +3678,7 @@ button {
   cursor: default;
 }
 
-/* Ã§Â¿ÂÃ¦ÂÂ£Ã£ÂÂ«Ã£ÂÂ¼Ã£ÂÂ: Ã¨Â©Â³Ã§Â´Â°Ã¥ÂºÂ¦Ã£ÂÂÃ¤Â¸ÂÃ£ÂÂÃ£ÂÂ¦Ã§Â¢ÂºÃ¥Â®ÂÃ£ÂÂ«Ã§Â·Â/Ã¨ÂÂÃ¨ÂÂ²Ã£ÂÂÃ©ÂÂ©Ã§ÂÂ¨ */
+/* ÃÂ§ÃÂ¿ÃÂÃÂ¦ÃÂÃÂ£ÃÂ£ÃÂÃÂ«ÃÂ£ÃÂÃÂ¼ÃÂ£ÃÂÃÂ: ÃÂ¨ÃÂ©ÃÂ³ÃÂ§ÃÂ´ÃÂ°ÃÂ¥ÃÂºÃÂ¦ÃÂ£ÃÂÃÂÃÂ¤ÃÂ¸ÃÂÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂ¦ÃÂ§ÃÂ¢ÃÂºÃÂ¥ÃÂ®ÃÂÃÂ£ÃÂÃÂ«ÃÂ§ÃÂ·ÃÂ/ÃÂ¨ÃÂÃÂÃÂ¨ÃÂÃÂ²ÃÂ£ÃÂÃÂÃÂ©ÃÂÃÂ©ÃÂ§ÃÂÃÂ¨ */
 .focus-launch.focus-launch--habit {
   background:
     radial-gradient(circle at 88% 12%, rgba(210, 255, 220, 0.30), transparent 30%),
@@ -3696,7 +3701,7 @@ button {
     0 6px 16px rgba(130, 50, 35, 0.14);
 }
 
-/* ---- Ã¥ÂÂÃ©ÂÂ¤Ã£ÂÂÃ£ÂÂ¿Ã£ÂÂ³Ã¯Â¼ÂdangerÃ¯Â¼Â ---- */
+/* ---- ÃÂ¥ÃÂÃÂÃÂ©ÃÂÃÂ¤ÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂ¿ÃÂ£ÃÂÃÂ³ÃÂ¯ÃÂ¼ÃÂdangerÃÂ¯ÃÂ¼ÃÂ ---- */
 .goal-library-card__action--danger {
   color: var(--danger);
   border-color: rgba(176, 64, 64, 0.25);
@@ -3710,7 +3715,7 @@ button {
   margin: 4px 0 8px;
 }
 
-/* ---- Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ Ã£ÂÂ»Ã£ÂÂ¯Ã£ÂÂ·Ã£ÂÂ§Ã£ÂÂ³ ---- */
+/* ---- ÃÂ£ÃÂÃÂ¢ÃÂ£ÃÂÃÂ«ÃÂ£ÃÂÃÂÃÂ£ÃÂÃÂ ÃÂ£ÃÂÃÂ»ÃÂ£ÃÂÃÂ¯ÃÂ£ÃÂÃÂ·ÃÂ£ÃÂÃÂ§ÃÂ£ÃÂÃÂ³ ---- */
 .garden-album {
   opacity: 0.88;
 }
@@ -3795,7 +3800,7 @@ button {
 
 
 
-/* ã¢ãã¤ã«: ãã«ã¹ã¯ãªã¼ã³è¡¨ç¤ºï¼ç¸¦åãï¼ ââ */
+/* Ã£ÂÂ¢Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«: Ã£ÂÂÃ£ÂÂ«Ã£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂªÃ£ÂÂ¼Ã£ÂÂ³Ã¨Â¡Â¨Ã§Â¤ÂºÃ¯Â¼ÂÃ§Â¸Â¦Ã¥ÂÂÃ£ÂÂÃ¯Â¼Â Ã¢ÂÂÃ¢ÂÂ */
 @media (max-width: 479px) {
   html, body {
     height: var(--real-100vh, 100dvh);
@@ -3834,7 +3839,7 @@ button {
   }
 }
 
-/* ã¢ãã¤ã«: ãã«ã¹ã¯ãªã¼ã³è¡¨ç¤ºï¼æ¨ªåãï¼ ââ */
+/* Ã£ÂÂ¢Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«: Ã£ÂÂÃ£ÂÂ«Ã£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂªÃ£ÂÂ¼Ã£ÂÂ³Ã¨Â¡Â¨Ã§Â¤ÂºÃ¯Â¼ÂÃ¦Â¨ÂªÃ¥ÂÂÃ£ÂÂÃ¯Â¼Â Ã¢ÂÂÃ¢ÂÂ */
 @media (max-height: 500px) and (orientation: landscape) {
   html, body {
     height: var(--real-100vh, 100dvh);
