@@ -6029,11 +6029,13 @@ sb.auth.onAuthStateChange(async (event, session) => {
     if (!_appInitialized) {
       await loadStateFromSupabase(session.user.id);
       _authOverlay.hidden = true;
+      window.scrollTo(0, 0);
       _appInitialized = true;
       init();
     } else if (event === "SIGNED_IN") {
       await loadStateFromSupabase(session.user.id);
       _authOverlay.hidden = true;
+      window.scrollTo(0, 0);
       render();
     }
   } else {
