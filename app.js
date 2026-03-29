@@ -3867,6 +3867,7 @@ function renderSessionSheet() {
               </div>
               <div class="panel stack">
                 <h3 class="panel__title">記録の仕上げ</h3>
+                ${state.setup.goalType !== "habit" ? `
                 <div class="field-grid field-grid--two">
                   <label class="field">
                     <span class="field__label">進んだマイルストーン</span>
@@ -3882,7 +3883,7 @@ function renderSessionSheet() {
                       <option value="complete" ${ui.finishDraft.milestoneStatus === "complete" ? "selected" : ""}>ここまで完了</option>
                     </select>
                   </label>
-                </div>
+                </div>` : ""}
                 <label class="field">
                   <span class="field__label">ひとこと</span>
                   <textarea data-finish-field="reflection" placeholder="任意。気づきがあれば一言だけ">${escapeHtml(ui.finishDraft.reflection)}</textarea>
@@ -3891,7 +3892,7 @@ function renderSessionSheet() {
             `
             : `
               <div class="panel panel--cool">
-                ${state.setup.title ? `<p style="font-size:0.8rem;font-weight:600;opacity:0.6;text-align:center;margin:0 0 2px;letter-spacing:0.02em">${escapeHtml(state.setup.title)}</p>` : ""}
+                ${state.setup.goal ? `<p style="font-size:0.8rem;font-weight:600;opacity:0.6;text-align:center;margin:0 0 2px;letter-spacing:0.02em">${escapeHtml(state.setup.goal)}</p>` : ""}
                 <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : (ui.focusPausedAt ? "⏸" : formatCountdown(remaining))}</p>
                 ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession.departures}回<\/p>` : ""}
               </div>
