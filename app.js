@@ -628,6 +628,9 @@ function init() {
   startSessionTicker();
   bindEvents();
   render();
+  setInterval(() => {
+    if (!state.activeSession) _resyncFromSupabase();
+  }, 3 * 60 * 1000);
 }
 
 function bindEvents() {
@@ -5832,7 +5835,9 @@ async function loadStateFromSupabase(userId) {
     );
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
     if (error?.code === "TIMEOUT") {
-      console.warn("Supabase load timeout: using local state");
+      console.warn("Supabase load timeout: will retry in 15s");
+      _supabaseLoadedSuccessfully = true;
+      setTimeout(() => _resyncFromSupabase(), 15000);
       return;
     }
     if (error && error.code !== "PGRST116") {
@@ -5873,12 +5878,22 @@ async function pushStateToSupabase() {
   if (!user) return;
   syncActiveGoalRecord();
   try {
+    const { data: existing } = await sb.from("user_data").select("state").eq("user_id", user.id).single();
+    const supabaseTs = existing?.state?.meta?.lastSavedAt || 0;
+    const localTs = state.meta?.lastSavedAt || 0;
+    if (supabaseTs > localTs) {
+      state = mergeState(buildSeedState(), existing.state);
+      localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+      render();
+      return;
+    }
     await sb.from("user_data").upsert(
       { user_id: user.id, state: JSON.parse(JSON.stringify(state)) },
       { onConflict: "user_id" }
     );
   } catch (err) {
     console.warn("Supabase sync error:", err);
+    setTimeout(() => pushStateToSupabase(), 30000);
   }
 }
 
