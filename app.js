@@ -677,7 +677,7 @@ function handleKeydown(event) {
       return;
     }
     state.meta.currentView = tabViews[viewIndex];
-    saveState();
+    saveNavState();
     render();
     return;
   }
@@ -729,7 +729,7 @@ function handleClick(event) {
       ui.reviewLogExpanded = false;
     }
     state.meta.currentView = target.dataset.view;
-    saveState();
+    saveNavState();
     render();
     return;
   }
@@ -5265,6 +5265,10 @@ function saveState() {
   state.meta.lastSavedAt = Date.now();
   localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
   if (_supabaseLoadedSuccessfully) scheduleSyncToSupabase();
+}
+
+function saveNavState() {
+  localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
 }
 
 function exportData() {
