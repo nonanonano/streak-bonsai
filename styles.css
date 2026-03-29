@@ -1157,9 +1157,12 @@ button {
 
 .metric-card__value {
   margin: 18px 0 0;
-  font-size: 2rem;
+  font-size: 1.55rem;
   line-height: 1;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metric-card__unit {
