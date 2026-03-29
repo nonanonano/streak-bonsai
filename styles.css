@@ -2489,8 +2489,8 @@ button {
 
 .flower-choice-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
   overflow: visible;
   padding: 0;
 }
@@ -2503,22 +2503,21 @@ button {
 
 .flower-choice {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
-  align-items: center;
-  padding: 14px;
-  border-radius: 24px;
-  border: 1px solid rgba(34, 32, 29, 0.1);
-  background: rgba(255, 251, 245, 0.82);
-  text-align: left;
+  justify-items: center;
+  gap: 6px;
+  align-items: start;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid rgba(34, 32, 29, 0.1);
+  background: rgba(255, 252, 246, 0.88);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .flower-choice.is-active {
-  border-color: rgba(110, 168, 143, 0.34);
-  background: linear-gradient(135deg, rgba(233, 245, 236, 0.96), rgba(255, 247, 241, 0.94));
-  box-shadow: 0 16px 30px rgba(80, 108, 91, 0.1);
-  outline: 2px solid rgba(110, 168, 143, 0.18);
-  outline-offset: -2px;
+  border-color: var(--sage);
+  background: linear-gradient(150deg, rgba(234, 246, 240, 0.98), rgba(220, 240, 232, 0.95));
 }
 
 .flower-choice__art {
@@ -2540,8 +2539,9 @@ button {
 }
 
 .flower-choice__label {
-  font-size: 1rem;
-  line-height: 1.2;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--sage);
 }
 
 .flower-choice__selected {
@@ -2558,10 +2558,10 @@ button {
 }
 
 .flower-choice__trait {
-  color: var(--sage);
-  font-size: 0.78rem;
-  font-weight: 800;
-  line-height: 1.4;
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.3;
 }
 
 .flower-choice__copy {
@@ -3142,15 +3142,6 @@ button {
   .focus-launch__flower-panel {
     width: 78px;
     min-height: 84px;
-  }
-
-  .flower-choice {
-    grid-template-columns: 64px 1fr;
-    min-height: 124px;
-  }
-
-  .flower-choice__head {
-    align-items: start;
   }
 
   .garden-scene {
