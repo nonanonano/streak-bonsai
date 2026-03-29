@@ -3141,32 +3141,19 @@ function renderBonsaiPicker(selectedKey, actionName = "select-setup-bonsai") {
 }
 
 function renderFlowerPicker(selectedType, actionName, options = {}) {
-  const compact = Boolean(options.compact);
   const currentType = normalizeFlowerType(selectedType);
-  const currentFlower = FLOWER_LIBRARY[currentType];
 
   return `
-    <div class="field flower-picker ${compact ? "flower-picker--compact" : ""}">
-      <div>
-        <span class="field__label">育てる植物</span>
-        <p class="section-copy">目標の種類に合った植物を選びます。咲く木として成長します。</p>
-        <p class="flower-picker__current">選択中: ${escapeHtml(currentFlower.label)}</p>
-      </div>
-      <div class="flower-choice-grid ${compact ? "flower-choice-grid--compact" : ""}">
+    <div class="field">
+      <span class="field__label">育てる植物</span>
+      <p class="section-copy">目標の種類に合った植物を選びます。咲く木として成長します。</p>
+      <div class="flower-choice-grid">
         ${Object.entries(FLOWER_LIBRARY)
           .map(([key, flower]) => `
             <button type="button" class="flower-choice ${currentType === key ? "is-active" : ""}" data-action="${actionName}" data-flower-type="${key}" aria-pressed="${currentType === key ? "true" : "false"}">
-              <div class="flower-choice__art">
-                ${renderFlowerArtwork(key, 8, { size: compact ? "picker-compact" : "picker" })}
-              </div>
-              <div class="flower-choice__body">
-                <div class="flower-choice__head">
-                  <strong class="flower-choice__label">${escapeHtml(flower.label)}</strong>
-                  ${currentType === key ? `<span class="flower-choice__selected">選択中</span>` : ""}
-                </div>
-                <span class="flower-choice__trait">${escapeHtml(flower.trait)}</span>
-                <span class="flower-choice__copy">${escapeHtml(flower.copy)}</span>
-              </div>
+              ${renderFlowerArtwork(key, 8, { size: "picker" })}
+              <span class="flower-choice__label">${escapeHtml(flower.label)}</span>
+              <span class="flower-choice__trait">${escapeHtml(flower.trait)}</span>
             </button>
           `)
           .join("")}
