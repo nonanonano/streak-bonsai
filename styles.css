@@ -52,7 +52,7 @@ button {
 }
 
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: stretch;
@@ -3793,3 +3793,18 @@ button {
   border-color: rgba(176, 64, 64, 0.2);
 }
 
+
+
+/* モバイル: フルスクリーン表示 */
+@media (max-width: 479px) {
+  .app-shell {
+    padding: 0;
+    align-items: flex-start;
+  }
+  .device-frame {
+    height: 100dvh;
+    width: 100%;
+    border-radius: 0;
+    min-height: auto;
+  }
+}
