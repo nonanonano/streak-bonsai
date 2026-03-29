@@ -1,58 +1,58 @@
 // =========================================================
-// SUPABASE è¨­å®
+// SUPABASE Ã¨Â¨Â­Ã¥Â®Â
 // =========================================================
 const SUPABASE_URL = "https://kyzyyciutnkhaxadwdlx.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_8BS-Guu8UUfb3sEHRfHGRg_vTvB0FyB";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-ï»¿const STORAGE_KEY = "tomosu-state-v1";
+Ã¯Â»Â¿const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
 const PLAN_RANK = { C: 1, B: 2, A: 3 };
 const PLAN_META = {
-  A: { label: "Plan A", tag: "éå¸¸" },
-  B: { label: "Plan B", tag: "ç­ç¸®" },
-  C: { label: "Plan C", tag: "ææ¸" },
+  A: { label: "Plan A", tag: "Ã©ÂÂÃ¥Â¸Â¸" },
+  B: { label: "Plan B", tag: "Ã§ÂÂ­Ã§Â¸Â®" },
+  C: { label: "Plan C", tag: "Ã¦ÂÂÃ¦Â¸Â" },
 };
 const REASONS = [
-  "æ®æ¥­ã§éå§ãéãã",
-  "ã¿ã¹ã¯ãéããã",
-  "éå§åã®æºåãé¢å",
-  "ç²å´",
-  "äºå®å¤æ´",
-  "å¿ãã",
+  "Ã¦Â®ÂÃ¦Â¥Â­Ã£ÂÂ§Ã©ÂÂÃ¥Â§ÂÃ£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ",
+  "Ã£ÂÂ¿Ã£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ",
+  "Ã©ÂÂÃ¥Â§ÂÃ¥ÂÂÃ£ÂÂ®Ã¦ÂºÂÃ¥ÂÂÃ£ÂÂÃ©ÂÂ¢Ã¥ÂÂ",
+  "Ã§ÂÂ²Ã¥ÂÂ´",
+  "Ã¤ÂºÂÃ¥Â®ÂÃ¥Â¤ÂÃ¦ÂÂ´",
+  "Ã¥Â¿ÂÃ£ÂÂÃ£ÂÂ",
 ];
 const REPLAN_MODES = {
-  lighten_today: "ä»æ¥ãè»½ããã",
-  reset_week: "ä»é±ãç«ã¦ç´ã",
-  break_goal: "ç®æ¨ãåè§£ãã",
-  retarget_goal: "ç®æ¨ãæ´æ°ãã",
-  consult_block: "è©°ã¾ããç¸è«ãã",
+  lighten_today: "Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂÃ¨Â»Â½Ã£ÂÂÃ£ÂÂÃ£ÂÂ",
+  reset_week: "Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂÃ§Â«ÂÃ£ÂÂ¦Ã§ÂÂ´Ã£ÂÂ",
+  break_goal: "Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¥ÂÂÃ¨Â§Â£Ã£ÂÂÃ£ÂÂ",
+  retarget_goal: "Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¦ÂÂ´Ã¦ÂÂ°Ã£ÂÂÃ£ÂÂ",
+  consult_block: "Ã¨Â©Â°Ã£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ§ÂÂ¸Ã¨Â«ÂÃ£ÂÂÃ£ÂÂ",
 };
 const SETUP_SECTIONS = {
   goal: {
-    label: "ç®æ¨ç·¨é",
-    hint: "ç»é²æ¸ã¿ãç´ã",
-    title: "ç®æ¨ç·¨é",
-    copy: "ç»é²æ¸ã¿ã®ç®æ¨ãããã§ç·¨éãã¾ãã",
+    label: "Ã§ÂÂ®Ã¦Â¨ÂÃ§Â·Â¨Ã©ÂÂ",
+    hint: "Ã§ÂÂ»Ã©ÂÂ²Ã¦Â¸ÂÃ£ÂÂ¿Ã£ÂÂÃ§ÂÂ´Ã£ÂÂ",
+    title: "Ã§ÂÂ®Ã¦Â¨ÂÃ§Â·Â¨Ã©ÂÂ",
+    copy: "Ã§ÂÂ»Ã©ÂÂ²Ã¦Â¸ÂÃ£ÂÂ¿Ã£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ§Ã§Â·Â¨Ã©ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ",
   },
   roadmap: {
     label: "Roadmap",
-    hint: "ç¯ç®ãæ´ãã",
+    hint: "Ã§Â¯ÂÃ§ÂÂ®Ã£ÂÂÃ¦ÂÂ´Ã£ÂÂÃ£ÂÂ",
     title: "Roadmap",
-    copy: "ãã¤ã«ã¹ãã¼ã³ã®è¿½å ã¨èª¿æ´ã¯è¨­å®ã§è¡ãã¾ãã",
+    copy: "Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂ®Ã¨Â¿Â½Ã¥ÂÂ Ã£ÂÂ¨Ã¨ÂªÂ¿Ã¦ÂÂ´Ã£ÂÂ¯Ã¨Â¨Â­Ã¥Â®ÂÃ£ÂÂ§Ã¨Â¡ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ",
   },
   schedule: {
-    label: "å®æ½æé",
-    hint: "ãã¤åãã",
-    title: "å®æ½æé",
-    copy: "ææ¥ãã¨ã«ãåããããæéã ããããã§æ´ãã¾ãã",
+    label: "Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ",
+    hint: "Ã£ÂÂÃ£ÂÂ¤Ã¥ÂÂÃ£ÂÂÃ£ÂÂ",
+    title: "Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ",
+    copy: "Ã¦ÂÂÃ¦ÂÂ¥Ã£ÂÂÃ£ÂÂ¨Ã£ÂÂ«Ã£ÂÂÃ¥ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ¦ÂÂÃ©ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ§Ã¦ÂÂ´Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ",
   },
   plan: {
-    label: "ãã©ã³ã®å¤æ´",
-    hint: "ã©ãã¾ã§è»½ãããã",
-    title: "ãã©ã³",
-    copy: "éå¸¸ / ç­ç¸® / ææ¸ã®3æ®µéã ãèª¿æ´ãã¾ãã",
+    label: "Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ³Ã£ÂÂ®Ã¥Â¤ÂÃ¦ÂÂ´",
+    hint: "Ã£ÂÂ©Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂ§Ã¨Â»Â½Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ",
+    title: "Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ³",
+    copy: "Ã©ÂÂÃ¥Â¸Â¸ / Ã§ÂÂ­Ã§Â¸Â® / Ã¦ÂÂÃ¦Â¸ÂÃ£ÂÂ®3Ã¦Â®ÂµÃ©ÂÂÃ£ÂÂ Ã£ÂÂÃ¨ÂªÂ¿Ã¦ÂÂ´Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ",
   },
 };
 const ROADMAP_TARGETS = {
@@ -65,31 +65,31 @@ const ROADMAP_TARGETS = {
 const ROADMAP_ID_ORDER = ["goal", "checkpoint", "foundation", "week", "next"];
 const WEEKDAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const FLOWER_STAGE_THRESHOLDS = [0, 1, 2, 3, 5, 7, 10, 14, 21, 30];
-const FLOWER_STAGE_LABELS = ["ç¨®", "è½", "åè", "èã®ã³", "ã¤ã¼ã¿", "è²ã¥ã", "å²ãå§ã", "ä¸åå²ã", "æºé", "æ¼ãè±"];
-// ç®æ¨æ¤ç©ã©ã¤ãã©ãªï¼æ¢ã»æ¡ã»ãã¤ãï¼
+const FLOWER_STAGE_LABELS = ["Ã§Â¨Â®", "Ã¨ÂÂ½", "Ã¥ÂÂÃ¨ÂÂ", "Ã¨ÂÂÃ£ÂÂ®Ã£ÂÂ³", "Ã£ÂÂ¤Ã£ÂÂ¼Ã£ÂÂ¿", "Ã¨ÂÂ²Ã£ÂÂ¥Ã£ÂÂ", "Ã¥ÂÂ²Ã£ÂÂÃ¥Â§ÂÃ£ÂÂ", "Ã¤Â¸ÂÃ¥ÂÂÃ¥ÂÂ²Ã£ÂÂ", "Ã¦ÂºÂÃ©ÂÂ", "Ã¦ÂÂ¼Ã£ÂÂÃ¨ÂÂ±"];
+// Ã§ÂÂ®Ã¦Â¨ÂÃ¦Â¤ÂÃ§ÂÂ©Ã£ÂÂ©Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ©Ã£ÂÂªÃ¯Â¼ÂÃ¦Â¢ÂÃ£ÂÂ»Ã¦Â¡ÂÃ£ÂÂ»Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂÃ¯Â¼Â
 const FLOWER_LIBRARY = {
   ume: {
-    label: "æ¢",
-    trait: "ã¯ããã¦å²ãç®æ¨",
-    copy: "ç­æã®ç®æ¨ã«ãå³ããææãè¶ãã¦æåã«å²ããéæã®åã³ãæããããæ¤ç©ã§ãã",
+    label: "Ã¦Â¢Â",
+    trait: "Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ¦Ã¥ÂÂ²Ã£ÂÂÃ§ÂÂ®Ã¦Â¨Â",
+    copy: "Ã§ÂÂ­Ã¦ÂÂÃ£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ«Ã£ÂÂÃ¥ÂÂ³Ã£ÂÂÃ£ÂÂÃ¦ÂÂÃ¦ÂÂÃ£ÂÂÃ¨Â¶ÂÃ£ÂÂÃ£ÂÂ¦Ã¦ÂÂÃ¥ÂÂÃ£ÂÂ«Ã¥ÂÂ²Ã£ÂÂÃ£ÂÂÃ©ÂÂÃ¦ÂÂÃ£ÂÂ®Ã¥ÂÂÃ£ÂÂ³Ã£ÂÂÃ¦ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ¦Â¤ÂÃ§ÂÂ©Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ",
     trunk: "#6a5248", branch: "#5a4238",
     bud: "#e8b4c8", petal: "#f9f0f4", petalLight: "#fffbfe", center: "#d4526e",
     pot: "#8a7060", potRim: "#786050", soil: "#6a5040",
     stem: "#6a5248", leaf: "#4a3830",
   },
   sakura: {
-    label: "æ¡",
-    trait: "ç¯ç®ãç¥ãç®æ¨",
-    copy: "å¤§ããªç¯ç®ãæ¬çªã«ãæºéã®ç¬éãæãç¾ãããéæã®æåãå¤§ããæ¤ç©ã§ãã",
+    label: "Ã¦Â¡Â",
+    trait: "Ã§Â¯ÂÃ§ÂÂ®Ã£ÂÂÃ§Â¥ÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨Â",
+    copy: "Ã¥Â¤Â§Ã£ÂÂÃ£ÂÂªÃ§Â¯ÂÃ§ÂÂ®Ã£ÂÂÃ¦ÂÂ¬Ã§ÂÂªÃ£ÂÂ«Ã£ÂÂÃ¦ÂºÂÃ©ÂÂÃ£ÂÂ®Ã§ÂÂ¬Ã©ÂÂÃ£ÂÂÃ¦ÂÂÃ£ÂÂÃ§Â¾ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ©ÂÂÃ¦ÂÂÃ£ÂÂ®Ã¦ÂÂÃ¥ÂÂÃ£ÂÂÃ¥Â¤Â§Ã£ÂÂÃ£ÂÂÃ¦Â¤ÂÃ§ÂÂ©Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ",
     trunk: "#7a6258", branch: "#6a5248",
     bud: "#f4c0d8", petal: "#f9d8e8", petalLight: "#fff4f8", center: "#e87090",
     pot: "#907060", potRim: "#7e6050", soil: "#6e5040",
     stem: "#7a6258", leaf: "#6a5248",
   },
   satsuki: {
-    label: "ãã¤ã",
-    trait: "é²ã¿ãè¦ããç®æ¨",
-    copy: "æ®µéçãªç®æ¨ã«ãé²æçã«å¿ãã¦è±ãå¢ããã®ã§ãé å¼µãããã®ã¾ã¾è¦ãã¾ãã",
+    label: "Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ",
+    trait: "Ã©ÂÂ²Ã£ÂÂ¿Ã£ÂÂÃ¨Â¦ÂÃ£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨Â",
+    copy: "Ã¦Â®ÂµÃ©ÂÂÃ§ÂÂÃ£ÂÂªÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ«Ã£ÂÂÃ©ÂÂ²Ã¦ÂÂÃ§ÂÂÃ£ÂÂ«Ã¥Â¿ÂÃ£ÂÂÃ£ÂÂ¦Ã¨ÂÂ±Ã£ÂÂÃ¥Â¢ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ®Ã£ÂÂ§Ã£ÂÂÃ©Â ÂÃ¥Â¼ÂµÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ®Ã£ÂÂ¾Ã£ÂÂ¾Ã¨Â¦ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ",
     trunk: "#6a5c48", branch: "#5a4c38",
     bud: "#d04880", petal: "#e8609a", petalLight: "#ffd8ec", center: "#a02860",
     pot: "#887060", potRim: "#766050", soil: "#665040",
@@ -99,25 +99,25 @@ const FLOWER_LIBRARY = {
 
 const BONSAI_LIBRARY = {
   pine: {
-    label: "æ¾", trait: "ç©ã¿ä¸ããç¿æ£",
+    label: "Ã¦ÂÂ¾", trait: "Ã§Â©ÂÃ£ÂÂ¿Ã¤Â¸ÂÃ£ÂÂÃ£ÂÂÃ§Â¿ÂÃ¦ÂÂ£",
     trunk: "#5a4a3a", branch: "#4a3c2c",
     foliage: "#2e6644", foliageDark: "#1e4e32", foliageLight: "#4e8e5c",
     pot: "#8c6e58", potRim: "#7a5c48", soil: "#6a5040",
   },
   maple: {
-    label: "ãã¿ã", trait: "å¤ããç¿æ£",
+    label: "Ã£ÂÂÃ£ÂÂ¿Ã£ÂÂ", trait: "Ã¥Â¤ÂÃ£ÂÂÃ£ÂÂÃ§Â¿ÂÃ¦ÂÂ£",
     trunk: "#7a5840", branch: "#6a4c36",
     foliage: "#c04020", foliageDark: "#8a2c14", foliageLight: "#f08040",
     pot: "#906858", potRim: "#7e5848", soil: "#6e5038",
   },
   moss: {
-    label: "è", trait: "æ´ããç¿æ£",
+    label: "Ã¨ÂÂ", trait: "Ã¦ÂÂ´Ã£ÂÂÃ£ÂÂÃ§Â¿ÂÃ¦ÂÂ£",
     trunk: "#5a7040", branch: "#4a6030",
     foliage: "#5a9040", foliageDark: "#3a6828", foliageLight: "#8abf60",
     pot: "#7a8060", potRim: "#6a7050", soil: "#5a6040",
   },
 };
-const BONSAI_STAGE_LABELS = ["é¢ã®ã¿","è½çã","å¹¼æ¨","æé·æ","å½¢ææ","æ¨¹å½¢æ","æ´ã","èæ","éæ¨","åä½"];
+const BONSAI_STAGE_LABELS = ["Ã©ÂÂ¢Ã£ÂÂ®Ã£ÂÂ¿","Ã¨ÂÂ½Ã§ÂÂÃ£ÂÂ","Ã¥Â¹Â¼Ã¦ÂÂ¨","Ã¦ÂÂÃ©ÂÂ·Ã¦ÂÂ","Ã¥Â½Â¢Ã¦ÂÂÃ¦ÂÂ","Ã¦Â¨Â¹Ã¥Â½Â¢Ã¦ÂÂ","Ã¦ÂÂ´Ã£ÂÂ","Ã¨ÂÂÃ¦ÂÂ","Ã©ÂÂÃ¦ÂÂ¨","Ã¥ÂÂÃ¤Â½Â"];
 
 const screenRoot = document.querySelector("#screen-root");
 const screenFrame = document.querySelector(".screen-frame");
@@ -211,10 +211,10 @@ function normalizeLogs(logs = []) {
 
 function inferDefaultFlowerType(setup = {}) {
   const goalText = `${setup.goal || ""} ${setup.currentLevel || ""}`.toLowerCase();
-  if (/å§|æå|ã¾ã|first|week|é±|1é±/.test(goalText)) {
+  if (/Ã¥Â§Â|Ã¦ÂÂÃ¥ÂÂ|Ã£ÂÂ¾Ã£ÂÂ|first|week|Ã©ÂÂ±|1Ã©ÂÂ±/.test(goalText)) {
     return "ume";
   }
-  if (/è©¦é¨|åé¨|çºè¡¨|æ¬çª|ãã¬ã¼ã³|é¢æ¥|æåº|exam|test/.test(goalText)) {
+  if (/Ã¨Â©Â¦Ã©Â¨Â|Ã¥ÂÂÃ©Â¨Â|Ã§ÂÂºÃ¨Â¡Â¨|Ã¦ÂÂ¬Ã§ÂÂª|Ã£ÂÂÃ£ÂÂ¬Ã£ÂÂ¼Ã£ÂÂ³|Ã©ÂÂ¢Ã¦ÂÂ¥|Ã¦ÂÂÃ¥ÂÂº|exam|test/.test(goalText)) {
     return "sakura";
   }
   return "satsuki";
@@ -257,16 +257,16 @@ function formatStudyDays(studyDays) {
   const days = normalizeStudyDays(studyDays);
 
   if (!days.length) {
-    return "æªè¨­å®";
+    return "Ã¦ÂÂªÃ¨Â¨Â­Ã¥Â®Â";
   }
   if (days.length === WEEKDAY_KEYS.length) {
-    return "æ¯æ¥";
+    return "Ã¦Â¯ÂÃ¦ÂÂ¥";
   }
   if (days.join(",") === "Mon,Tue,Wed,Thu,Fri") {
-    return "å¹³æ¥";
+    return "Ã¥Â¹Â³Ã¦ÂÂ¥";
   }
   if (days.join(",") === "Sat,Sun") {
-    return "åæ¥";
+    return "Ã¥ÂÂÃ¦ÂÂ¥";
   }
 
   return days.map((key) => weekdayShortLabel(key)).join(" ");
@@ -285,7 +285,7 @@ function normalizeOptionalDate(value) {
 
 function formatDeadlineBadge(deadline) {
   const normalized = normalizeOptionalDate(deadline);
-  return normalized ? `æé ${normalized}` : "æéãªã";
+  return normalized ? `Ã¦ÂÂÃ©ÂÂ ${normalized}` : "Ã¦ÂÂÃ©ÂÂÃ£ÂÂªÃ£ÂÂ";
 }
 
 function getFlowerTypeMeta(flowerType, setup = {}) {
@@ -357,7 +357,7 @@ function getBonsaiHealth(logs, studyDays) {
   return scheduled > 0 ? Math.round((completed / scheduled) * 100) : 100;
 }
 
-// ç´è¿7åã®å®æ½äºå®æ¥ãââãããã§è¿ãï¼èª¬æä¸è¦ã®ä¸ç®ç­ç¶UIï¼
+// Ã§ÂÂ´Ã¨Â¿Â7Ã¥ÂÂÃ£ÂÂ®Ã¥Â®ÂÃ¦ÂÂ½Ã¤ÂºÂÃ¥Â®ÂÃ¦ÂÂ¥Ã£ÂÂÃ¢ÂÂÃ¢ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ§Ã¨Â¿ÂÃ£ÂÂÃ¯Â¼ÂÃ¨ÂªÂ¬Ã¦ÂÂÃ¤Â¸ÂÃ¨Â¦ÂÃ£ÂÂ®Ã¤Â¸ÂÃ§ÂÂ®Ã§ÂÂ­Ã§ÂÂ¶UIÃ¯Â¼Â
 function renderStreakDots(logs, studyDays) {
   const days = normalizeStudyDays(studyDays);
   const today = new Date();
@@ -371,7 +371,7 @@ function renderStreakDots(logs, studyDays) {
     const done = Boolean(log && log.outcome !== "miss" && log.outcome !== "none");
     slots.unshift({ done, isToday: i === 0 });
   }
-  // 7åæªæºãªãå·¦ãèããããã§åãã
+  // 7Ã¥ÂÂÃ¦ÂÂªÃ¦ÂºÂÃ£ÂÂªÃ£ÂÂÃ¥Â·Â¦Ã£ÂÂÃ¨ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ§Ã¥ÂÂÃ£ÂÂÃ£ÂÂ
   while (slots.length < 7) slots.unshift({ done: false, isToday: false, filler: true });
   return `<span class="streak-dots">${slots.map(s =>
     `<span class="streak-dot${s.done ? " is-done" : ""}${s.isToday ? " is-today" : ""}${s.filler ? " is-filler" : ""}"></span>`
@@ -633,7 +633,19 @@ function init() {
   }, 3 * 60 * 1000);
 }
 
+function updateVH() {
+  document.documentElement.style.setProperty("--real-100vh", window.innerHeight + "px");
+}
+
 function bindEvents() {
+  // 画面の向き切り替え時にビューポート高さを再計算
+  updateVH();
+  window.addEventListener("resize", updateVH);
+  window.addEventListener("orientationchange", () => {
+    setTimeout(updateVH, 50);
+    setTimeout(updateVH, 300);
+  });
+
   document.addEventListener("click", handleClick);
   document.addEventListener("input", handleInput);
   document.addEventListener("keydown", handleKeydown);
@@ -673,7 +685,7 @@ function handleKeydown(event) {
     if (state.activeSession) {
       ui.sessionOpen = true;
       render();
-      showToast("ã»ãã·ã§ã³ä¸­ã¯ç»é¢ãåãæ¿ãããã¾ãã");
+      showToast("Ã£ÂÂ»Ã£ÂÂÃ£ÂÂ·Ã£ÂÂ§Ã£ÂÂ³Ã¤Â¸Â­Ã£ÂÂ¯Ã§ÂÂ»Ã©ÂÂ¢Ã£ÂÂÃ¥ÂÂÃ£ÂÂÃ¦ÂÂ¿Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ");
       return;
     }
     state.meta.currentView = tabViews[viewIndex];
@@ -723,7 +735,7 @@ function handleClick(event) {
     if (state.activeSession) {
       ui.sessionOpen = true;
       render();
-      showToast("ã»ãã·ã§ã³ä¸­ã¯ç»é¢ãåãæ¿ãããã¾ãã");
+      showToast("Ã£ÂÂ»Ã£ÂÂÃ£ÂÂ·Ã£ÂÂ§Ã£ÂÂ³Ã¤Â¸Â­Ã£ÂÂ¯Ã§ÂÂ»Ã©ÂÂ¢Ã£ÂÂÃ¥ÂÂÃ£ÂÂÃ¦ÂÂ¿Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ");
       return;
     }
     ui.missPanelOpen = false;
@@ -741,7 +753,7 @@ function handleClick(event) {
     if (state.activeSession) {
       ui.sessionOpen = true;
       render();
-      showToast("ã»ãã·ã§ã³ä¸­ã¯è¨­å®ãéãã¾ãã");
+      showToast("Ã£ÂÂ»Ã£ÂÂÃ£ÂÂ·Ã£ÂÂ§Ã£ÂÂ³Ã¤Â¸Â­Ã£ÂÂ¯Ã¨Â¨Â­Ã¥Â®ÂÃ£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ");
       return;
     }
     ui.setupMode = "edit";
@@ -794,12 +806,12 @@ function handleClick(event) {
     if (activateGoal(target.dataset.goalId || "")) {
       ui.goalLibraryDraft = null;
       render();
-      showToast("è¡¨ç¤ºããç®æ¨ãåãæ¿ãã¾ããã");
+      showToast("Ã¨Â¡Â¨Ã§Â¤ÂºÃ£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¥ÂÂÃ£ÂÂÃ¦ÂÂ¿Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     }
     return;
   }
 
-  // ã¢ã«ãã ã¸ç§»åï¼ãã¼ã¿ä¿æããã¾ã¾éè¡¨ç¤ºï¼
+  // Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ Ã£ÂÂ¸Ã§Â§Â»Ã¥ÂÂÃ¯Â¼ÂÃ£ÂÂÃ£ÂÂ¼Ã£ÂÂ¿Ã¤Â¿ÂÃ¦ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂ¾Ã©ÂÂÃ¨Â¡Â¨Ã§Â¤ÂºÃ¯Â¼Â
   if (action === "archive-goal") {
     const goalId = target.dataset.goalId;
     ensureGoalCollection();
@@ -807,7 +819,7 @@ function handleClick(event) {
     if (!goal) return;
     goal.archived = true;
     goal.archivedAt = toISODate(new Date());
-    // ã¢ã¼ã«ã¤ãå¯¾è±¡ãã¢ã¯ãã£ãç®æ¨ãªãå¥ã®ç®æ¨ã¸åãæ¿ã
+    // Ã£ÂÂ¢Ã£ÂÂ¼Ã£ÂÂ«Ã£ÂÂ¤Ã£ÂÂÃ¥Â¯Â¾Ã¨Â±Â¡Ã£ÂÂÃ£ÂÂ¢Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂ£Ã£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂªÃ£ÂÂÃ¥ÂÂ¥Ã£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ¸Ã¥ÂÂÃ£ÂÂÃ¦ÂÂ¿Ã£ÂÂ
     if (goalId === state.meta.activeGoalId) {
       const next = state.goals.find(g => !g.archived && g.id !== goalId);
       if (next) { applyGoalRecord(next); state.meta.activeGoalId = next.id; }
@@ -816,11 +828,11 @@ function handleClick(event) {
     ui.deleteConfirmGoalId = null;
     saveState();
     render();
-    showToast("ã¢ã«ãã ã«ä¿å­ãã¾ããã");
+    showToast("Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ Ã£ÂÂ«Ã¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
-  // å®å¨æ¶å»ã®ç¢ºèªã¹ããã
+  // Ã¥Â®ÂÃ¥ÂÂ¨Ã¦Â¶ÂÃ¥ÂÂ»Ã£ÂÂ®Ã§Â¢ÂºÃ¨ÂªÂÃ£ÂÂ¹Ã£ÂÂÃ£ÂÂÃ£ÂÂ
   if (action === "confirm-delete-goal") {
     ui.deleteConfirmGoalId = target.dataset.goalId;
     render();
@@ -833,7 +845,7 @@ function handleClick(event) {
     return;
   }
 
-  // å®å¨æ¶å»ï¼ç¢ºèªå¾ï¼
+  // Ã¥Â®ÂÃ¥ÂÂ¨Ã¦Â¶ÂÃ¥ÂÂ»Ã¯Â¼ÂÃ§Â¢ÂºÃ¨ÂªÂÃ¥Â¾ÂÃ¯Â¼Â
   if (action === "delete-goal") {
     const goalId = target.dataset.goalId;
     ensureGoalCollection();
@@ -846,11 +858,11 @@ function handleClick(event) {
     ui.deleteConfirmGoalId = null;
     saveState();
     render();
-    showToast("ç®æ¨ãå®å¨ã«åé¤ãã¾ããã");
+    showToast("Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¥Â®ÂÃ¥ÂÂ¨Ã£ÂÂ«Ã¥ÂÂÃ©ÂÂ¤Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
-  // ã¢ã«ãã ããå®å¨æ¶å»
+  // Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ¥Â®ÂÃ¥ÂÂ¨Ã¦Â¶ÂÃ¥ÂÂ»
   if (action === "purge-archived-goal") {
     const goalId = target.dataset.goalId;
     ensureGoalCollection();
@@ -858,7 +870,7 @@ function handleClick(event) {
     ui.deleteConfirmGoalId = null;
     saveState();
     render();
-    showToast("ã¢ã«ãã ããåé¤ãã¾ããã");
+    showToast("Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ¥ÂÂÃ©ÂÂ¤Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
@@ -876,11 +888,11 @@ function handleClick(event) {
 
   if (action === "save-goal-library-edit") {
     if (!commitGoalLibraryDraft()) {
-      showToast("ç®æ¨åãå¥ãã¦ãã ããã");
+      showToast("Ã§ÂÂ®Ã¦Â¨ÂÃ¥ÂÂÃ£ÂÂÃ¥ÂÂ¥Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
       return;
     }
     render();
-    showToast("ç®æ¨ãæ´æ°ãã¾ããã");
+    showToast("Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¦ÂÂ´Ã¦ÂÂ°Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
@@ -928,7 +940,7 @@ function handleClick(event) {
     const weekdayKey = target.dataset.weekday || "";
     const nextDays = toggleStudyDay(ui.setupDraft.studyDays, weekdayKey);
     if (!nextDays.length) {
-      showToast("å®æ½ææ¥ã1ã¤ä»¥ä¸é¸ãã§ãã ããã");
+      showToast("Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ¦ÂÂ¥Ã£ÂÂ1Ã£ÂÂ¤Ã¤Â»Â¥Ã¤Â¸ÂÃ©ÂÂ¸Ã£ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
       return;
     }
     ui.setupDraft.studyDays = nextDays;
@@ -973,7 +985,7 @@ function handleClick(event) {
 
   if (action === "save-setup") {
     if ((state.meta.demoMode || ui.setupMode === "new_goal") && !ui.setupDraft.goal.trim()) {
-      showToast("æ°ããç®æ¨åãå¥ãã¦ãã ããã");
+      showToast("Ã¦ÂÂ°Ã£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ¥ÂÂÃ£ÂÂÃ¥ÂÂ¥Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
       return;
     }
     const saveResult = commitSetupDraft();
@@ -986,17 +998,17 @@ function handleClick(event) {
     ui.goalLibraryDraft = null;
     render();
     if (saveResult === "created" && conflicts.length) {
-      showToast(`ç®æ¨ãè¿½å ãã¾ãããå®æ½æéã¯ ${conflicts.map((item) => item.label).join(" / ")} ã¨éãªã£ã¦ãã¾ãã`);
+      showToast(`Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¨Â¿Â½Ã¥ÂÂ Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ¯ ${conflicts.map((item) => item.label).join(" / ")} Ã£ÂÂ¨Ã©ÂÂÃ£ÂÂªÃ£ÂÂ£Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ`);
     } else if (saveResult === "created") {
-      showToast("ç®æ¨ãè¿½å ãã¾ãããè¨­å®ç»é¢ã§ç¢ºèªã§ãã¾ãã");
+      showToast("Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¨Â¿Â½Ã¥ÂÂ Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¨Â¨Â­Ã¥Â®ÂÃ§ÂÂ»Ã©ÂÂ¢Ã£ÂÂ§Ã§Â¢ÂºÃ¨ÂªÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ");
     } else if (saveResult === "reset" && conflicts.length) {
-      showToast(`è¨­å®ãä¿å­ãã¾ãããå®æ½æéã¯ ${conflicts.map((item) => item.label).join(" / ")} ã¨éãªã£ã¦ãã¾ãã`);
+      showToast(`Ã¨Â¨Â­Ã¥Â®ÂÃ£ÂÂÃ¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ¯ ${conflicts.map((item) => item.label).join(" / ")} Ã£ÂÂ¨Ã©ÂÂÃ£ÂÂªÃ£ÂÂ£Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ`);
     } else if (saveResult === "reset") {
-      showToast("è¨­å®ãä¿å­ãã¦ãã©ã³ãä½ãç´ãã¾ããã");
+      showToast("Ã¨Â¨Â­Ã¥Â®ÂÃ£ÂÂÃ¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ³Ã£ÂÂÃ¤Â½ÂÃ£ÂÂÃ§ÂÂ´Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     } else if (conflicts.length) {
-      showToast(`è¨­å®ãä¿å­ãã¾ãããå®æ½æéã¯ ${conflicts.map((item) => item.label).join(" / ")} ã¨éãªã£ã¦ãã¾ãã`);
+      showToast(`Ã¨Â¨Â­Ã¥Â®ÂÃ£ÂÂÃ¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ¯ ${conflicts.map((item) => item.label).join(" / ")} Ã£ÂÂ¨Ã©ÂÂÃ£ÂÂªÃ£ÂÂ£Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ`);
     } else {
-      showToast("è¨­å®ãä¿å­ãã¾ããã");
+      showToast("Ã¨Â¨Â­Ã¥Â®ÂÃ£ÂÂÃ¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     }
     return;
   }
@@ -1005,7 +1017,7 @@ function handleClick(event) {
     ui.selectedSessionPlan = launchPlanKey;
     ui.sessionOpen = true;
     render();
-    showToast(`${PLAN_META[launchPlanKey].label}ãé¸ã³ã¾ãããéå§ãã¿ã³ã§å§ãããã¾ãã`);
+    showToast(`${PLAN_META[launchPlanKey].label}Ã£ÂÂÃ©ÂÂ¸Ã£ÂÂ³Ã£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ©ÂÂÃ¥Â§ÂÃ£ÂÂÃ£ÂÂ¿Ã£ÂÂ³Ã£ÂÂ§Ã¥Â§ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ`);
     return;
   }
 
@@ -1078,7 +1090,7 @@ function handleClick(event) {
   if (action === "begin-session") {
     beginSession(ui.selectedSessionPlan);
     render();
-    showToast(`${PLAN_META[ui.selectedSessionPlan].label}ãéå§ãã¾ããã`);
+    showToast(`${PLAN_META[ui.selectedSessionPlan].label}Ã£ÂÂÃ©ÂÂÃ¥Â§ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ`);
     return;
   }
 
@@ -1105,7 +1117,7 @@ function handleClick(event) {
   if (action === "save-finish-log") {
     saveFinishDraft();
     render();
-    showToast("ä»æ¥ã®è¨é²ãæ®ãã¾ããã");
+    showToast("Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ¦Â®ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
@@ -1121,7 +1133,7 @@ function handleClick(event) {
     syncSelectedSessionPlan(true);
     saveState();
     render();
-    showToast(`ä»æ¥ã¯${PLAN_META[state.today.recommendedPlan].label}ããå§ããè¨­å®ã«ãã¾ããã`);
+    showToast(`Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ¯${PLAN_META[state.today.recommendedPlan].label}Ã£ÂÂÃ£ÂÂÃ¥Â§ÂÃ£ÂÂÃ£ÂÂÃ¨Â¨Â­Ã¥Â®ÂÃ£ÂÂ«Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ`);
     return;
   }
 
@@ -1141,7 +1153,7 @@ function handleClick(event) {
     recordLog("miss", ui.missReasonDraft);
     ui.missPanelOpen = false;
     render();
-    showToast("æªå®æ½ã¨ãã¦è¨é²ãã¾ãããææ¥ã®å¾©å¸°ãä¸»å½¹ã«ãã¾ãã");
+    showToast("Ã¦ÂÂªÃ¥Â®ÂÃ¦ÂÂ½Ã£ÂÂ¨Ã£ÂÂÃ£ÂÂ¦Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¦ÂÂÃ¦ÂÂ¥Ã£ÂÂ®Ã¥Â¾Â©Ã¥Â¸Â°Ã£ÂÂÃ¤Â¸Â»Ã¥Â½Â¹Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ");
     return;
   }
 
@@ -1180,7 +1192,7 @@ function handleClick(event) {
     syncTodayLastLogFields();
     saveState();
     render();
-    showToast("ä»æ¥ã®ãã§ãã¯ã¤ã³ãè¨é²ãã¾ããï¼");
+    showToast("Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã£ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ¯Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂÃ¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ¯Â¼Â");
     return;
   }
 
@@ -1195,7 +1207,7 @@ function handleClick(event) {
     if (state.logs.length < before) {
       saveState();
       render();
-      showToast("ãã§ãã¯ã¤ã³ãåãæ¶ãã¾ããã");
+      showToast("Ã£ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ¯Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂÃ¥ÂÂÃ£ÂÂÃ¦Â¶ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     }
     return;
   }
@@ -1242,9 +1254,9 @@ function handleClick(event) {
     const saved = commitRoadmapDraft();
     render();
     if (saved) {
-      showToast("ãã¤ã«ã¹ãã¼ã³ãä¿å­ãã¾ããã");
+      showToast("Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂÃ¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     } else {
-      showToast("ã¿ã¤ãã«ãå¥ãã¦ãã ããã");
+      showToast("Ã£ÂÂ¿Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ«Ã£ÂÂÃ¥ÂÂ¥Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     }
     return;
   }
@@ -1252,28 +1264,28 @@ function handleClick(event) {
   if (action === "delete-roadmap-item") {
     deleteRoadmapItem(target.dataset.roadmapId || "");
     render();
-    showToast("ãã¤ã«ã¹ãã¼ã³ãåé¤ãã¾ããã");
+    showToast("Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂÃ¥ÂÂÃ©ÂÂ¤Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
     if (action === "manual-log") {
     recordLog(target.dataset.outcome, null);
     render();
-    showToast("æåã§è¨é²ãã¾ããã");
+    showToast("Ã¦ÂÂÃ¥ÂÂÃ£ÂÂ§Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
   if (action === "undo-log-date") {
     const removed = removeLatestLogByDate(target.dataset.date || toISODate(new Date()));
     render();
-    showToast(removed ? `åãæ¶ãã¾ãã: ${buildLogSummary(removed)}` : "åãæ¶ããè¨é²ãããã¾ããã");
+    showToast(removed ? `Ã¥ÂÂÃ£ÂÂÃ¦Â¶ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ: ${buildLogSummary(removed)}` : "Ã¥ÂÂÃ£ÂÂÃ¦Â¶ÂÃ£ÂÂÃ£ÂÂÃ¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
   if (action === "open-review-log-editor") {
     const opened = openReviewLogDraft(target.dataset.logId || "");
     render();
-    showToast(opened ? "è¨é²ãä¿®æ­£ã§ãã¾ãã" : "ä¿®æ­£ã§ããè¨é²ãè¦ã¤ããã¾ããã");
+    showToast(opened ? "Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ¤Â¿Â®Ã¦Â­Â£Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ" : "Ã¤Â¿Â®Ã¦Â­Â£Ã£ÂÂ§Ã£ÂÂÃ£ÂÂÃ¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ¨Â¦ÂÃ£ÂÂ¤Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
@@ -1292,7 +1304,7 @@ function handleClick(event) {
   if (action === "save-review-log") {
     const saved = saveReviewLogDraft();
     render();
-    showToast(saved ? "è¨é²ãæ´æ°ãã¾ããã" : "å®æ½æ¥ã¨å®æ½æéãç¢ºèªãã¦ãã ããã");
+    showToast(saved ? "Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ¦ÂÂ´Ã¦ÂÂ°Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ" : "Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂ¥Ã£ÂÂ¨Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂÃ§Â¢ÂºÃ¨ÂªÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return;
   }
 
@@ -1320,7 +1332,7 @@ function handleClick(event) {
     state.meta.currentView = "today";
     saveState();
     render();
-    showToast("å·®åãé©ç¨ãã¾ããã");
+    showToast("Ã¥Â·Â®Ã¥ÂÂÃ£ÂÂÃ©ÂÂ©Ã§ÂÂ¨Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
   }
 }
 
@@ -1408,7 +1420,7 @@ function render() {
   }
 
   todayLabel.textContent = formatHeaderDate(new Date());
-  setupShortcut.textContent = currentView === "setup" ? "éãã" : "è¨­å®";
+  setupShortcut.textContent = currentView === "setup" ? "Ã©ÂÂÃ£ÂÂÃ£ÂÂ" : "Ã¨Â¨Â­Ã¥Â®Â";
   setupShortcut.dataset.action = currentView === "setup" ? "close-setup" : "open-setup";
   if (currentView === "setup") {
     delete setupShortcut.dataset.section;
@@ -1441,7 +1453,7 @@ function render() {
     screenRoot.innerHTML = (renderMap[currentView] || renderMap.today)();
   } catch (err) {
     console.error("render error:", err);
-    screenRoot.innerHTML = `<div class="screen" style="padding:32px 24px;text-align:center;"><p style="font-size:1.1rem;margin-bottom:8px;">è¡¨ç¤ºã¨ã©ã¼ãçºçãã¾ãã</p><p style="font-size:0.82rem;color:var(--muted)">${escapeHtml(String(err.message || err))}</p></div>`;
+    screenRoot.innerHTML = `<div class="screen" style="padding:32px 24px;text-align:center;"><p style="font-size:1.1rem;margin-bottom:8px;">Ã¨Â¡Â¨Ã§Â¤ÂºÃ£ÂÂ¨Ã£ÂÂ©Ã£ÂÂ¼Ã£ÂÂÃ§ÂÂºÃ§ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p><p style="font-size:0.82rem;color:var(--muted)">${escapeHtml(String(err.message || err))}</p></div>`;
   }
   renderSessionSheet();
   startSessionTicker();
@@ -1591,36 +1603,36 @@ function getEditableScheduleRows(draft) {
 
 function renderEditableScheduleRow(item, draft) {
   const statusBadge = item.isActive
-    ? `<span class="status-badge status-badge--done">è¡¨ç¤ºä¸­</span>`
-    : `<span class="status-badge ${item.overlaps ? "status-badge--danger" : ""}">${item.overlaps ? "éãªã" : item.sharedDays.length ? "å¥æé" : "å¥ææ¥"}</span>`;
+    ? `<span class="status-badge status-badge--done">Ã¨Â¡Â¨Ã§Â¤ÂºÃ¤Â¸Â­</span>`
+    : `<span class="status-badge ${item.overlaps ? "status-badge--danger" : ""}">${item.overlaps ? "Ã©ÂÂÃ£ÂÂªÃ£ÂÂ" : item.sharedDays.length ? "Ã¥ÂÂ¥Ã¦ÂÂÃ©ÂÂ" : "Ã¥ÂÂ¥Ã¦ÂÂÃ¦ÂÂ¥"}</span>`;
 
   return `
     <article class="goal-window-row ${item.isActive ? "is-active" : ""} ${item.overlaps ? "is-conflict" : ""}">
       <div class="goal-window-row__head">
         <div class="goal-window-row__body">
           <strong class="goal-window-row__name">${escapeHtml(item.label)}</strong>
-          <div class="goal-window-row__meta">å®æ½æé ${escapeHtml(item.window)} / ${escapeHtml(formatStudyDays(item.studyDays))}</div>
+          <div class="goal-window-row__meta">Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ ${escapeHtml(item.window)} / ${escapeHtml(formatStudyDays(item.studyDays))}</div>
         </div>
         <div class="goal-window-row__actions">
           ${statusBadge}
           ${item.isActive
             ? ""
-            : `<button type="button" class="soft-button goal-window-row__pick" data-action="activate-goal" data-goal-id="${escapeHtml(item.id)}">ç·¨éãã</button>`}
+            : `<button type="button" class="soft-button goal-window-row__pick" data-action="activate-goal" data-goal-id="${escapeHtml(item.id)}">Ã§Â·Â¨Ã©ÂÂÃ£ÂÂÃ£ÂÂ</button>`}
         </div>
       </div>
       ${item.isActive
         ? `
           <div class="goal-window-row__editor">
-            ${renderWindowField("å®æ½æé", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
+            ${renderWindowField("Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
             <div class="field">
-              <span class="field__label">ææ¥</span>
+              <span class="field__label">Ã¦ÂÂÃ¦ÂÂ¥</span>
               <div class="weekday-choice-row goal-window-row__days">
                 ${WEEKDAY_KEYS.map((weekdayKey) => renderWeekdayChip(weekdayKey, draft.studyDays)).join("")}
               </div>
-              <p class="goal-window-row__current">ç¾å¨: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
+              <p class="goal-window-row__current">Ã§ÂÂ¾Ã¥ÂÂ¨: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
             </div>
             <div class="goal-window-row__save">
-              <button type="button" class="action-button action-button--primary" data-action="save-setup">ãã®åå®¹ã§ä¿å­</button>
+              <button type="button" class="action-button action-button--primary" data-action="save-setup">Ã£ÂÂÃ£ÂÂ®Ã¥ÂÂÃ¥Â®Â¹Ã£ÂÂ§Ã¤Â¿ÂÃ¥Â­Â</button>
             </div>
           </div>
         `
@@ -1636,17 +1648,17 @@ function renderPrimaryWindowRoster(draft) {
   const warningClass = conflicts.length && !isNewGoal ? "is-danger" : "";
   const warningText = conflicts.length
     ? (isNewGoal
-      ? "åãå®æ½æéã®ç®æ¨ãããã¾ããè¿½å å¾ã«èª¿æ´ã§ãã¾ãã"
-      : `ãã®å®æ½æéã¯ ${conflicts.map((item) => item.label).join(" / ")} ã¨éãªã£ã¦ãã¾ãã`)
-    : "ãã¾ã®å®æ½æéã¯åãå®æ½ææ¥ã®ç®æ¨ã¨éãªã£ã¦ãã¾ããã";
+      ? "Ã¥ÂÂÃ£ÂÂÃ¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ¨Â¿Â½Ã¥ÂÂ Ã¥Â¾ÂÃ£ÂÂ«Ã¨ÂªÂ¿Ã¦ÂÂ´Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ"
+      : `Ã£ÂÂÃ£ÂÂ®Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ¯ ${conflicts.map((item) => item.label).join(" / ")} Ã£ÂÂ¨Ã©ÂÂÃ£ÂÂªÃ£ÂÂ£Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ`)
+    : "Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂ®Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ¯Ã¥ÂÂÃ£ÂÂÃ¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ¦ÂÂ¥Ã£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ¨Ã©ÂÂÃ£ÂÂªÃ£ÂÂ£Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ";
 
   if (!isNewGoal) {
     const rows = getEditableScheduleRows(draft);
     return `
       <div class="stack setup-schedule-roster">
         <div class="setup-section-intro">
-          <h3 class="section-title">å®æ½æéä¸è¦§</h3>
-          <p class="section-copy">ãã®ä¸è¦§ããç·¨éãããç®æ¨ãéãã¦ããã®ã¾ã¾å®æ½æéã¨ææ¥ãç·¨éã§ãã¾ãã</p>
+          <h3 class="section-title">Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ¤Â¸ÂÃ¨Â¦Â§</h3>
+          <p class="section-copy">Ã£ÂÂÃ£ÂÂ®Ã¤Â¸ÂÃ¨Â¦Â§Ã£ÂÂÃ£ÂÂÃ§Â·Â¨Ã©ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂÃ£ÂÂ®Ã£ÂÂ¾Ã£ÂÂ¾Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ¨Ã¦ÂÂÃ¦ÂÂ¥Ã£ÂÂÃ§Â·Â¨Ã©ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
         </div>
         <div class="goal-window-list goal-window-list--editable">
           ${rows.map((item) => renderEditableScheduleRow(item, draft)).join("")}
@@ -1659,8 +1671,8 @@ function renderPrimaryWindowRoster(draft) {
   return `
     <div class="stack setup-schedule-roster">
       <div class="setup-section-intro">
-        <h3 class="section-title">ã»ãã®ç®æ¨ã®å®æ½æé</h3>
-        <p class="section-copy">åãå®æ½æéãé¿ããã¨ã1æ¥ã«æ±ããå¥å£ã®å¤ããè¦ãã¾ãã</p>
+        <h3 class="section-title">Ã£ÂÂ»Ã£ÂÂÃ£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ®Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ</h3>
+        <p class="section-copy">Ã¥ÂÂÃ£ÂÂÃ¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂÃ©ÂÂ¿Ã£ÂÂÃ£ÂÂÃ£ÂÂ¨Ã£ÂÂ1Ã¦ÂÂ¥Ã£ÂÂ«Ã¦ÂÂ±Ã£ÂÂÃ£ÂÂÃ¥ÂÂ¥Ã¥ÂÂ£Ã£ÂÂ®Ã¥Â¤ÂÃ£ÂÂÃ£ÂÂÃ¨Â¦ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
       </div>
       ${roster.length
         ? `
@@ -1670,17 +1682,17 @@ function renderPrimaryWindowRoster(draft) {
                 <div class="goal-window-row__head">
                   <div class="goal-window-row__body">
                     <strong class="goal-window-row__name">${escapeHtml(item.label)}</strong>
-                    <div class="goal-window-row__meta">å®æ½æé ${escapeHtml(item.window)} / ${escapeHtml(formatStudyDays(item.studyDays))}</div>
+                    <div class="goal-window-row__meta">Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ ${escapeHtml(item.window)} / ${escapeHtml(formatStudyDays(item.studyDays))}</div>
                   </div>
                   <div class="goal-window-row__actions">
-                    <span class="status-badge ${item.overlaps && !isNewGoal ? "status-badge--danger" : ""}">${item.overlaps ? (isNewGoal ? "å¾ã§èª¿æ´" : "éãªã") : (item.sharedDays.length ? "å¥æé" : "å¥ææ¥")}</span>
+                    <span class="status-badge ${item.overlaps && !isNewGoal ? "status-badge--danger" : ""}">${item.overlaps ? (isNewGoal ? "Ã¥Â¾ÂÃ£ÂÂ§Ã¨ÂªÂ¿Ã¦ÂÂ´" : "Ã©ÂÂÃ£ÂÂªÃ£ÂÂ") : (item.sharedDays.length ? "Ã¥ÂÂ¥Ã¦ÂÂÃ©ÂÂ" : "Ã¥ÂÂ¥Ã¦ÂÂÃ¦ÂÂ¥")}</span>
                   </div>
                 </div>
               </div>
             `).join("")}
           </div>
         `
-        : `<p class="section-copy">ã¾ã ä»ã®ç®æ¨ã¯ããã¾ããã</p>`}
+        : `<p class="section-copy">Ã£ÂÂ¾Ã£ÂÂ Ã¤Â»ÂÃ£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ</p>`}
       <p class="setup-warning ${warningClass}">${escapeHtml(warningText)}</p>
     </div>
   `;
@@ -1699,14 +1711,14 @@ function renderSetupSectionBody(section, draft) {
       <div class="stack setup-schedule">
         ${renderPrimaryWindowRoster(draft)}
         <div class="field">
-          <span class="field__label">ææ¥</span>
-          <p class="section-copy">Today ã«ã¯ãä»æ¥ã®ææ¥ã«åãç®æ¨ã ãè¡¨ç¤ºãã¾ãã</p>
+          <span class="field__label">Ã¦ÂÂÃ¦ÂÂ¥</span>
+          <p class="section-copy">Today Ã£ÂÂ«Ã£ÂÂ¯Ã£ÂÂÃ¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã¦ÂÂÃ¦ÂÂ¥Ã£ÂÂ«Ã¥ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ Ã£ÂÂÃ¨Â¡Â¨Ã§Â¤ÂºÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
           <div class="weekday-choice-row">
             ${WEEKDAY_KEYS.map((weekdayKey) => renderWeekdayChip(weekdayKey, draft.studyDays)).join("")}
           </div>
-          <p class="section-copy">ç¾å¨: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
+          <p class="section-copy">Ã§ÂÂ¾Ã¥ÂÂ¨: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
         </div>
-        ${renderWindowField("å®æ½æé", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
+        ${renderWindowField("Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
       </div>
     `;
   }
@@ -1715,8 +1727,8 @@ function renderSetupSectionBody(section, draft) {
     return `
       <div class="stack">
         <div class="setup-section-intro">
-          <h3 class="section-title">ãã¤ã«ã¹ãã¼ã³</h3>
-          <p class="section-copy">Roadmap ç»é¢ã¯è¡¨ç¤ºã ãã«ãã¦ãç·¨éã¯ããã§ã¾ã¨ãã¾ãã</p>
+          <h3 class="section-title">Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³</h3>
+          <p class="section-copy">Roadmap Ã§ÂÂ»Ã©ÂÂ¢Ã£ÂÂ¯Ã¨Â¡Â¨Ã§Â¤ÂºÃ£ÂÂ Ã£ÂÂÃ£ÂÂ«Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ§Â·Â¨Ã©ÂÂÃ£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ§Ã£ÂÂ¾Ã£ÂÂ¨Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
         </div>
         ${renderRoadmapMilestoneList(buildEditableRoadmapPreview(), { editable: true })}
       </div>
@@ -1726,9 +1738,9 @@ function renderSetupSectionBody(section, draft) {
   if (section === "plan") {
     return `
       <div class="plan-list">
-        ${renderEditablePlanCard("A", "normalMinutes", draft.normalMinutes, "ãã¤ãã®æ¨æºãã©ã³")}
-        ${renderEditablePlanCard("B", "shortMinutes", draft.shortMinutes, "å°ãè»½ãããç­ç¸®ãã©ã³")}
-        ${renderEditablePlanCard("C", "minimumMinutes", draft.minimumMinutes, "æä½éã ãé²ããææ¸ãã©ã³")}
+        ${renderEditablePlanCard("A", "normalMinutes", draft.normalMinutes, "Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂÃ£ÂÂ®Ã¦Â¨ÂÃ¦ÂºÂÃ£ÂÂÃ£ÂÂ©Ã£ÂÂ³")}
+        ${renderEditablePlanCard("B", "shortMinutes", draft.shortMinutes, "Ã¥Â°ÂÃ£ÂÂÃ¨Â»Â½Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ§ÂÂ­Ã§Â¸Â®Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ³")}
+        ${renderEditablePlanCard("C", "minimumMinutes", draft.minimumMinutes, "Ã¦ÂÂÃ¤Â½ÂÃ©ÂÂÃ£ÂÂ Ã£ÂÂÃ©ÂÂ²Ã£ÂÂÃ£ÂÂÃ¦ÂÂÃ¦Â¸ÂÃ£ÂÂÃ£ÂÂ©Ã£ÂÂ³")}
       </div>
     `;
   }
@@ -1744,34 +1756,34 @@ function renderSetupSectionBody(section, draft) {
   const isHabitDraft = draft.goalType === "habit";
   return `
     <div class="stack">
-      <p class="section-copy">ä¿å­ããã¨ãä»ã® Today ã¯å¤ããã«æ°ããç®æ¨ã ãè¿½å ãã¾ãã</p>
+      <p class="section-copy">Ã¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¨Ã£ÂÂÃ¤Â»ÂÃ£ÂÂ® Today Ã£ÂÂ¯Ã¥Â¤ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ«Ã¦ÂÂ°Ã£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ Ã£ÂÂÃ¨Â¿Â½Ã¥ÂÂ Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
       <div class="field">
-        <span class="field__label">ç¨®é¡</span>
+        <span class="field__label">Ã§Â¨Â®Ã©Â¡Â</span>
         <div class="goal-type-toggle">
           <button type="button" class="goal-type-btn ${!isHabitDraft ? "is-active" : ""}" data-action="select-goal-type" data-goal-type="goal">
-            <span class="goal-type-btn__icon">ð¯</span>
-            <span class="goal-type-btn__label">ç®æ¨éæ</span>
+            <span class="goal-type-btn__icon">Ã°ÂÂÂ¯</span>
+            <span class="goal-type-btn__label">Ã§ÂÂ®Ã¦Â¨ÂÃ©ÂÂÃ¦ÂÂ</span>
           </button>
           <button type="button" class="goal-type-btn ${isHabitDraft ? "is-active" : ""}" data-action="select-goal-type" data-goal-type="habit">
-            <span class="goal-type-btn__icon">ð¿</span>
-            <span class="goal-type-btn__label">ç¿æ£</span>
+            <span class="goal-type-btn__icon">Ã°ÂÂÂ¿</span>
+            <span class="goal-type-btn__label">Ã§Â¿ÂÃ¦ÂÂ£</span>
           </button>
         </div>
       </div>
       <label class="field">
-        <span class="field__label">ç®æ¨</span>
+        <span class="field__label">Ã§ÂÂ®Ã¦Â¨Â</span>
         <input class="field__control" data-setup-field="goal" type="text" value="${escapeHtml(draft.goal)}" />
       </label>
       ${!isHabitDraft ? `
         <div class="field">
-          <span class="field__label">æéï¼ç©ºæ¬ã§æéãªãï¼</span>
+          <span class="field__label">Ã¦ÂÂÃ©ÂÂÃ¯Â¼ÂÃ§Â©ÂºÃ¦Â¬ÂÃ£ÂÂ§Ã¦ÂÂÃ©ÂÂÃ£ÂÂªÃ£ÂÂÃ¯Â¼Â</span>
           <input class="field__control" data-setup-field="deadline" type="date" value="${escapeHtml(draft.deadline)}" />
         </div>
         ${renderFlowerPicker(draft.flowerType, "select-setup-flower")}
-        <p class="section-copy">ä¸ã®è¨­å®ã¡ãã¥ã¼ãã Roadmap / å®æ½æé / ãã©ã³ããã®ã¾ã¾æ±ºãããã¾ãã</p>
+        <p class="section-copy">Ã¤Â¸ÂÃ£ÂÂ®Ã¨Â¨Â­Ã¥Â®ÂÃ£ÂÂ¡Ã£ÂÂÃ£ÂÂ¥Ã£ÂÂ¼Ã£ÂÂÃ£ÂÂ Roadmap / Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ / Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ³Ã£ÂÂÃ£ÂÂÃ£ÂÂ®Ã£ÂÂ¾Ã£ÂÂ¾Ã¦Â±ÂºÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
       ` : `
         ${renderBonsaiPicker(draft.bonsaiKey)}
-        <p class="section-copy">ç¿æ£ã¿ã¤ãã¯ Roadmap ãä¸è¦ã§ããæ¯æ¥ã®ãã§ãã¯ã¤ã³ã§çæ ½ãè²ã¡ã¾ãã</p>
+        <p class="section-copy">Ã§Â¿ÂÃ¦ÂÂ£Ã£ÂÂ¿Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ¯ Roadmap Ã£ÂÂÃ¤Â¸ÂÃ¨Â¦ÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂÃ¦Â¯ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã£ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ¯Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ§Ã§ÂÂÃ¦Â Â½Ã£ÂÂÃ¨ÂÂ²Ã£ÂÂ¡Ã£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
       `}
     </div>
   `;
@@ -1867,13 +1879,13 @@ function renderGoalLibrary() {
   const goals = listGoalsByPrimaryWindow();
   const editingGoalId = ui.goalLibraryDraft ? ui.goalLibraryDraft.goalId : "";
   const intro = ui.setupMode === "new_goal"
-    ? "ä¿å­ããã¨ä¸è¦§ã«è¿½å ããã¾ããToday ã¯ä»ã®ç®æ¨ã®ã¾ã¾ã§ãã"
-    : "ç»é²æ¸ã¿ã®ç®æ¨ãããã§ç·¨éãã¾ããè¡¨ç¤ºããç®æ¨ã¯è¨­å®ã¡ãã¥ã¼ä¸ã®é¸æã¿ãã§åãæ¿ãã¾ãã";
+    ? "Ã¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¨Ã¤Â¸ÂÃ¨Â¦Â§Ã£ÂÂ«Ã¨Â¿Â½Ã¥ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂToday Ã£ÂÂ¯Ã¤Â»ÂÃ£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ®Ã£ÂÂ¾Ã£ÂÂ¾Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ"
+    : "Ã§ÂÂ»Ã©ÂÂ²Ã¦Â¸ÂÃ£ÂÂ¿Ã£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ§Ã§Â·Â¨Ã©ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ¨Â¡Â¨Ã§Â¤ÂºÃ£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ¯Ã¨Â¨Â­Ã¥Â®ÂÃ£ÂÂ¡Ã£ÂÂÃ£ÂÂ¥Ã£ÂÂ¼Ã¤Â¸ÂÃ£ÂÂ®Ã©ÂÂ¸Ã¦ÂÂÃ£ÂÂ¿Ã£ÂÂÃ£ÂÂ§Ã¥ÂÂÃ£ÂÂÃ¦ÂÂ¿Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ";
 
   return `
     <div class="stack">
       <div class="setup-section-intro goal-library__intro">
-        <h3 class="section-title">ç»é²æ¸ã¿ã®ç®æ¨</h3>
+        <h3 class="section-title">Ã§ÂÂ»Ã©ÂÂ²Ã¦Â¸ÂÃ£ÂÂ¿Ã£ÂÂ®Ã§ÂÂ®Ã¦Â¨Â</h3>
         <p class="section-copy">${escapeHtml(intro)}</p>
       </div>
       <div class="goal-library">
@@ -1885,62 +1897,62 @@ function renderGoalLibrary() {
           const flower = isHabitGoal ? null : getGoalFlowerState(goal);
           const bonsaiMeta = isHabitGoal ? getBonsaiTypeMeta(goal.setup.bonsaiKey) : null;
           const meta = isHabitGoal
-            ? `ç¿æ£ / ${bonsaiMeta.label}`
-            : `${formatDeadlineBadge(deadlineText)} / æ¤ç© ${flower.label}`;
+            ? `Ã§Â¿ÂÃ¦ÂÂ£ / ${bonsaiMeta.label}`
+            : `${formatDeadlineBadge(deadlineText)} / Ã¦Â¤ÂÃ§ÂÂ© ${flower.label}`;
           return `
             <article class="goal-library-card ${isActive ? "is-active" : ""}">
               <div class="goal-library-card__head">
                 <strong>${escapeHtml(isEditing ? ui.goalLibraryDraft.goal : goal.setup.goal)}</strong>
-                <span class="status-badge ${isActive ? "status-badge--done" : ""}">${isActive ? "è¡¨ç¤ºä¸­" : "ä¿å­æ¸ã¿"}</span>
+                <span class="status-badge ${isActive ? "status-badge--done" : ""}">${isActive ? "Ã¨Â¡Â¨Ã§Â¤ÂºÃ¤Â¸Â­" : "Ã¤Â¿ÂÃ¥Â­ÂÃ¦Â¸ÂÃ£ÂÂ¿"}</span>
               </div>
               ${isEditing
                 ? `
                   <div class="goal-library-card__editor">
                     <div class="field">
-                      <span class="field__label">ç¨®é¡</span>
+                      <span class="field__label">Ã§Â¨Â®Ã©Â¡Â</span>
                       <div class="goal-type-toggle goal-type-toggle--compact">
                         <button type="button" class="goal-type-btn ${ui.goalLibraryDraft.goalType !== "habit" ? "is-active" : ""}" data-action="select-goal-library-type" data-goal-type="goal">
-                          <span class="goal-type-btn__icon">ð¯</span>
-                          <span class="goal-type-btn__label">ç®æ¨éæ</span>
+                          <span class="goal-type-btn__icon">Ã°ÂÂÂ¯</span>
+                          <span class="goal-type-btn__label">Ã§ÂÂ®Ã¦Â¨ÂÃ©ÂÂÃ¦ÂÂ</span>
                         </button>
                         <button type="button" class="goal-type-btn ${ui.goalLibraryDraft.goalType === "habit" ? "is-active" : ""}" data-action="select-goal-library-type" data-goal-type="habit">
-                          <span class="goal-type-btn__icon">ð¿</span>
-                          <span class="goal-type-btn__label">ç¿æ£</span>
+                          <span class="goal-type-btn__icon">Ã°ÂÂÂ¿</span>
+                          <span class="goal-type-btn__label">Ã§Â¿ÂÃ¦ÂÂ£</span>
                         </button>
                       </div>
                     </div>
                     <label class="field">
-                      <span class="field__label">ç®æ¨</span>
+                      <span class="field__label">Ã§ÂÂ®Ã¦Â¨Â</span>
                       <input class="field__control" data-goal-library-field="goal" type="text" value="${escapeHtml(ui.goalLibraryDraft.goal)}" />
                     </label>
                     ${ui.goalLibraryDraft.goalType === "habit"
                       ? renderBonsaiPicker(ui.goalLibraryDraft.bonsaiKey, "select-goal-library-bonsai")
                       : `<label class="field">
-                          <span class="field__label">æéï¼ç©ºæ¬ã§æéãªãï¼</span>
+                          <span class="field__label">Ã¦ÂÂÃ©ÂÂÃ¯Â¼ÂÃ§Â©ÂºÃ¦Â¬ÂÃ£ÂÂ§Ã¦ÂÂÃ©ÂÂÃ£ÂÂªÃ£ÂÂÃ¯Â¼Â</span>
                           <input class="field__control" data-goal-library-field="deadline" type="date" value="${escapeHtml(ui.goalLibraryDraft.deadline)}" />
                         </label>
                         ${renderFlowerPicker(ui.goalLibraryDraft.flowerType, "select-goal-library-flower", { compact: true })}`}
                     <div class="goal-library-card__actions">
-                      <button type="button" class="soft-button goal-library-card__action" data-action="save-goal-library-edit">ä¿å­</button>
-                      <button type="button" class="soft-button goal-library-card__action" data-action="cancel-goal-library-edit">éãã</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="save-goal-library-edit">Ã¤Â¿ÂÃ¥Â­Â</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="cancel-goal-library-edit">Ã©ÂÂÃ£ÂÂÃ£ÂÂ</button>
                     </div>
                   </div>
                 `
                 : ui.deleteConfirmGoalId === goal.id
                   ? `
-                    <p class="goal-library-card__delete-warn">â ï¸ ãã®ç®æ¨ãå®å¨æ¶å»ãã¾ããï¼åã«æ»ãã¾ããã</p>
+                    <p class="goal-library-card__delete-warn">Ã¢ÂÂ Ã¯Â¸Â Ã£ÂÂÃ£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¥Â®ÂÃ¥ÂÂ¨Ã¦Â¶ÂÃ¥ÂÂ»Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ¯Â¼ÂÃ¥ÂÂÃ£ÂÂ«Ã¦ÂÂ»Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ</p>
                     <div class="goal-library-card__actions">
-                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="delete-goal" data-goal-id="${goal.id}">å®å¨æ¶å»ãã</button>
-                      <button type="button" class="soft-button goal-library-card__action" data-action="cancel-delete-goal">ããã</button>
+                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="delete-goal" data-goal-id="${goal.id}">Ã¥Â®ÂÃ¥ÂÂ¨Ã¦Â¶ÂÃ¥ÂÂ»Ã£ÂÂÃ£ÂÂ</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="cancel-delete-goal">Ã£ÂÂÃ£ÂÂÃ£ÂÂ</button>
                     </div>
                   `
                   : `
                     <p class="goal-library-card__meta">${escapeHtml(meta)}</p>
-                    ${isActive ? `<p class="goal-library-card__note">${escapeHtml(isGoalScheduledForDate(goal) ? "ãã®ç®æ¨ã¯ä»æ¥ã® Today ã«åºã¾ãã" : "ä»æ¥ã¯è¡¨ç¤ºå¯¾è±¡å¤ã§ãã")}</p>` : ""}
+                    ${isActive ? `<p class="goal-library-card__note">${escapeHtml(isGoalScheduledForDate(goal) ? "Ã£ÂÂÃ£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ¯Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ® Today Ã£ÂÂ«Ã¥ÂÂºÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ" : "Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ¯Ã¨Â¡Â¨Ã§Â¤ÂºÃ¥Â¯Â¾Ã¨Â±Â¡Ã¥Â¤ÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ")}</p>` : ""}
                     <div class="goal-library-card__actions">
-                      <button type="button" class="soft-button goal-library-card__action" data-action="start-goal-library-edit" data-goal-id="${goal.id}">ç·¨é</button>
-                      <button type="button" class="soft-button goal-library-card__action" data-action="archive-goal" data-goal-id="${goal.id}">ã¢ã«ãã ã¸</button>
-                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="confirm-delete-goal" data-goal-id="${goal.id}">å®å¨æ¶å»</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="start-goal-library-edit" data-goal-id="${goal.id}">Ã§Â·Â¨Ã©ÂÂ</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="archive-goal" data-goal-id="${goal.id}">Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ Ã£ÂÂ¸</button>
+                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="confirm-delete-goal" data-goal-id="${goal.id}">Ã¥Â®ÂÃ¥ÂÂ¨Ã¦Â¶ÂÃ¥ÂÂ»</button>
                     </div>
                   `}
             </article>
@@ -1969,11 +1981,11 @@ function renderTodayGoalCard(goal, index) {
       <div class="focus-launch__halo" aria-hidden="true"></div>
       <div class="focus-launch__goal-meta">
         <div class="focus-launch__status-row">
-          <span class="status-badge ${escapeHtml(missionState.badgeClass || "")}">${escapeHtml(missionState.isClosed ? "å®æ½æ¸ã¿" : missionState.badge)}</span>
+          <span class="status-badge ${escapeHtml(missionState.badgeClass || "")}">${escapeHtml(missionState.isClosed ? "Ã¥Â®ÂÃ¦ÂÂ½Ã¦Â¸ÂÃ£ÂÂ¿" : missionState.badge)}</span>
         </div>
         <div class="focus-launch__goal-timing">
           <span class="focus-launch__goal-deadline">${escapeHtml(formatDeadlineBadge(goal.setup.deadline))}</span>
-          <span class="focus-launch__goal-slot">å®æ½æé ${escapeHtml(goal.setup.primaryWindow)}</span>
+          <span class="focus-launch__goal-slot">Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ ${escapeHtml(goal.setup.primaryWindow)}</span>
         </div>
       </div>
       <div class="focus-launch__title-row">
@@ -1988,7 +2000,7 @@ function renderTodayGoalCard(goal, index) {
             (planKey) => `
               <button type="button" class="pill-button focus-plan-button ${selectedPlanKey === planKey ? "is-active" : ""}" data-action="launch-session-plan" data-goal-id="${goal.id}" data-plan="${planKey}">
                 <span class="focus-plan-button__label">${PLAN_META[planKey].label}</span>
-                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}å</span>
+                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}Ã¥ÂÂ</span>
               </button>
             `,
           )
@@ -2017,12 +2029,12 @@ function renderTodayHabitCard(goal, index) {
       <div class="focus-launch__halo" aria-hidden="true"></div>
       <div class="focus-launch__goal-meta">
         <div class="focus-launch__status-row">
-          <span class="status-badge ${isDone ? "status-badge--done" : "status-badge--accent"}">${isDone ? "å®äºæ¸ã¿" : "æªå®äº"}</span>
-          <span class="status-badge">ç¿æ£</span>
+          <span class="status-badge ${isDone ? "status-badge--done" : "status-badge--accent"}">${isDone ? "Ã¥Â®ÂÃ¤ÂºÂÃ¦Â¸ÂÃ£ÂÂ¿" : "Ã¦ÂÂªÃ¥Â®ÂÃ¤ÂºÂ"}</span>
+          <span class="status-badge">Ã§Â¿ÂÃ¦ÂÂ£</span>
         </div>
         <div class="focus-launch__goal-timing">
           <span class="focus-launch__goal-slot">${escapeHtml(bonsaiMeta.label)} / ${escapeHtml(growth.stageLabel)}</span>
-          ${(() => { const w = goal.setup.primaryWindow || (goal.setup.primaryStart && goal.setup.primaryEnd ? `${goal.setup.primaryStart}-${goal.setup.primaryEnd}` : ""); return w ? `<span class="focus-launch__goal-slot">å®æ½æé ${escapeHtml(w)}</span>` : ""; })()}
+          ${(() => { const w = goal.setup.primaryWindow || (goal.setup.primaryStart && goal.setup.primaryEnd ? `${goal.setup.primaryStart}-${goal.setup.primaryEnd}` : ""); return w ? `<span class="focus-launch__goal-slot">Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ ${escapeHtml(w)}</span>` : ""; })()}
         </div>
       </div>
       <div class="focus-launch__title-row">
@@ -2037,7 +2049,7 @@ function renderTodayHabitCard(goal, index) {
             (planKey) => `
               <button type="button" class="pill-button focus-plan-button ${selectedPlanKey === planKey ? "is-active" : ""}" data-action="launch-session-plan" data-goal-id="${goal.id}" data-plan="${planKey}">
                 <span class="focus-plan-button__label">${PLAN_META[planKey].label}</span>
-                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}å</span>
+                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}Ã¥ÂÂ</span>
               </button>
             `,
           )
@@ -2056,8 +2068,8 @@ function renderActiveGoalContext(options = {}) {
   return `
     <details class="goal-selector">
       <summary>
-        <span class="hero__context goal-selector__current">å¯¾è±¡ç®æ¨: ${escapeHtml(state.setup.goal)}</span>
-        <span class="goal-selector__button">é¸æ</span>
+        <span class="hero__context goal-selector__current">Ã¥Â¯Â¾Ã¨Â±Â¡Ã§ÂÂ®Ã¦Â¨Â: ${escapeHtml(state.setup.goal)}</span>
+        <span class="goal-selector__button">Ã©ÂÂ¸Ã¦ÂÂ</span>
       </summary>
       <div class="goal-selector__body">
         ${goals.map((goal) => {
@@ -2073,7 +2085,7 @@ function renderActiveGoalContext(options = {}) {
               ${isActive ? "disabled" : ""}
             >
               <span class="goal-selector__option-title">${escapeHtml(goal.setup.goal)}</span>
-              <span class="goal-selector__option-state">${isActive ? "è¡¨ç¤ºä¸­" : "é¸ã¶"}</span>
+              <span class="goal-selector__option-state">${isActive ? "Ã¨Â¡Â¨Ã§Â¤ÂºÃ¤Â¸Â­" : "Ã©ÂÂ¸Ã£ÂÂ¶"}</span>
             </button>
           `;
         }).join("")}
@@ -2088,15 +2100,15 @@ function renderSetupView() {
   const isNewGoal = ui.setupMode === "new_goal";
   const activeSectionKey = SETUP_SECTIONS[ui.setupSection] ? ui.setupSection : "goal";
   const activeSection = SETUP_SECTIONS[activeSectionKey];
-  const saveLabel = state.meta.demoMode || isNewGoal ? "ãã®åå®¹ã§å§ãã" : "å¤æ´ãä¿å­ãã";
-  const sectionTitle = activeSectionKey === "goal" ? (isNewGoal ? "ç®æ¨è¿½å " : "ç®æ¨ç·¨é") : activeSection.title;
+  const saveLabel = state.meta.demoMode || isNewGoal ? "Ã£ÂÂÃ£ÂÂ®Ã¥ÂÂÃ¥Â®Â¹Ã£ÂÂ§Ã¥Â§ÂÃ£ÂÂÃ£ÂÂ" : "Ã¥Â¤ÂÃ¦ÂÂ´Ã£ÂÂÃ¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂ";
+  const sectionTitle = activeSectionKey === "goal" ? (isNewGoal ? "Ã§ÂÂ®Ã¦Â¨ÂÃ¨Â¿Â½Ã¥ÂÂ " : "Ã§ÂÂ®Ã¦Â¨ÂÃ§Â·Â¨Ã©ÂÂ") : activeSection.title;
   const newGoalSectionCopy = {
-    roadmap: "è¿½å ããç®æ¨ã®ãã¤ã«ã¹ãã¼ã³ãããã§æ±ºãã¾ãã",
-    schedule: "è¿½å ããç®æ¨ã®å®æ½ææ¥ã¨å®æ½æéãããã§æ±ºãã¾ãã",
-    plan: "è¿½å ããç®æ¨ã® Plan A / B / C ãããã§æ±ºãã¾ãã",
+    roadmap: "Ã¨Â¿Â½Ã¥ÂÂ Ã£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ®Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ§Ã¦Â±ÂºÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ",
+    schedule: "Ã¨Â¿Â½Ã¥ÂÂ Ã£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ®Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ¦ÂÂ¥Ã£ÂÂ¨Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ§Ã¦Â±ÂºÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ",
+    plan: "Ã¨Â¿Â½Ã¥ÂÂ Ã£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ® Plan A / B / C Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ§Ã¦Â±ÂºÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ",
   };
   const sectionCopy = activeSectionKey === "goal"
-    ? (isNewGoal ? "ä»ã® Today ã¯å¤ããã«ãæ°ããç®æ¨ãè¿½å ãã¾ãã" : activeSection.copy)
+    ? (isNewGoal ? "Ã¤Â»ÂÃ£ÂÂ® Today Ã£ÂÂ¯Ã¥Â¤ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ«Ã£ÂÂÃ¦ÂÂ°Ã£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¨Â¿Â½Ã¥ÂÂ Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ" : activeSection.copy)
     : (isNewGoal ? newGoalSectionCopy[activeSectionKey] || activeSection.copy : activeSection.copy);
   const showSaveAction = !(activeSectionKey === "goal" && !isNewGoal);
   const isHabitMode = isNewGoal ? draft.goalType === "habit" : state.setup.goalType === "habit";
@@ -2104,16 +2116,16 @@ function renderSetupView() {
     renderSetupMenuItem({
       action: "start-new-goal",
       section: "goal",
-      label: "ç®æ¨è¿½å ",
-      hint: "å¥ã®ç®æ¨ãå¢ãã",
+      label: "Ã§ÂÂ®Ã¦Â¨ÂÃ¨Â¿Â½Ã¥ÂÂ ",
+      hint: "Ã¥ÂÂ¥Ã£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¥Â¢ÂÃ£ÂÂÃ£ÂÂ",
       iconKey: "add",
       active: isNewGoal && activeSectionKey === "goal",
     }),
     renderSetupMenuItem({
       action: "edit-current-goal",
       section: "goal",
-      label: "ç®æ¨ç·¨é",
-      hint: "ç»é²æ¸ã¿ãç´ã",
+      label: "Ã§ÂÂ®Ã¦Â¨ÂÃ§Â·Â¨Ã©ÂÂ",
+      hint: "Ã§ÂÂ»Ã©ÂÂ²Ã¦Â¸ÂÃ£ÂÂ¿Ã£ÂÂÃ§ÂÂ´Ã£ÂÂ",
       iconKey: "goal",
       active: !isNewGoal && activeSectionKey === "goal",
     }),
@@ -2121,23 +2133,23 @@ function renderSetupView() {
       action: "select-setup-section",
       section: "roadmap",
       label: "Roadmap",
-      hint: "ç¯ç®ãæ´ãã",
+      hint: "Ã§Â¯ÂÃ§ÂÂ®Ã£ÂÂÃ¦ÂÂ´Ã£ÂÂÃ£ÂÂ",
       iconKey: "roadmap",
       active: activeSectionKey === "roadmap",
     }),
     renderSetupMenuItem({
       action: "select-setup-section",
       section: "schedule",
-      label: "å®æ½æé",
-      hint: "ãã¤ããã",
+      label: "Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ",
+      hint: "Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂÃ£ÂÂÃ£ÂÂ",
       iconKey: "schedule",
       active: activeSectionKey === "schedule",
     }),
     renderSetupMenuItem({
       action: "select-setup-section",
       section: "plan",
-      label: "ãã©ã³",
-      hint: "A / B / C ã®å¹",
+      label: "Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ³",
+      hint: "A / B / C Ã£ÂÂ®Ã¥Â¹Â",
       iconKey: "plan",
       active: activeSectionKey === "plan",
     }),
@@ -2149,12 +2161,12 @@ function renderSetupView() {
         <aside class="setup-nav setup-nav--menu">
           <div class="setup-nav__lead">
             <p class="setup-nav__eyebrow">Settings</p>
-            <strong>å¤ããããã®ãé¸ã¶</strong>
+            <strong>Ã¥Â¤ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ®Ã£ÂÂÃ©ÂÂ¸Ã£ÂÂ¶</strong>
           </div>
           <div class="setup-nav__list">${setupMenu}</div>
           <div class="setup-nav__data-actions">
-            <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">ã¨ã¯ã¹ãã¼ã</button>
-            <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">ã¤ã³ãã¼ã</button>
+            <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">Ã£ÂÂ¨Ã£ÂÂ¯Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ</button>
+            <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ</button>
           </div>
         </aside>
 
@@ -2170,7 +2182,7 @@ function renderSetupView() {
           <div class="setup-stage__header">
             ${renderSetupSectionIcon(activeSectionKey)}
             <div class="setup-stage__copy">
-              ${isNewGoal ? '<span class="status-badge status-badge--accent">è¿½å ä¸­</span>' : ""}
+              ${isNewGoal ? '<span class="status-badge status-badge--accent">Ã¨Â¿Â½Ã¥ÂÂ Ã¤Â¸Â­</span>' : ""}
               <h2 class="panel__title">${escapeHtml(sectionTitle)}</h2>
             </div>
           </div>
@@ -2198,9 +2210,9 @@ function renderTodayView() {
           ? goals.map((goal, index) => renderTodayGoalCard(goal, index)).join("")
           : `
             <section class="panel panel--warm stack">
-              <span class="status-badge">ä»æ¥ã¯${escapeHtml(weekdayLabel(todayKey))}</span>
-              <h2 class="section-title">ä»æ¥ã¯è¡¨ç¤ºããç®æ¨ãããã¾ãã</h2>
-              <p class="section-copy">å®æ½ææ¥ã ${escapeHtml(weekdayLabel(todayKey))} ã®ç®æ¨ã ãã Today ã«è¡¨ç¤ºãã¦ãã¾ããè¨­å®ã®å®æ½æéããææ¥ãå¤æ´ã§ãã¾ãã</p>
+              <span class="status-badge">Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ¯${escapeHtml(weekdayLabel(todayKey))}</span>
+              <h2 class="section-title">Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ¯Ã¨Â¡Â¨Ã§Â¤ÂºÃ£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</h2>
+              <p class="section-copy">Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ¦ÂÂ¥Ã£ÂÂ ${escapeHtml(weekdayLabel(todayKey))} Ã£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂ Today Ã£ÂÂ«Ã¨Â¡Â¨Ã§Â¤ÂºÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ¨Â¨Â­Ã¥Â®ÂÃ£ÂÂ®Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂÃ¦ÂÂÃ¦ÂÂ¥Ã£ÂÂÃ¥Â¤ÂÃ¦ÂÂ´Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
             </section>
           `}
       </div>
@@ -2221,9 +2233,9 @@ function getTodayMissionState(currentState, todayLog) {
     return {
       panelClass: "panel--focus",
       badgeClass: "status-badge--accent",
-      badge: "æªå®äº",
-      title: "ã¾ã ä»æ¥ã®1æ¬ã¯çµãã£ã¦ãã¾ããã",
-      detail: "çµããã¾ã§ã¯ããã®1æ¬ã ããåªåããã°ååã§ãã",
+      badge: "Ã¦ÂÂªÃ¥Â®ÂÃ¤ÂºÂ",
+      title: "Ã£ÂÂ¾Ã£ÂÂ Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®1Ã¦ÂÂ¬Ã£ÂÂ¯Ã§ÂµÂÃ£ÂÂÃ£ÂÂ£Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ",
+      detail: "Ã§ÂµÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂ§Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ®1Ã¦ÂÂ¬Ã£ÂÂ Ã£ÂÂÃ£ÂÂÃ¥ÂÂªÃ¥ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ°Ã¥ÂÂÃ¥ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ",
       showPendingCue: true,
       isClosed: false,
     };
@@ -2233,9 +2245,9 @@ function getTodayMissionState(currentState, todayLog) {
     return {
       panelClass: "panel--focus",
       badgeClass: "status-badge--accent",
-      badge: "ç®æ¨æ´æ°å¾",
-      title: "ç®æ¨ãæ´æ°ããã®ã§ãæ°ãã1æ¬ã¯ã¾ã æªçæã§ãã",
-      detail: `åã®è¨é²: ${buildLogSummary(todayLog)}`,
+      badge: "Ã§ÂÂ®Ã¦Â¨ÂÃ¦ÂÂ´Ã¦ÂÂ°Ã¥Â¾Â",
+      title: "Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ¦ÂÂ´Ã¦ÂÂ°Ã£ÂÂÃ£ÂÂÃ£ÂÂ®Ã£ÂÂ§Ã£ÂÂÃ¦ÂÂ°Ã£ÂÂÃ£ÂÂ1Ã¦ÂÂ¬Ã£ÂÂ¯Ã£ÂÂ¾Ã£ÂÂ Ã¦ÂÂªÃ§ÂÂÃ¦ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ",
+      detail: `Ã¥ÂÂÃ£ÂÂ®Ã¨Â¨ÂÃ©ÂÂ²: ${buildLogSummary(todayLog)}`,
       showPendingCue: true,
       isClosed: false,
     };
@@ -2245,8 +2257,8 @@ function getTodayMissionState(currentState, todayLog) {
     return {
       panelClass: "panel--miss",
       badgeClass: "status-badge--danger",
-      badge: "æªå®æ½",
-      title: "ä»æ¥ã¯ã¾ã éãããã¦ãã¾ããã",
+      badge: "Ã¦ÂÂªÃ¥Â®ÂÃ¦ÂÂ½",
+      title: "Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ¯Ã£ÂÂ¾Ã£ÂÂ Ã©ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ",
       detail: buildLogSummary(todayLog),
       showPendingCue: true,
       isClosed: false,
@@ -2256,8 +2268,8 @@ function getTodayMissionState(currentState, todayLog) {
   return {
     panelClass: "panel--done",
     badgeClass: "status-badge--done",
-    badge: "å®äºæ¸ã¿",
-    title: "ä»æ¥ã®1æ¬ã¯è¨é²æ¸ã¿ã§ãã",
+    badge: "Ã¥Â®ÂÃ¤ÂºÂÃ¦Â¸ÂÃ£ÂÂ¿",
+    title: "Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®1Ã¦ÂÂ¬Ã£ÂÂ¯Ã¨Â¨ÂÃ©ÂÂ²Ã¦Â¸ÂÃ£ÂÂ¿Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ",
     detail: buildLogSummary(todayLog),
     showPendingCue: false,
     isClosed: true,
@@ -2311,8 +2323,8 @@ function computeCatchUpRecommendation(currentState) {
 function renderRoadmapMilestoneCard(milestone, index, options = {}) {
   const editable = Boolean(options.editable);
   const isGoal = Boolean(options.isGoal);
-  const deadlineLabel = milestone.deadline ? `æé ${milestone.deadline}` : "";
-  const targetLabel = Number.isFinite(Number(milestone.target)) ? `å¨ä½ç®å® ${Math.round(Number(milestone.target))}%` : "";
+  const deadlineLabel = milestone.deadline ? `Ã¦ÂÂÃ©ÂÂ ${milestone.deadline}` : "";
+  const targetLabel = Number.isFinite(Number(milestone.target)) ? `Ã¥ÂÂ¨Ã¤Â½ÂÃ§ÂÂ®Ã¥Â®Â ${Math.round(Number(milestone.target))}%` : "";
 
   return `
     <article class="milestone ${milestone.isActive ? "is-active" : ""} ${milestone.isComplete ? "is-complete" : ""} ${isGoal ? "is-goal" : ""}" data-step="${index + 1}">
@@ -2326,8 +2338,8 @@ function renderRoadmapMilestoneCard(milestone, index, options = {}) {
         ${deadlineLabel ? `<div class="milestone__meta">${escapeHtml(deadlineLabel)}</div>` : ""}
         ${editable ? `
           <div class="milestone__actions milestone__actions--compact">
-            <button type="button" class="ghost-button" data-action="open-roadmap-editor" data-roadmap-id="${escapeHtml(milestone.id)}">ä¿®æ­£</button>
-            <button type="button" class="ghost-button" data-action="delete-roadmap-item" data-roadmap-id="${escapeHtml(milestone.id)}">åé¤</button>
+            <button type="button" class="ghost-button" data-action="open-roadmap-editor" data-roadmap-id="${escapeHtml(milestone.id)}">Ã¤Â¿Â®Ã¦Â­Â£</button>
+            <button type="button" class="ghost-button" data-action="delete-roadmap-item" data-roadmap-id="${escapeHtml(milestone.id)}">Ã¥ÂÂÃ©ÂÂ¤</button>
           </div>
         ` : ""}
       </div>
@@ -2344,7 +2356,7 @@ function renderRoadmapInsertSlot(afterId = "") {
   const afterAttr = afterId ? ` data-after-id="${escapeHtml(afterId)}"` : "";
   return `
     <article class="milestone milestone--insert" data-step="+">
-      <button type="button" class="milestone-add-button" data-action="open-roadmap-editor" aria-label="ãã¤ã«ã¹ãã¼ã³ãè¿½å "${afterAttr}></button>
+      <button type="button" class="milestone-add-button" data-action="open-roadmap-editor" aria-label="Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂÃ¨Â¿Â½Ã¥ÂÂ "${afterAttr}></button>
     </article>
   `;
 }
@@ -2359,7 +2371,7 @@ function renderRoadmapMilestoneList(roadmap, options = {}) {
           ${renderRoadmapInsertSlot("")}
         </div>
       `
-      : `<p class="preview-empty">ã¾ã ãã¤ã«ã¹ãã¼ã³ã¯ããã¾ããã</p>`;
+      : `<p class="preview-empty">Ã£ÂÂ¾Ã£ÂÂ Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ</p>`;
   }
 
   if (editable) {
@@ -2376,7 +2388,7 @@ function renderRoadmapMilestoneList(roadmap, options = {}) {
     `;
   }
 
-  // é²è¦§ã¢ã¼ã: ã¹ã¿ã¼ãâã´ã¼ã«ã®é ã§è¡¨ç¤ºï¼ãã¼ã¿ã¯éé ï¼
+  // Ã©ÂÂ²Ã¨Â¦Â§Ã£ÂÂ¢Ã£ÂÂ¼Ã£ÂÂ: Ã£ÂÂ¹Ã£ÂÂ¿Ã£ÂÂ¼Ã£ÂÂÃ¢ÂÂÃ£ÂÂ´Ã£ÂÂ¼Ã£ÂÂ«Ã£ÂÂ®Ã©Â ÂÃ£ÂÂ§Ã¨Â¡Â¨Ã§Â¤ÂºÃ¯Â¼ÂÃ£ÂÂÃ£ÂÂ¼Ã£ÂÂ¿Ã£ÂÂ¯Ã©ÂÂÃ©Â ÂÃ¯Â¼Â
   const reversed = [...roadmap.milestones].reverse();
   const goalIndex = reversed.length - 1;
 
@@ -2401,7 +2413,7 @@ function getRoadmapMilestoneForDisplay(roadmap) {
 function renderRoadmapCurrentStatus(roadmap) {
   const milestone = getRoadmapMilestoneForDisplay(roadmap);
   if (!milestone) {
-    return `<p class="preview-empty">ã¾ã ãã¤ã«ã¹ãã¼ã³ã¯ããã¾ããã</p>`;
+    return `<p class="preview-empty">Ã£ÂÂ¾Ã£ÂÂ Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ</p>`;
   }
 
   const overallProgress = clamp(Math.round(Number(roadmap.learningProgress) || 0), 0, 100);
@@ -2409,8 +2421,8 @@ function renderRoadmapCurrentStatus(roadmap) {
   const achievementRate = milestone.isComplete
     ? 100
     : clamp(Math.round((overallProgress / target) * 100), 0, 100);
-  const statusLabel = milestone.isComplete ? "å°éæ¸ã¿" : "é²è¡ä¸­";
-  const deadlineLabel = milestone.deadline ? `æé ${milestone.deadline}` : "æéãªã";
+  const statusLabel = milestone.isComplete ? "Ã¥ÂÂ°Ã©ÂÂÃ¦Â¸ÂÃ£ÂÂ¿" : "Ã©ÂÂ²Ã¨Â¡ÂÃ¤Â¸Â­";
+  const deadlineLabel = milestone.deadline ? `Ã¦ÂÂÃ©ÂÂ ${milestone.deadline}` : "Ã¦ÂÂÃ©ÂÂÃ£ÂÂªÃ£ÂÂ";
 
   return `
     <article class="roadmap-focus-card">
@@ -2422,7 +2434,7 @@ function renderRoadmapCurrentStatus(roadmap) {
         </div>
         <div class="roadmap-focus-card__value-block">
           <strong class="roadmap-focus-card__value">${overallProgress}%</strong>
-          <span class="roadmap-focus-card__value-label">å¨ä½é²æ</span>
+          <span class="roadmap-focus-card__value-label">Ã¥ÂÂ¨Ã¤Â½ÂÃ©ÂÂ²Ã¦ÂÂ</span>
         </div>
       </div>
 
@@ -2452,14 +2464,14 @@ function renderRoadmapView() {
 
       <section class="panel panel--cool stack">
         <div class="status-strip">
-          <span class="status-badge">${roadmap.daysRemaining == null ? "æéãªã" : `æ®ã ${formatRemainingSpan(roadmap.daysRemaining)}`}</span>
+          <span class="status-badge">${roadmap.daysRemaining == null ? "Ã¦ÂÂÃ©ÂÂÃ£ÂÂªÃ£ÂÂ" : `Ã¦Â®ÂÃ£ÂÂ ${formatRemainingSpan(roadmap.daysRemaining)}`}</span>
         </div>
         <div>
-          <h2 class="section-title">ç¾å¨ã®éæç¶æ³</h2>
+          <h2 class="section-title">Ã§ÂÂ¾Ã¥ÂÂ¨Ã£ÂÂ®Ã©ÂÂÃ¦ÂÂÃ§ÂÂ¶Ã¦Â³Â</h2>
         </div>
         ${renderRoadmapCurrentStatus(roadmap)}
         <div>
-          <h2 class="section-title">å¨ä½ã®ã­ã¼ãããã</h2>
+          <h2 class="section-title">Ã¥ÂÂ¨Ã¤Â½ÂÃ£ÂÂ®Ã£ÂÂ­Ã£ÂÂ¼Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ</h2>
         </div>
         ${renderRoadmapMilestoneList(roadmap)}
       </section>
@@ -2472,11 +2484,11 @@ function renderHabitStreakRoadmap() {
   const executedDays = growth.executedDays;
   const bonsaiMeta = getBonsaiTypeMeta(state.setup.bonsaiKey || "pine");
   const milestones = [
-    { days: 7,   label: "7æ¥",   desc: "æåã®å£ãè¶ãã",       emoji: "ð±" },
-    { days: 21,  label: "21æ¥",  desc: "ãªãºã ãçã¾ãã¦ãã",   emoji: "ðª´" },
-    { days: 66,  label: "66æ¥",  desc: "èªååã®å¥ãå£",         emoji: "ð³" },
-    { days: 100, label: "100æ¥", desc: "æ¬ç©ã®ç¿æ£ã¸",           emoji: "ð" },
-    { days: 365, label: "1å¹´",   desc: "äººçãå¤ãã£ã",         emoji: "â©ï¸" },
+    { days: 7,   label: "7Ã¦ÂÂ¥",   desc: "Ã¦ÂÂÃ¥ÂÂÃ£ÂÂ®Ã¥Â£ÂÃ£ÂÂÃ¨Â¶ÂÃ£ÂÂÃ£ÂÂ",       emoji: "Ã°ÂÂÂ±" },
+    { days: 21,  label: "21Ã¦ÂÂ¥",  desc: "Ã£ÂÂªÃ£ÂÂºÃ£ÂÂ Ã£ÂÂÃ§ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ",   emoji: "Ã°ÂÂªÂ´" },
+    { days: 66,  label: "66Ã¦ÂÂ¥",  desc: "Ã¨ÂÂªÃ¥ÂÂÃ¥ÂÂÃ£ÂÂ®Ã¥ÂÂ¥Ã£ÂÂÃ¥ÂÂ£",         emoji: "Ã°ÂÂÂ³" },
+    { days: 100, label: "100Ã¦ÂÂ¥", desc: "Ã¦ÂÂ¬Ã§ÂÂ©Ã£ÂÂ®Ã§Â¿ÂÃ¦ÂÂ£Ã£ÂÂ¸",           emoji: "Ã°ÂÂÂ" },
+    { days: 365, label: "1Ã¥Â¹Â´",   desc: "Ã¤ÂºÂºÃ§ÂÂÃ£ÂÂÃ¥Â¤ÂÃ£ÂÂÃ£ÂÂ£Ã£ÂÂ",         emoji: "Ã¢ÂÂ©Ã¯Â¸Â" },
   ];
   const nextMilestone = milestones.find(m => executedDays < m.days);
   const daysToNext = nextMilestone ? nextMilestone.days - executedDays : 0;
@@ -2487,12 +2499,12 @@ function renderHabitStreakRoadmap() {
         <div class="status-strip"><span class="status-badge">${escapeHtml(bonsaiMeta.label)} / ${escapeHtml(growth.stageLabel)}</span></div>
         <div style="text-align:center;padding:8px 0 4px">
           <p style="font-size:3rem;margin:0;line-height:1.1">${executedDays}</p>
-          <p style="font-size:0.85rem;color:var(--muted);margin:4px 0 0">å®æ½ããæ¥æ°</p>
+          <p style="font-size:0.85rem;color:var(--muted);margin:4px 0 0">Ã¥Â®ÂÃ¦ÂÂ½Ã£ÂÂÃ£ÂÂÃ¦ÂÂ¥Ã¦ÂÂ°</p>
         </div>
-        ${nextMilestone ? `<div style="font-size:0.82rem;color:var(--muted);text-align:center">æ¬¡ã®ãã¤ã«ã¹ãã¼ã³ã${escapeHtml(nextMilestone.label)}ãã¾ã§ ãã¨ <strong style="color:var(--ink)">${daysToNext}æ¥</strong></div>` : `<div style="font-size:0.88rem;text-align:center;color:var(--accent)">ð ãã¹ã¦ã®ãã¤ã«ã¹ãã¼ã³ãéæï¼</div>`}
+        ${nextMilestone ? `<div style="font-size:0.82rem;color:var(--muted);text-align:center">Ã¦Â¬Â¡Ã£ÂÂ®Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂ${escapeHtml(nextMilestone.label)}Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂ§ Ã£ÂÂÃ£ÂÂ¨ <strong style="color:var(--ink)">${daysToNext}Ã¦ÂÂ¥</strong></div>` : `<div style="font-size:0.88rem;text-align:center;color:var(--accent)">Ã°ÂÂÂ Ã£ÂÂÃ£ÂÂ¹Ã£ÂÂ¦Ã£ÂÂ®Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂÃ©ÂÂÃ¦ÂÂÃ¯Â¼Â</div>`}
       </section>
       <section class="panel stack">
-        <h2 class="section-title">ç¿æ£ã®éã®ã</h2>
+        <h2 class="section-title">Ã§Â¿ÂÃ¦ÂÂ£Ã£ÂÂ®Ã©ÂÂÃ£ÂÂ®Ã£ÂÂ</h2>
         <div class="stack" style="gap:10px">
           ${milestones.map(m => {
             const done = executedDays >= m.days;
@@ -2504,7 +2516,7 @@ function renderHabitStreakRoadmap() {
                 <div style="flex:1">
                   <div style="display:flex;justify-content:space-between;align-items:baseline">
                     <strong style="font-size:0.95rem">${escapeHtml(m.label)}</strong>
-                    <span style="font-size:0.78rem;color:var(--muted)">${done ? "â éæ" : `${executedDays}/${m.days}æ¥`}</span>
+                    <span style="font-size:0.78rem;color:var(--muted)">${done ? "Ã¢ÂÂ Ã©ÂÂÃ¦ÂÂ" : `${executedDays}/${m.days}Ã¦ÂÂ¥`}</span>
                   </div>
                   <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0">${escapeHtml(m.desc)}</p>
                 </div>
@@ -2530,26 +2542,26 @@ function renderRoadmapEditor(stepLabel = "+") {
     <article class="milestone milestone--editor" data-step="${escapeHtml(String(stepLabel))}">
       <section class="panel panel--warm stack milestone-editor">
         <div>
-          <h2 class="panel__title">${isEdit ? "ãã¤ã«ã¹ãã¼ã³ãä¿®æ­£" : "ãã¤ã«ã¹ãã¼ã³ãè¿½å "}</h2>
+          <h2 class="panel__title">${isEdit ? "Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂÃ¤Â¿Â®Ã¦Â­Â£" : "Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³Ã£ÂÂÃ¨Â¿Â½Ã¥ÂÂ "}</h2>
         </div>
         <label class="field">
-          <span class="field__label">ã¿ã¤ãã«</span>
-          <input class="field__control" data-roadmap-field="label" type="text" value="${escapeHtml(draft.label || "")}" placeholder="æ¨¡è©¦ã§70% / 3åéãä¸å¨ ãªã©" />
+          <span class="field__label">Ã£ÂÂ¿Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ«</span>
+          <input class="field__control" data-roadmap-field="label" type="text" value="${escapeHtml(draft.label || "")}" placeholder="Ã¦Â¨Â¡Ã¨Â©Â¦Ã£ÂÂ§70% / 3Ã¥ÂÂÃ©ÂÂÃ£ÂÂÃ¤Â¸ÂÃ¥ÂÂ¨ Ã£ÂÂªÃ£ÂÂ©" />
         </label>
         <div class="field-grid field-grid--two">
           <label class="field">
-            <span class="field__label">æé</span>
+            <span class="field__label">Ã¦ÂÂÃ©ÂÂ</span>
             <input class="field__control" data-roadmap-field="deadline" type="date" value="${escapeHtml(draft.deadline || "")}" ${isGoalItem ? "disabled" : ""} />
           </label>
           <label class="field">
-            <span class="field__label">å°éç®å® (%)</span>
+            <span class="field__label">Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ®Ã¥Â®Â (%)</span>
             <input class="field__control" data-roadmap-field="target" type="number" min="0" max="100" value="${escapeHtml(String(draft.target ?? 0))}" />
           </label>
         </div>
-        ${isGoalItem ? '<p class="section-copy">æçµæéã¯ç®æ¨ç·¨éã§å¤æ´ãã¾ãã</p>' : ''}
+        ${isGoalItem ? '<p class="section-copy">Ã¦ÂÂÃ§ÂµÂÃ¦ÂÂÃ©ÂÂÃ£ÂÂ¯Ã§ÂÂ®Ã¦Â¨ÂÃ§Â·Â¨Ã©ÂÂÃ£ÂÂ§Ã¥Â¤ÂÃ¦ÂÂ´Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>' : ''}
         <div class="action-row milestone-editor__actions">
-          <button type="button" class="action-button action-button--primary" data-action="save-roadmap-item">${isEdit ? "ä¿®æ­£ãä¿å­" : "è¿½å ãã"}</button>
-          <button type="button" class="soft-button" data-action="cancel-roadmap-editor">éãã</button>
+          <button type="button" class="action-button action-button--primary" data-action="save-roadmap-item">${isEdit ? "Ã¤Â¿Â®Ã¦Â­Â£Ã£ÂÂÃ¤Â¿ÂÃ¥Â­Â" : "Ã¨Â¿Â½Ã¥ÂÂ Ã£ÂÂÃ£ÂÂ"}</button>
+          <button type="button" class="soft-button" data-action="cancel-roadmap-editor">Ã©ÂÂÃ£ÂÂÃ£ÂÂ</button>
         </div>
       </section>
     </article>
@@ -2574,8 +2586,8 @@ function renderReviewView() {
 
       <section class="panel stack">
         <div class="metric-grid">
-          ${renderMetricCard("7æ¥å®è¡ç", metrics.executionRate)}
-          ${renderMetricCard("ãã¼ã¿ã«åå¼·æé", formatLoggedDuration(totalStudySeconds), "")}
+          ${renderMetricCard("7Ã¦ÂÂ¥Ã¥Â®ÂÃ¨Â¡ÂÃ§ÂÂ", metrics.executionRate)}
+          ${renderMetricCard("Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ¿Ã£ÂÂ«Ã¥ÂÂÃ¥Â¼Â·Ã¦ÂÂÃ©ÂÂ", formatLoggedDuration(totalStudySeconds), "")}
         </div>
       </section>
 
@@ -2645,17 +2657,17 @@ function renderReviewPotCard(goal) {
       <div class="review-pot-card">
         <div class="review-pot-card__copy">
           <div class="status-strip">
-            <span class="status-badge status-badge--done">é¸æä¸­</span>
+            <span class="status-badge status-badge--done">Ã©ÂÂ¸Ã¦ÂÂÃ¤Â¸Â­</span>
             ${isHabit
-              ? `<span class="status-badge">ç¿æ£</span>`
-              : `<span class="status-badge ${isGoalAchieved(goal) ? "status-badge--done" : "status-badge--accent"}">${isGoalAchieved(goal) ? "éææ¸ã¿" : "è²æä¸­"}</span>`}
+              ? `<span class="status-badge">Ã§Â¿ÂÃ¦ÂÂ£</span>`
+              : `<span class="status-badge ${isGoalAchieved(goal) ? "status-badge--done" : "status-badge--accent"}">${isGoalAchieved(goal) ? "Ã©ÂÂÃ¦ÂÂÃ¦Â¸ÂÃ£ÂÂ¿" : "Ã¨ÂÂ²Ã¦ÂÂÃ¤Â¸Â­"}</span>`}
           </div>
           <div class="stack stack--tight">
             <h2 class="section-title">${escapeHtml(goal.setup.goal)}</h2>
             <p class="section-copy">${escapeHtml(statusCopy)}</p>
             ${todayLog && isExecutionOutcome(todayLog.outcome)
               ? `<div class="review-pot-card__actions">
-                  <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(todayLog.logId)}">ãã®è¨é²ãä¿®æ­£</button>
+                  <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(todayLog.logId)}">Ã£ÂÂÃ£ÂÂ®Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ¤Â¿Â®Ã¦Â­Â£</button>
                 </div>`
               : ""}
           </div>
@@ -2671,15 +2683,15 @@ function renderReviewPotCard(goal) {
         </div>
         <div class="review-pot-card__facts">
           <div class="review-pot-card__fact">
-            <span>${isHabit ? "æé·æ®µé" : "å²ãæ¹"}</span>
+            <span>${isHabit ? "Ã¦ÂÂÃ©ÂÂ·Ã¦Â®ÂµÃ©ÂÂ" : "Ã¥ÂÂ²Ã£ÂÂÃ¦ÂÂ¹"}</span>
             <strong>${escapeHtml(isHabit ? bonsaiGrowth.stageLabel : flower.stageLabel)}</strong>
           </div>
           <div class="review-pot-card__fact">
-            <span>${isHabit ? "ç¶ç¶æ¥æ°" : "è²ææ¥æ°"}</span>
-            <strong>${escapeHtml(`${isHabit ? bonsaiGrowth.executedDays : flower.executedDays}æ¥`)}</strong>
+            <span>${isHabit ? "Ã§Â¶ÂÃ§Â¶ÂÃ¦ÂÂ¥Ã¦ÂÂ°" : "Ã¨ÂÂ²Ã¦ÂÂÃ¦ÂÂ¥Ã¦ÂÂ°"}</span>
+            <strong>${escapeHtml(`${isHabit ? bonsaiGrowth.executedDays : flower.executedDays}Ã¦ÂÂ¥`)}</strong>
           </div>
           <div class="review-pot-card__fact">
-            <span>${isHabit ? "ç´è¿7å" : "å¨ä½é²æ"}</span>
+            <span>${isHabit ? "Ã§ÂÂ´Ã¨Â¿Â7Ã¥ÂÂ" : "Ã¥ÂÂ¨Ã¤Â½ÂÃ©ÂÂ²Ã¦ÂÂ"}</span>
             <strong>${isHabit ? renderStreakDots(goal.logs || [], goal.setup.studyDays) : escapeHtml(`${roadmap.learningProgress}%`)}</strong>
           </div>
         </div>
@@ -2696,7 +2708,7 @@ function renderReviewLogEditPanel() {
   const collapsedCount = 5;
   const shouldCollapse = allLogs.length > collapsedCount;
   const visibleLogs = ui.reviewLogExpanded ? allLogs : allLogs.slice(0, collapsedCount);
-  const toggleLabel = ui.reviewLogExpanded ? "åã®è¨é²ãéãã" : "ããã«åã®è¨é²ãè¦ã";
+  const toggleLabel = ui.reviewLogExpanded ? "Ã¥ÂÂÃ£ÂÂ®Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ" : "Ã£ÂÂÃ£ÂÂÃ£ÂÂ«Ã¥ÂÂÃ£ÂÂ®Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ¨Â¦ÂÃ£ÂÂ";
 
   const activeEntry = ui.reviewLogDraft ? getLogEntryById(ui.reviewLogDraft.logId) : null;
   if (ui.reviewLogDraft && !activeEntry) {
@@ -2706,7 +2718,7 @@ function renderReviewLogEditPanel() {
   return `
     <section class="panel stack">
       <div>
-        <h2 class="section-title">è¨é²ãä¿®æ­£</h2>
+        <h2 class="section-title">Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ¤Â¿Â®Ã¦Â­Â£</h2>
       </div>
       ${activeEntry ? renderReviewLogEditor(activeEntry) : ""}
       <div class="review-log-list">
@@ -2728,27 +2740,27 @@ function renderReviewLogEditor(entry) {
   return `
     <div class="review-log-editor">
       <div class="status-strip">
-        <span class="status-badge status-badge--accent">ä¿®æ­£ä¸­</span>
+        <span class="status-badge status-badge--accent">Ã¤Â¿Â®Ã¦Â­Â£Ã¤Â¸Â­</span>
         <span class="status-badge">${escapeHtml(outcomeLabel(entry.outcome))}</span>
       </div>
       <div class="field-grid field-grid--two">
         <label class="field">
-          <span class="field__label">å®æ½æ¥</span>
+          <span class="field__label">Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂ¥</span>
           <input class="field__control" data-review-log-field="date" type="date" value="${escapeHtml(draft.date)}" />
         </label>
         <div class="field">
-          <span class="field__label">å®æ½æé</span>
+          <span class="field__label">Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ</span>
           <div class="review-log-duration">
             <input class="field__control" data-review-log-field="elapsedHours" type="number" min="0" inputmode="numeric" value="${escapeHtml(draft.elapsedHours)}" />
-            <span>æé</span>
+            <span>Ã¦ÂÂÃ©ÂÂ</span>
             <input class="field__control" data-review-log-field="elapsedMinutes" type="number" min="0" inputmode="numeric" value="${escapeHtml(draft.elapsedMinutes)}" />
-            <span>å</span>
+            <span>Ã¥ÂÂ</span>
           </div>
         </div>
       </div>
       <div class="review-log-editor__actions">
-        <button type="button" class="action-button action-button--primary" data-action="save-review-log">ä¿å­ãã</button>
-        <button type="button" class="soft-button" data-action="cancel-review-log-edit">éãã</button>
+        <button type="button" class="action-button action-button--primary" data-action="save-review-log">Ã¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ£ÂÂ</button>
+        <button type="button" class="soft-button" data-action="cancel-review-log-edit">Ã©ÂÂÃ£ÂÂÃ£ÂÂ</button>
       </div>
     </div>
   `;
@@ -2757,9 +2769,9 @@ function renderReviewLogEditor(entry) {
 function renderReviewLogCard(entry) {
   const isEditing = ui.reviewLogDraft && ui.reviewLogDraft.logId === entry.logId;
   const detailParts = [
-    entry.milestoneLabel ? `ç¯ç® ${entry.milestoneLabel}` : "",
-    entry.progressText ? `å°é ${entry.progressText}` : "",
-    entry.reflection ? `ã¡ã¢ ${entry.reflection}` : "",
+    entry.milestoneLabel ? `Ã§Â¯ÂÃ§ÂÂ® ${entry.milestoneLabel}` : "",
+    entry.progressText ? `Ã¥ÂÂ°Ã©ÂÂ ${entry.progressText}` : "",
+    entry.reflection ? `Ã£ÂÂ¡Ã£ÂÂ¢ ${entry.reflection}` : "",
   ].filter(Boolean);
 
   return `
@@ -2767,9 +2779,9 @@ function renderReviewLogCard(entry) {
       <div class="review-log-card__head">
         <div>
           <strong class="review-log-card__title">${escapeHtml(formatReviewLogDate(entry.date))}</strong>
-          <p class="review-log-card__meta">${escapeHtml(`${outcomeLabel(entry.outcome)} / å®è¡ ${formatLoggedDuration(getLoggedSeconds(entry))}`)}</p>
+          <p class="review-log-card__meta">${escapeHtml(`${outcomeLabel(entry.outcome)} / Ã¥Â®ÂÃ¨Â¡Â ${formatLoggedDuration(getLoggedSeconds(entry))}`)}</p>
         </div>
-        <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(entry.logId)}">ä¿®æ­£</button>
+        <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(entry.logId)}">Ã¤Â¿Â®Ã¦Â­Â£</button>
       </div>
       ${detailParts.length ? `<p class="review-log-card__detail">${escapeHtml(detailParts.join(" / "))}</p>` : ""}
     </article>
@@ -2789,15 +2801,15 @@ function renderGardenView() {
         <div class="hero__sticky">
           <div class="hero__accent"></div>
           <div class="status-strip">
-            <span class="status-badge">è²æä¸­ ${growingGoals.length}</span>
-            <span class="status-badge status-badge--done">éææ¸ã¿ ${archivedGoals.length}</span>
+            <span class="status-badge">Ã¨ÂÂ²Ã¦ÂÂÃ¤Â¸Â­ ${growingGoals.length}</span>
+            <span class="status-badge status-badge--done">Ã©ÂÂÃ¦ÂÂÃ¦Â¸ÂÃ£ÂÂ¿ ${archivedGoals.length}</span>
           </div>
         </div>
       </div>
 
-      ${habitGoals.length ? renderGardenShelfSection("è²ã¦ã¦ããçæ ½", "ç¿æ£ã¿ã¤ãã®ç®æ¨ã§ããæ¯æ¥ã®ãã§ãã¯ã¤ã³ã§æé·ãã¾ãã", habitGoals, { emptyCopy: "ã¾ã ç¿æ£ã¯ããã¾ããã" }) : ""}
-      ${renderGardenShelfSection("ä»è²ã¦ã¦ããè±", "é²è¡ä¸­ã®ç®æ¨ãã¾ã¨ãã¦ãã¾ãã", growingGoals, { emptyCopy: "ã¾ã è²æä¸­ã®è±ã¯ããã¾ããã" })}
-      ${renderAchievementGardenSection("ç®æ¨éæããè±", "éæããè±ã¯ãã®åº­ã«æ¤ãã¦ãå²ããè¨é²ãæ®ãã¦ããã¾ãã", archivedGoals, { emptyCopy: "ã¾ã éæããè±ã¯ããã¾ããã" })}
+      ${habitGoals.length ? renderGardenShelfSection("Ã¨ÂÂ²Ã£ÂÂ¦Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂÃ§ÂÂÃ¦Â Â½", "Ã§Â¿ÂÃ¦ÂÂ£Ã£ÂÂ¿Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂÃ¦Â¯ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã£ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ¯Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ§Ã¦ÂÂÃ©ÂÂ·Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ", habitGoals, { emptyCopy: "Ã£ÂÂ¾Ã£ÂÂ Ã§Â¿ÂÃ¦ÂÂ£Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ" }) : ""}
+      ${renderGardenShelfSection("Ã¤Â»ÂÃ¨ÂÂ²Ã£ÂÂ¦Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂÃ¨ÂÂ±", "Ã©ÂÂ²Ã¨Â¡ÂÃ¤Â¸Â­Ã£ÂÂ®Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂ¨Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ", growingGoals, { emptyCopy: "Ã£ÂÂ¾Ã£ÂÂ Ã¨ÂÂ²Ã¦ÂÂÃ¤Â¸Â­Ã£ÂÂ®Ã¨ÂÂ±Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ" })}
+      ${renderAchievementGardenSection("Ã§ÂÂ®Ã¦Â¨ÂÃ©ÂÂÃ¦ÂÂÃ£ÂÂÃ£ÂÂÃ¨ÂÂ±", "Ã©ÂÂÃ¦ÂÂÃ£ÂÂÃ£ÂÂÃ¨ÂÂ±Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂ®Ã¥ÂºÂ­Ã£ÂÂ«Ã¦Â¤ÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ¥ÂÂ²Ã£ÂÂÃ£ÂÂÃ¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ¦Â®ÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ", archivedGoals, { emptyCopy: "Ã£ÂÂ¾Ã£ÂÂ Ã©ÂÂÃ¦ÂÂÃ£ÂÂÃ£ÂÂÃ¨ÂÂ±Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ" })}
       ${renderAlbumSection()}
     </section>
   `;
@@ -2815,12 +2827,12 @@ function renderAlbumSection() {
       const growth = getBonsaiGrowth(goal.logs || []);
       const health = getBonsaiHealth(goal.logs || [], goal.setup.studyDays);
       artwork = renderBonsaiArtwork(goal.setup.bonsaiKey || "pine", growth.stageIndex, health, { size: "card" });
-      subtitle = `${getBonsaiTypeMeta(goal.setup.bonsaiKey).label} / ${growth.stageIndex}æ®µé / ${growth.executedDays}æ¥é`;
+      subtitle = `${getBonsaiTypeMeta(goal.setup.bonsaiKey).label} / ${growth.stageIndex}Ã¦Â®ÂµÃ©ÂÂ / ${growth.executedDays}Ã¦ÂÂ¥Ã©ÂÂ`;
     } else {
       const growth = getFlowerGrowth(goal.logs || []);
       const flower = getGoalFlowerState(goal);
       artwork = renderFlowerArtwork(flower.key, growth.stageIndex, { size: "card" });
-      subtitle = `${flower.label} / ${growth.stageLabel} / ${growth.executedDays}æ¥é`;
+      subtitle = `${flower.label} / ${growth.stageLabel} / ${growth.executedDays}Ã¦ÂÂ¥Ã©ÂÂ`;
     }
     const archivedDate = goal.archivedAt ? goal.archivedAt.replace(/-/g, ".") : "";
     return `
@@ -2829,15 +2841,15 @@ function renderAlbumSection() {
         <div class="album-card__body">
           <p class="album-card__name">${escapeHtml(goal.setup.goal)}</p>
           <p class="album-card__sub">${escapeHtml(subtitle)}</p>
-          ${archivedDate ? `<p class="album-card__date">${archivedDate} ä¿å­</p>` : ""}
+          ${archivedDate ? `<p class="album-card__date">${archivedDate} Ã¤Â¿ÂÃ¥Â­Â</p>` : ""}
           ${isConfirm
-            ? `<p class="album-card__warn">â ï¸ å®å¨æ¶å»ãã¾ããï¼åã«æ»ãã¾ããã</p>
+            ? `<p class="album-card__warn">Ã¢ÂÂ Ã¯Â¸Â Ã¥Â®ÂÃ¥ÂÂ¨Ã¦Â¶ÂÃ¥ÂÂ»Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ¯Â¼ÂÃ¥ÂÂÃ£ÂÂ«Ã¦ÂÂ»Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ</p>
                <div class="album-card__actions">
-                 <button class="soft-button" data-action="purge-archived-goal" data-goal-id="${goal.id}">æ¶å»ãã</button>
-                 <button class="soft-button" data-action="cancel-delete-goal">ããã</button>
+                 <button class="soft-button" data-action="purge-archived-goal" data-goal-id="${goal.id}">Ã¦Â¶ÂÃ¥ÂÂ»Ã£ÂÂÃ£ÂÂ</button>
+                 <button class="soft-button" data-action="cancel-delete-goal">Ã£ÂÂÃ£ÂÂÃ£ÂÂ</button>
                </div>`
             : `<div class="album-card__actions">
-                 <button class="soft-button album-card__delete" data-action="confirm-delete-goal" data-goal-id="${goal.id}">å®å¨æ¶å»</button>
+                 <button class="soft-button album-card__delete" data-action="confirm-delete-goal" data-goal-id="${goal.id}">Ã¥Â®ÂÃ¥ÂÂ¨Ã¦Â¶ÂÃ¥ÂÂ»</button>
                </div>`}
         </div>
       </div>
@@ -2846,8 +2858,8 @@ function renderAlbumSection() {
   return `
     <section class="panel stack garden-album">
       <div>
-        <h2 class="section-title">ã¢ã«ãã </h2>
-        <p class="section-copy">ã¢ã«ãã ã¸ç§»åããç®æ¨ã§ããè¨é²ã¯ããã§è¦è¿ãã¾ãã</p>
+        <h2 class="section-title">Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ </h2>
+        <p class="section-copy">Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ Ã£ÂÂ¸Ã§Â§Â»Ã¥ÂÂÃ£ÂÂÃ£ÂÂÃ§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂÃ¨Â¨ÂÃ©ÂÂ²Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ§Ã¨Â¦ÂÃ¨Â¿ÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
       </div>
       <div class="album-list">${cards}</div>
     </section>
@@ -2862,7 +2874,7 @@ function renderGardenShelfSection(title, copy, goals, options = {}) {
           <h2 class="section-title">${escapeHtml(title)}</h2>
           <p class="section-copy">${escapeHtml(copy)}</p>
         </div>
-        <p class="preview-empty">${escapeHtml(options.emptyCopy || "ã¾ã ããã¾ããã")}</p>
+        <p class="preview-empty">${escapeHtml(options.emptyCopy || "Ã£ÂÂ¾Ã£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ")}</p>
       </section>
     `;
   }
@@ -2899,10 +2911,10 @@ function renderGardenShelfCard(goal, options = {}) {
         <div class="garden-card__body">
           <div class="garden-card__head">
             <strong class="garden-card__title">${escapeHtml(goal.setup.goal)}</strong>
-            <span class="status-badge">ç¿æ£</span>
+            <span class="status-badge">Ã§Â¿ÂÃ¦ÂÂ£</span>
           </div>
           <p class="garden-card__meta">${escapeHtml(`${bonsaiMeta.label} / ${growth.stageLabel}`)}</p>
-          <div class="garden-card__streak">${escapeHtml(`ç¶ç¶ ${growth.executedDays}æ¥`)}&ensp;${renderStreakDots(goal.logs || [], goal.setup.studyDays)}</div>
+          <div class="garden-card__streak">${escapeHtml(`Ã§Â¶ÂÃ§Â¶Â ${growth.executedDays}Ã¦ÂÂ¥`)}&ensp;${renderStreakDots(goal.logs || [], goal.setup.studyDays)}</div>
         </div>
       </div>
     `;
@@ -2924,10 +2936,10 @@ function renderGardenShelfCard(goal, options = {}) {
       <div class="garden-card__body">
         <div class="garden-card__head">
           <strong class="garden-card__title">${escapeHtml(goal.setup.goal)}</strong>
-          <span class="status-badge ${completed ? "status-badge--done" : ""}">${completed ? "éææ¸ã¿" : "è²æä¸­"}</span>
+          <span class="status-badge ${completed ? "status-badge--done" : ""}">${completed ? "Ã©ÂÂÃ¦ÂÂÃ¦Â¸ÂÃ£ÂÂ¿" : "Ã¨ÂÂ²Ã¦ÂÂÃ¤Â¸Â­"}</span>
         </div>
         <p class="garden-card__meta">${escapeHtml(`${flower.label} / ${flower.stageLabel}`)}</p>
-        <p class="garden-card__meta">${escapeHtml(`è²æ ${flower.executedDays}æ¥ / é²æ ${roadmap.learningProgress}%`)}</p>
+        <p class="garden-card__meta">${escapeHtml(`Ã¨ÂÂ²Ã¦ÂÂ ${flower.executedDays}Ã¦ÂÂ¥ / Ã©ÂÂ²Ã¦ÂÂ ${roadmap.learningProgress}%`)}</p>
       </div>
     </div>
   `;
@@ -2941,7 +2953,7 @@ function renderAchievementGardenSection(title, copy, goals, options = {}) {
           <h2 class="section-title">${escapeHtml(title)}</h2>
           <p class="section-copy">${escapeHtml(copy)}</p>
         </div>
-        <p class="preview-empty">${escapeHtml(options.emptyCopy || "ã¾ã ããã¾ããã")}</p>
+        <p class="preview-empty">${escapeHtml(options.emptyCopy || "Ã£ÂÂ¾Ã£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ")}</p>
       </section>
     `;
   }
@@ -2967,7 +2979,7 @@ function renderAchievementGardenPlanter(goals, bedIndex, totalBeds = 1) {
   const sceneZoom = totalBeds > 1 ? 118 : 100;
 
   return `
-    <section class="garden-planter ${totalBeds > 1 ? "garden-planter--stacked" : ""}" style="--plot-count:${goals.length}; --scene-position:${scenePosition}%; --scene-zoom:${sceneZoom}%;" aria-label="${escapeHtml(`éæè±å£ ${bedIndex + 1}`)}">
+    <section class="garden-planter ${totalBeds > 1 ? "garden-planter--stacked" : ""}" style="--plot-count:${goals.length}; --scene-position:${scenePosition}%; --scene-zoom:${sceneZoom}%;" aria-label="${escapeHtml(`Ã©ÂÂÃ¦ÂÂÃ¨ÂÂ±Ã¥Â£Â ${bedIndex + 1}`)}">
       <div class="garden-planter__grid">
         ${goals.map((goal) => renderAchievementGardenPlot(goal)).join("")}
       </div>
@@ -2983,7 +2995,7 @@ function renderAchievementGardenPlot(goal) {
   return `
     <article class="garden-plot ${isActive ? "is-active" : ""}">
       <details class="garden-plot__details">
-        <summary class="garden-plot__touch" aria-label="${escapeHtml(`${goal.setup.goal} ã®è©³ç´°ãè¡¨ç¤º`)}">
+        <summary class="garden-plot__touch" aria-label="${escapeHtml(`${goal.setup.goal} Ã£ÂÂ®Ã¨Â©Â³Ã§Â´Â°Ã£ÂÂÃ¨Â¡Â¨Ã§Â¤Âº`)}">
           <div class="garden-plot__flower">
             ${renderFlowerArtwork(flower.key, flower.stageIndex, { size: "garden", showSoil: false })}
           </div>
@@ -2991,7 +3003,7 @@ function renderAchievementGardenPlot(goal) {
         <div class="garden-plot__tooltip" role="note">
           <div class="garden-plot__label">${escapeHtml(goal.setup.goal)}</div>
           <div class="garden-plot__meta">${escapeHtml(`${flower.label} / ${flower.stageLabel}`)}</div>
-          <div class="garden-plot__meta">${escapeHtml(`è²æ ${flower.executedDays}æ¥ / é²æ ${roadmap.learningProgress}%`)}</div>
+          <div class="garden-plot__meta">${escapeHtml(`Ã¨ÂÂ²Ã¦ÂÂ ${flower.executedDays}Ã¦ÂÂ¥ / Ã©ÂÂ²Ã¦ÂÂ ${roadmap.learningProgress}%`)}</div>
         </div>
       </details>
     </article>
@@ -3010,12 +3022,12 @@ function renderReplanView() {
       <div class="hero">
         <div class="hero__accent"></div>
         ${renderActiveGoalContext()}
-        <h1 class="hero__title">èªç±éè«ã§ã¯ãªããç«ã¦ç´ãã«éä¸­ãã</h1>
+        <h1 class="hero__title">Ã¨ÂÂªÃ§ÂÂ±Ã©ÂÂÃ¨Â«ÂÃ£ÂÂ§Ã£ÂÂ¯Ã£ÂÂªÃ£ÂÂÃ£ÂÂÃ§Â«ÂÃ£ÂÂ¦Ã§ÂÂ´Ã£ÂÂÃ£ÂÂ«Ã©ÂÂÃ¤Â¸Â­Ã£ÂÂÃ£ÂÂ</h1>
       </div>
 
       <section class="stack">
         <div>
-          <h2 class="section-title">ããããä¿®æ­£</h2>
+          <h2 class="section-title">Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ¤Â¿Â®Ã¦Â­Â£</h2>
         </div>
         <div class="mode-grid">
           ${Object.entries(REPLAN_MODES)
@@ -3033,23 +3045,23 @@ function renderReplanView() {
       ${isRetargetMode ? `
         <section class="panel stack">
           <div>
-            <h2 class="panel__title">ç®æ¨ã¨Roadmapãæ´æ°</h2>
+            <h2 class="panel__title">Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ¨RoadmapÃ£ÂÂÃ¦ÂÂ´Ã¦ÂÂ°</h2>
           </div>
           <label class="field">
-            <span class="field__label">ç®æ¨</span>
+            <span class="field__label">Ã§ÂÂ®Ã¦Â¨Â</span>
             <input class="field__control" data-replan-field="goalDraft" type="text" value="${escapeHtml(state.replan.goalDraft || "")}" />
           </label>
           <label class="field">
-            <span class="field__label">ä»æ¥ã®ããã·ã§ã³</span>
+            <span class="field__label">Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã£ÂÂÃ£ÂÂÃ£ÂÂ·Ã£ÂÂ§Ã£ÂÂ³</span>
             <input class="field__control" data-replan-field="missionDraft" type="text" value="${escapeHtml(state.replan.missionDraft || "")}" />
           </label>
           <div class="field-grid field-grid--two">
             <label class="field">
-              <span class="field__label">ä»é±ã®å°éç¹</span>
+              <span class="field__label">Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹</span>
               <input class="field__control" data-replan-field="weekDraft" type="text" value="${escapeHtml(state.replan.weekDraft || "")}" />
             </label>
             <label class="field">
-              <span class="field__label">æ¬¡ã®ä¸æ­©</span>
+              <span class="field__label">Ã¦Â¬Â¡Ã£ÂÂ®Ã¤Â¸ÂÃ¦Â­Â©</span>
               <input class="field__control" data-replan-field="nextDraft" type="text" value="${escapeHtml(state.replan.nextDraft || "")}" />
             </label>
           </div>
@@ -3058,40 +3070,40 @@ function renderReplanView() {
 
       <section class="panel stack">
         <div>
-          <h2 class="panel__title">ç¸è«åå®¹</h2>
+          <h2 class="panel__title">Ã§ÂÂ¸Ã¨Â«ÂÃ¥ÂÂÃ¥Â®Â¹</h2>
         </div>
         <label class="field">
-          <textarea data-replan-field="text" placeholder="${isRetargetMode ? "ä¾: ChatGPTã¨åé¡ãåºãåãåå¼·ã«å¯ããã" : "å°ã£ã¦ãããã¨ãç­ãæ¸ã"}">${escapeHtml(state.replan.text || "")}</textarea>
+          <textarea data-replan-field="text" placeholder="${isRetargetMode ? "Ã¤Â¾Â: ChatGPTÃ£ÂÂ¨Ã¥ÂÂÃ©Â¡ÂÃ£ÂÂÃ¥ÂÂºÃ£ÂÂÃ¥ÂÂÃ£ÂÂÃ¥ÂÂÃ¥Â¼Â·Ã£ÂÂ«Ã¥Â¯ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ" : "Ã¥ÂÂ°Ã£ÂÂ£Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¨Ã£ÂÂÃ§ÂÂ­Ã£ÂÂÃ¦ÂÂ¸Ã£ÂÂ"}">${escapeHtml(state.replan.text || "")}</textarea>
         </label>
-        <button type="button" class="action-button" data-action="generate-replan">å·®åãä½ã</button>
+        <button type="button" class="action-button" data-action="generate-replan">Ã¥Â·Â®Ã¥ÂÂÃ£ÂÂÃ¤Â½ÂÃ£ÂÂ</button>
       </section>
 
       <section class="panel stack">
         <div>
-          <h2 class="panel__title">å·®åãã¬ãã¥ã¼</h2>
+          <h2 class="panel__title">Ã¥Â·Â®Ã¥ÂÂÃ£ÂÂÃ£ÂÂ¬Ã£ÂÂÃ£ÂÂ¥Ã£ÂÂ¼</h2>
         </div>
         ${
           preview.length
             ? `<ul class="preview-list">${preview.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
-            : `<p class="preview-empty">ã¢ã¼ããé¸ãã§ãå·®åãä½ãããæ¼ãã¨ãããã«å¤æ´æ¡ãåºã¾ãã</p>`
+            : `<p class="preview-empty">Ã£ÂÂ¢Ã£ÂÂ¼Ã£ÂÂÃ£ÂÂÃ©ÂÂ¸Ã£ÂÂÃ£ÂÂ§Ã£ÂÂÃ¥Â·Â®Ã¥ÂÂÃ£ÂÂÃ¤Â½ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ¦ÂÂ¼Ã£ÂÂÃ£ÂÂ¨Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ«Ã¥Â¤ÂÃ¦ÂÂ´Ã¦Â¡ÂÃ£ÂÂÃ¥ÂÂºÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>`
         }
       </section>
 
       <div class="action-row">
-        <button type="button" class="soft-button" data-action="navigate" data-view="today">æ»ã</button>
-        <button type="button" class="action-button action-button--primary" data-action="apply-replan">ãã®å¤æ´ãé©ç¨</button>
+        <button type="button" class="soft-button" data-action="navigate" data-view="today">Ã¦ÂÂ»Ã£ÂÂ</button>
+        <button type="button" class="action-button action-button--primary" data-action="apply-replan">Ã£ÂÂÃ£ÂÂ®Ã¥Â¤ÂÃ¦ÂÂ´Ã£ÂÂÃ©ÂÂ©Ã§ÂÂ¨</button>
       </div>
     </section>
   `;
 }
 
-function renderPlanCard(planKey, plan, recommendedPlan, recommendedLabel = "æ¨å¥¨") {
+function renderPlanCard(planKey, plan, recommendedPlan, recommendedLabel = "Ã¦ÂÂ¨Ã¥Â¥Â¨") {
   return `
     <article class="plan-card ${recommendedPlan === planKey ? "is-recommended" : ""}">
       <div class="plan-card__head">
         <div>
           <div class="plan-card__label">${PLAN_META[planKey].label} (${PLAN_META[planKey].tag})</div>
-          <div class="plan-card__meta">${plan.minutes}å</div>
+          <div class="plan-card__meta">${plan.minutes}Ã¥ÂÂ</div>
         </div>
         ${recommendedPlan === planKey ? `<span class="status-badge status-badge--accent">${escapeHtml(recommendedLabel)}</span>` : ""}
       </div>
@@ -3112,7 +3124,7 @@ function renderEditablePlanCard(planKey, fieldName, value, hint) {
       </div>
       <label class="plan-card__editor">
         <input class="field__control" data-setup-field="${fieldName}" type="number" min="${min}" max="${max}" value="${escapeHtml(String(value))}" />
-        <span class="plan-card__unit">å</span>
+        <span class="plan-card__unit">Ã¥ÂÂ</span>
       </label>
     </article>
   `;
@@ -3133,8 +3145,8 @@ function renderBonsaiPicker(selectedKey, actionName = "select-setup-bonsai") {
   const currentKey = BONSAI_LIBRARY[selectedKey] ? selectedKey : "pine";
   return `
     <div class="field">
-      <span class="field__label">è²ã¦ãçæ ½</span>
-      <p class="section-copy">çæ ½ã®ç¨®é¡ãé¸ã³ã¾ããæ¥ãã®ãã§ãã¯ã¤ã³ã§è²ã£ã¦ããã¾ãã</p>
+      <span class="field__label">Ã¨ÂÂ²Ã£ÂÂ¦Ã£ÂÂÃ§ÂÂÃ¦Â Â½</span>
+      <p class="section-copy">Ã§ÂÂÃ¦Â Â½Ã£ÂÂ®Ã§Â¨Â®Ã©Â¡ÂÃ£ÂÂÃ©ÂÂ¸Ã£ÂÂ³Ã£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ¦ÂÂ¥Ã£ÂÂÃ£ÂÂ®Ã£ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ¯Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ§Ã¨ÂÂ²Ã£ÂÂ£Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
       <div class="bonsai-picker">
         ${Object.entries(BONSAI_LIBRARY).map(([key, bonsai]) => `
           <button type="button" class="bonsai-picker-item ${currentKey === key ? "is-active" : ""}" data-action="${actionName}" data-bonsai-key="${key}" aria-pressed="${currentKey === key ? "true" : "false"}">
@@ -3153,8 +3165,8 @@ function renderFlowerPicker(selectedType, actionName, options = {}) {
 
   return `
     <div class="field">
-      <span class="field__label">è²ã¦ãæ¤ç©</span>
-      <p class="section-copy">ç®æ¨ã®ç¨®é¡ã«åã£ãæ¤ç©ãé¸ã³ã¾ããå²ãæ¨ã¨ãã¦æé·ãã¾ãã</p>
+      <span class="field__label">Ã¨ÂÂ²Ã£ÂÂ¦Ã£ÂÂÃ¦Â¤ÂÃ§ÂÂ©</span>
+      <p class="section-copy">Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ®Ã§Â¨Â®Ã©Â¡ÂÃ£ÂÂ«Ã¥ÂÂÃ£ÂÂ£Ã£ÂÂÃ¦Â¤ÂÃ§ÂÂ©Ã£ÂÂÃ©ÂÂ¸Ã£ÂÂ³Ã£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ¥ÂÂ²Ã£ÂÂÃ¦ÂÂ¨Ã£ÂÂ¨Ã£ÂÂÃ£ÂÂ¦Ã¦ÂÂÃ©ÂÂ·Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ</p>
       <div class="flower-choice-grid">
         ${Object.entries(FLOWER_LIBRARY)
           .map(([key, flower]) => `
@@ -3366,7 +3378,7 @@ function renderFlowerArtwork(flowerType, stageIndex, options = {}) {
 }
 
 // ============================================================
-// ç®æ¨æ¤ç© SVGã¬ã³ãã©ã¼ï¼æ¢ã»æ¡ã»ãã¤ãï¼
+// Ã§ÂÂ®Ã¦Â¨ÂÃ¦Â¤ÂÃ§ÂÂ© SVGÃ£ÂÂ¬Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ¼Ã¯Â¼ÂÃ¦Â¢ÂÃ£ÂÂ»Ã¦Â¡ÂÃ£ÂÂ»Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂÃ¯Â¼Â
 // ============================================================
 
 function renderUmeBonsaiSvg(flower, stage, stageRatio) {
@@ -3509,7 +3521,7 @@ function renderSatsukiSvg(flower, stage, stageRatio) {
 }
 
 // ============================================================
-// ç¿æ£æ¤ç© SVGã¬ã³ãã©ã¼ï¼ãã¿ãã»èï¼
+// Ã§Â¿ÂÃ¦ÂÂ£Ã¦Â¤ÂÃ§ÂÂ© SVGÃ£ÂÂ¬Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ¼Ã¯Â¼ÂÃ£ÂÂÃ£ÂÂ¿Ã£ÂÂÃ£ÂÂ»Ã¨ÂÂÃ¯Â¼Â
 // ============================================================
 
 function renderMapleBonsaiSvg(b, stage, stageRatio, health) {
@@ -3599,7 +3611,7 @@ function renderMossSvg(b, stage, stageRatio, health) {
 }
 
 // ============================================================
-// æ§ãã©ã¯ã¼ SVGã¬ã³ãã©ã¼ï¼äºææ§ã®ããä¿æï¼
+// Ã¦ÂÂ§Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ¯Ã£ÂÂ¼ SVGÃ£ÂÂ¬Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ¼Ã¯Â¼ÂÃ¤ÂºÂÃ¦ÂÂÃ¦ÂÂ§Ã£ÂÂ®Ã£ÂÂÃ£ÂÂÃ¤Â¿ÂÃ¦ÂÂÃ¯Â¼Â
 // ============================================================
 
 function renderTulipFlowerSvg(flower, stage, stageRatio) {
@@ -3681,18 +3693,18 @@ function renderSunflowerFlowerSvg(flower, stage, stageRatio) {
 
   let blossom = "";
   if (stage < 3) {
-    // ç¨®ãèã®ã³: åã®ä¸ã«å°ããªä¸¸ãè½/è¾
+    // Ã§Â¨Â®Ã£ÂÂÃ¨ÂÂÃ£ÂÂ®Ã£ÂÂ³: Ã¥ÂÂÃ£ÂÂ®Ã¤Â¸ÂÃ£ÂÂ«Ã¥Â°ÂÃ£ÂÂÃ£ÂÂªÃ¤Â¸Â¸Ã£ÂÂÃ¨ÂÂ½/Ã¨ÂÂ¾
     const r = 3.5 + stage * 1.5;
     blossom = `<circle cx="60" cy="${bY + 5}" r="${r}" fill="${flower.bud}" opacity="0.82"/>`;
   } else if (stage < 6) {
-    // ã¤ã¼ã¿ãè²ã¥ã: è±å¼ãªããè¨ããã ä¸¸ãè¾ã ã
+    // Ã£ÂÂ¤Ã£ÂÂ¼Ã£ÂÂ¿Ã£ÂÂÃ¨ÂÂ²Ã£ÂÂ¥Ã£ÂÂ: Ã¨ÂÂ±Ã¥Â¼ÂÃ£ÂÂªÃ£ÂÂÃ£ÂÂÃ¨ÂÂ¨Ã£ÂÂÃ£ÂÂÃ£ÂÂ Ã¤Â¸Â¸Ã£ÂÂÃ¨ÂÂ¾Ã£ÂÂ Ã£ÂÂ
     const r = 5 + (stage - 3) * 3.5;
     blossom = `
       <circle cx="60" cy="${bY.toFixed(1)}" r="${(r + 2).toFixed(1)}" fill="${flower.center}" opacity="0.22"/>
       <circle cx="60" cy="${bY.toFixed(1)}" r="${r.toFixed(1)}" fill="${flower.bud}" opacity="0.9"/>
     `;
   } else {
-    // å²ãå§ãä»¥é: è±å¼ãéã
+    // Ã¥ÂÂ²Ã£ÂÂÃ¥Â§ÂÃ£ÂÂÃ¤Â»Â¥Ã©ÂÂ: Ã¨ÂÂ±Ã¥Â¼ÂÃ£ÂÂÃ©ÂÂÃ£ÂÂ
     const petalCount = Math.round(10 + (stage - 6) * 1.5);
     const centerR = 7 + (stage - 6) * 2.2;
     const petalL = 12 + (stage - 6) * 4 + stageRatio * 4;
@@ -3799,7 +3811,7 @@ function renderWindowField(label, startKey, endKey, startValue, endValue) {
       <span class="field__label">${label}</span>
       <div class="time-pair">
         <input class="field__control time-pair__input" data-setup-field="${startKey}" type="text" inputmode="numeric" autocomplete="off" placeholder="05:30" value="${escapeHtml(startValue)}" />
-        <span>ã</span>
+        <span>Ã£ÂÂ</span>
         <input class="field__control time-pair__input" data-setup-field="${endKey}" type="text" inputmode="numeric" autocomplete="off" placeholder="06:00" value="${escapeHtml(endValue)}" />
       </div>
     </div>
@@ -3820,7 +3832,7 @@ function renderSessionSheet() {
   const overtime = state.activeSession && remaining <= 0;
   const milestoneOptions = normalizeRoadmapItems(state.roadmap, state.setup)
     .map(
-      (item) => `<option value="${escapeHtml(item.id)}" ${ui.finishDraft && ui.finishDraft.milestoneId === item.id ? "selected" : ""}>${escapeHtml(item.label)} / ç®å® ${item.target}%</option>`,
+      (item) => `<option value="${escapeHtml(item.id)}" ${ui.finishDraft && ui.finishDraft.milestoneId === item.id ? "selected" : ""}>${escapeHtml(item.label)} / Ã§ÂÂ®Ã¥Â®Â ${item.target}%</option>`,
     )
     .join("");
 
@@ -3835,7 +3847,7 @@ function renderSessionSheet() {
             .map(
               (key) => `
                 <button type="button" class="pill-button ${displayPlanKey === key ? "is-active" : ""}" data-action="select-session-plan" data-plan="${key}">
-                  ${PLAN_META[key].label}<br /><span class="muted">${state.plans[key].minutes}å</span>
+                  ${PLAN_META[key].label}<br /><span class="muted">${state.plans[key].minutes}Ã¥ÂÂ</span>
                 </button>
               `,
             )
@@ -3854,43 +3866,43 @@ function renderSessionSheet() {
                     inputmode="decimal"
                     autocomplete="off"
                     data-finish-field="elapsedInput"
-                    placeholder="å"
+                    placeholder="Ã¥ÂÂ"
                     value="${escapeHtml(formatElapsedForInput(ui.finishDraft.elapsedSeconds))}"
                   />
-                  <span class="elapsed-timer-unit">${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : "å:ç§"}</span>
+                  <span class="elapsed-timer-unit">${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : "Ã¥ÂÂ:Ã§Â§Â"}</span>
                 </div>
-                <p class="sheet__caption">å®è¡æé / äºå® ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">â± ã¿ãããã¦ä¿®æ­£ï¼ä¾: 10 ã¾ãã¯ 1:30ï¼</span></p>
+                <p class="sheet__caption">Ã¥Â®ÂÃ¨Â¡ÂÃ¦ÂÂÃ©ÂÂ / Ã¤ÂºÂÃ¥Â®Â ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">Ã¢ÂÂ± Ã£ÂÂ¿Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¦Ã¤Â¿Â®Ã¦Â­Â£Ã¯Â¼ÂÃ¤Â¾Â: 10 Ã£ÂÂ¾Ã£ÂÂÃ£ÂÂ¯ 1:30Ã¯Â¼Â</span></p>
               </div>
               <div class="panel stack">
-                <h3 class="panel__title">è¨é²ã®ä»ä¸ã</h3>
+                <h3 class="panel__title">Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂ®Ã¤Â»ÂÃ¤Â¸ÂÃ£ÂÂ</h3>
                 ${state.setup.goalType !== "habit" ? `
                 <div class="field-grid field-grid--two">
                   <label class="field">
-                    <span class="field__label">é²ãã ãã¤ã«ã¹ãã¼ã³</span>
+                    <span class="field__label">Ã©ÂÂ²Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³</span>
                     <select class="field__control" data-finish-field="milestoneId">
-                      <option value="">ä»åã¯æ´æ°ããªã</option>
+                      <option value="">Ã¤Â»ÂÃ¥ÂÂÃ£ÂÂ¯Ã¦ÂÂ´Ã¦ÂÂ°Ã£ÂÂÃ£ÂÂªÃ£ÂÂ</option>
                       ${milestoneOptions}
                     </select>
                   </label>
                   <label class="field">
-                    <span class="field__label">ãã®ç¯ç®ã®æ±ã</span>
+                    <span class="field__label">Ã£ÂÂÃ£ÂÂ®Ã§Â¯ÂÃ§ÂÂ®Ã£ÂÂ®Ã¦ÂÂ±Ã£ÂÂ</span>
                     <select class="field__control" data-finish-field="milestoneStatus">
-                      <option value="working" ${ui.finishDraft.milestoneStatus === "working" ? "selected" : ""}>ã¾ã éä¸­</option>
-                      <option value="complete" ${ui.finishDraft.milestoneStatus === "complete" ? "selected" : ""}>ããã¾ã§å®äº</option>
+                      <option value="working" ${ui.finishDraft.milestoneStatus === "working" ? "selected" : ""}>Ã£ÂÂ¾Ã£ÂÂ Ã©ÂÂÃ¤Â¸Â­</option>
+                      <option value="complete" ${ui.finishDraft.milestoneStatus === "complete" ? "selected" : ""}>Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂ§Ã¥Â®ÂÃ¤ÂºÂ</option>
                     </select>
                   </label>
                 </div>` : ""}
                 <label class="field">
-                  <span class="field__label">ã²ã¨ãã¨</span>
-                  <textarea data-finish-field="reflection" placeholder="ä»»æãæ°ã¥ããããã°ä¸è¨ã ã">${escapeHtml(ui.finishDraft.reflection)}</textarea>
+                  <span class="field__label">Ã£ÂÂ²Ã£ÂÂ¨Ã£ÂÂÃ£ÂÂ¨</span>
+                  <textarea data-finish-field="reflection" placeholder="Ã¤Â»Â»Ã¦ÂÂÃ£ÂÂÃ¦Â°ÂÃ£ÂÂ¥Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ°Ã¤Â¸ÂÃ¨Â¨ÂÃ£ÂÂ Ã£ÂÂ">${escapeHtml(ui.finishDraft.reflection)}</textarea>
                 </label>
               </div>
             `
             : `
               <div class="panel panel--cool">
                 ${state.setup.goal ? `<p style="font-size:0.8rem;font-weight:600;opacity:0.6;text-align:center;margin:0 0 2px;letter-spacing:0.02em">${escapeHtml(state.setup.goal)}</p>` : ""}
-                <p class="sheet__timer" id="session-timer-value">${overtime ? "æéã§ã" : (ui.focusPausedAt ? "â¸" : formatCountdown(remaining))}</p>
-                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">é¢è± ${state.activeSession.departures}å<\/p>` : ""}
+                <p class="sheet__timer" id="session-timer-value">${overtime ? "Ã¦ÂÂÃ©ÂÂÃ£ÂÂ§Ã£ÂÂ" : (ui.focusPausedAt ? "Ã¢ÂÂ¸" : formatCountdown(remaining))}</p>
+                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">Ã©ÂÂ¢Ã¨ÂÂ± ${state.activeSession.departures}Ã¥ÂÂ<\/p>` : ""}
               </div>
             `
         }
@@ -3899,18 +3911,18 @@ function renderSessionSheet() {
           ${
             ui.finishDraft
               ? `
-                <button type="button" class="action-button action-button--primary" data-action="save-finish-log">è¨é²ãã¦éãã</button>
-                <button type="button" class="soft-button" data-action="cancel-finish">ã¿ã¤ãã¼ã«æ»ã</button>
+                <button type="button" class="action-button action-button--primary" data-action="save-finish-log">Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ£ÂÂ¦Ã©ÂÂÃ£ÂÂÃ£ÂÂ</button>
+                <button type="button" class="soft-button" data-action="cancel-finish">Ã£ÂÂ¿Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ«Ã¦ÂÂ»Ã£ÂÂ</button>
               `
               : state.activeSession
                 ? `
-                  <button type="button" class="action-button action-button--primary" data-action="complete-session">å®äºãè¨é²ãã</button>
-                  <button type="button" class="action-button" data-action="downgrade-session">ãã£ã¨è»½ããã¦çå°ãã</button>
-                  <button type="button" class="soft-button" data-action="close-session">éãã</button>
+                  <button type="button" class="action-button action-button--primary" data-action="complete-session">Ã¥Â®ÂÃ¤ÂºÂÃ£ÂÂÃ¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ£ÂÂ</button>
+                  <button type="button" class="action-button" data-action="downgrade-session">Ã£ÂÂÃ£ÂÂ£Ã£ÂÂ¨Ã¨Â»Â½Ã£ÂÂÃ£ÂÂÃ£ÂÂ¦Ã§ÂÂÃ¥ÂÂ°Ã£ÂÂÃ£ÂÂ</button>
+                  <button type="button" class="soft-button" data-action="close-session">Ã©ÂÂÃ£ÂÂÃ£ÂÂ</button>
                 `
                 : `
-                  <button type="button" class="action-button action-button--primary" data-action="begin-session">ãã®ãã©ã³ã§å§ãã</button>
-                  <button type="button" class="soft-button" data-action="close-session">ãã¨ã§</button>
+                  <button type="button" class="action-button action-button--primary" data-action="begin-session">Ã£ÂÂÃ£ÂÂ®Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ³Ã£ÂÂ§Ã¥Â§ÂÃ£ÂÂÃ£ÂÂ</button>
+                  <button type="button" class="soft-button" data-action="close-session">Ã£ÂÂÃ£ÂÂ¨Ã£ÂÂ§</button>
                 `
           }
         </div>
@@ -3970,10 +3982,10 @@ function pauseFocusSession() {
 function sendFocusNotification() {
   if (!("Notification" in window)) return;
   if (Notification.permission === "granted") {
-    new Notification("â¸ ä½æ¥­ä¸­ã§ãï¼", { body: "StreakBonsaiã«æ»ã£ã¦ã¿ã¤ãã¼ãåéãã¦ãã ãã", icon: "./bonsai-favicon.svg" });
+    new Notification("Ã¢ÂÂ¸ Ã¤Â½ÂÃ¦Â¥Â­Ã¤Â¸Â­Ã£ÂÂ§Ã£ÂÂÃ¯Â¼Â", { body: "StreakBonsaiÃ£ÂÂ«Ã¦ÂÂ»Ã£ÂÂ£Ã£ÂÂ¦Ã£ÂÂ¿Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂÃ¥ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂ", icon: "./bonsai-favicon.svg" });
   } else if (Notification.permission !== "denied") {
     Notification.requestPermission().then(p => {
-      if (p === "granted") new Notification("â¸ ä½æ¥­ä¸­ã§ãï¼", { body: "StreakBonsaiã«æ»ã£ã¦ã¿ã¤ãã¼ãåéãã¦ãã ãã", icon: "./bonsai-favicon.svg" });
+      if (p === "granted") new Notification("Ã¢ÂÂ¸ Ã¤Â½ÂÃ¦Â¥Â­Ã¤Â¸Â­Ã£ÂÂ§Ã£ÂÂÃ¯Â¼Â", { body: "StreakBonsaiÃ£ÂÂ«Ã¦ÂÂ»Ã£ÂÂ£Ã£ÂÂ¦Ã£ÂÂ¿Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂÃ¥ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂ", icon: "./bonsai-favicon.svg" });
     });
   }
 }
@@ -3986,7 +3998,7 @@ function resumeFocusSession() {
   ui.focusPausedAt = null;
   hideFocusLostOverlay();
   const d = state.activeSession.departures || 0;
-  showToast(`ä½æ¥­åéï¼ é¢è±: ${d}å`);
+  showToast(`Ã¤Â½ÂÃ¦Â¥Â­Ã¥ÂÂÃ©ÂÂÃ¯Â¼Â Ã©ÂÂ¢Ã¨ÂÂ±: ${d}Ã¥ÂÂ`);
   startSessionTicker();
   saveState();
   render();
@@ -3998,7 +4010,7 @@ function showFocusLostOverlay() {
     overlay = document.createElement("div");
     overlay.id = "focus-lost-overlay";
     overlay.style.cssText = "position:fixed;inset:0;z-index:9998;background:rgba(20,16,10,0.82);backdrop-filter:blur(4px);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;gap:14px";
-    overlay.innerHTML = '<div style="font-size:2.8rem">â¸<\/div><p style="font-size:1.1rem;font-weight:700;margin:0">ã¿ã¤ãã¼ãä¸æåæ­¢ãã¾ãã<\/p><p style="font-size:0.88rem;opacity:0.75;margin:0">ãã®ã¿ãã«æ»ãã¨åéãã¾ã<\/p>';
+    overlay.innerHTML = '<div style="font-size:2.8rem">Ã¢ÂÂ¸<\/div><p style="font-size:1.1rem;font-weight:700;margin:0">Ã£ÂÂ¿Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂÃ¤Â¸ÂÃ¦ÂÂÃ¥ÂÂÃ¦Â­Â¢Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ<\/p><p style="font-size:0.88rem;opacity:0.75;margin:0">Ã£ÂÂÃ£ÂÂ®Ã£ÂÂ¿Ã£ÂÂÃ£ÂÂ«Ã¦ÂÂ»Ã£ÂÂÃ£ÂÂ¨Ã¥ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂ<\/p>';
     document.body.appendChild(overlay);
   }
   overlay.hidden = false;
@@ -4168,7 +4180,7 @@ function computeRoadmap(currentState) {
   const milestones = stagedMilestones.map((item) => ({
     ...item,
     isActive: Boolean(currentMilestone && item.id === currentMilestone.id),
-    state: item.isComplete ? "å°éæ¸ã¿" : currentMilestone && item.id === currentMilestone.id ? "ãã¾ãã" : "ãããã",
+    state: item.isComplete ? "Ã¥ÂÂ°Ã©ÂÂÃ¦Â¸ÂÃ£ÂÂ¿" : currentMilestone && item.id === currentMilestone.id ? "Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ" : "Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ",
   }));
 
   return {
@@ -4214,10 +4226,10 @@ function inferWindowState(currentState) {
 
   if (minute < primary.start) {
     return {
-      badge: "æ¬¡ã¯å®æ½æé",
-      windowLabel: `å®æ½æé ${currentState.setup.primaryWindow}`,
-      actionLabel: `å®æ½æéã« ${PLAN_META[baselinePlan].label} ããä»æ¥ã®1æ¬ãçµãã¾ã`,
-      copy: "ã¾ã å®æ½æéåã§ããæéã«ãªã£ããå§ããã°ååã§ãã",
+      badge: "Ã¦Â¬Â¡Ã£ÂÂ¯Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ",
+      windowLabel: `Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ ${currentState.setup.primaryWindow}`,
+      actionLabel: `Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ« ${PLAN_META[baselinePlan].label} Ã£ÂÂÃ£ÂÂÃ¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®1Ã¦ÂÂ¬Ã£ÂÂÃ§ÂµÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂ`,
+      copy: "Ã£ÂÂ¾Ã£ÂÂ Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ¥ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂÃ¦ÂÂÃ©ÂÂÃ£ÂÂ«Ã£ÂÂªÃ£ÂÂ£Ã£ÂÂÃ£ÂÂÃ¥Â§ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ°Ã¥ÂÂÃ¥ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ",
       tone: "accent",
       planCap: baselinePlan,
     };
@@ -4225,20 +4237,20 @@ function inferWindowState(currentState) {
 
   if (minute <= primary.end) {
     return {
-      badge: "ãã¾å®æ½æé",
+      badge: "Ã£ÂÂÃ£ÂÂ¾Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ",
       windowLabel: currentState.setup.primaryWindow,
-      actionLabel: `ãã¾å§ãããªã ${PLAN_META[baselinePlan].label} ã§ä»æ¥ã®1æ¬ãçµãã`,
-      copy: "ä»æ¥ã®1æ¬ãé²ããæéå¸¯ã§ãã",
+      actionLabel: `Ã£ÂÂÃ£ÂÂ¾Ã¥Â§ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂªÃ£ÂÂ ${PLAN_META[baselinePlan].label} Ã£ÂÂ§Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®1Ã¦ÂÂ¬Ã£ÂÂÃ§ÂµÂÃ£ÂÂÃ£ÂÂ`,
+      copy: "Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®1Ã¦ÂÂ¬Ã£ÂÂÃ©ÂÂ²Ã£ÂÂÃ£ÂÂÃ¦ÂÂÃ©ÂÂÃ¥Â¸Â¯Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ",
       tone: "accent",
       planCap: baselinePlan,
     };
   }
 
   return {
-    badge: "å®æ½æéå¾",
-    windowLabel: `å®æ½æé ${currentState.setup.primaryWindow}`,
-    actionLabel: `ããããå§ãããªã ${PLAN_META.C.label} ã§è¨é²ãæ®ãã°ååã§ã`,
-    copy: "å®æ½æéã¯çµããã¾ãããä»æ¥ã¯æå°åä½ã§ã¤ãªããã°ååã§ãã",
+    badge: "Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ¥Â¾Â",
+    windowLabel: `Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂ ${currentState.setup.primaryWindow}`,
+    actionLabel: `Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ¥Â§ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂªÃ£ÂÂ ${PLAN_META.C.label} Ã£ÂÂ§Ã¨Â¨ÂÃ©ÂÂ²Ã£ÂÂÃ¦Â®ÂÃ£ÂÂÃ£ÂÂ°Ã¥ÂÂÃ¥ÂÂÃ£ÂÂ§Ã£ÂÂ`,
+    copy: "Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ¯Ã§ÂµÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ¯Ã¦ÂÂÃ¥Â°ÂÃ¥ÂÂÃ¤Â½ÂÃ£ÂÂ§Ã£ÂÂ¤Ã£ÂÂªÃ£ÂÂÃ£ÂÂÃ£ÂÂ°Ã¥ÂÂÃ¥ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ",
     tone: "default",
     planCap: "C",
   };
@@ -4248,24 +4260,24 @@ function generateReviewSuggestions(metrics, currentState) {
   const reasons = topReasons(currentState.logs, 3).map((item) => item.reason);
   const suggestions = [];
 
-  if (reasons.some((reason) => reason.includes("æ®æ¥­"))) {
-    suggestions.push("ç«æã¯æåããPlan Bã«ãã");
+  if (reasons.some((reason) => reason.includes("Ã¦Â®ÂÃ¦Â¥Â­"))) {
+    suggestions.push("Ã§ÂÂ«Ã¦ÂÂÃ£ÂÂ¯Ã¦ÂÂÃ¥ÂÂÃ£ÂÂÃ£ÂÂPlan BÃ£ÂÂ«Ã£ÂÂÃ£ÂÂ");
   }
 
   if (metrics.rescueRate >= 20 || currentState.planTuning.rescuePrimaryDays.length > 0) {
-    suggestions.push("éæã¯ææ¸æ ãä¸»æ æ±ãã«ãã");
+    suggestions.push("Ã©ÂÂÃ¦ÂÂÃ£ÂÂ¯Ã¦ÂÂÃ¦Â¸ÂÃ¦ÂÂ Ã£ÂÂÃ¤Â¸Â»Ã¦ÂÂ Ã¦ÂÂ±Ã£ÂÂÃ£ÂÂ«Ã£ÂÂÃ£ÂÂ");
   }
 
-  if (reasons.some((reason) => reason.includes("æºå"))) {
-    suggestions.push("éå§åã®æºåã¯2åã¦ã©ã¼ã ã¢ããã«åãã");
-  } else if (reasons.some((reason) => reason.includes("ã¿ã¹ã¯"))) {
-    suggestions.push("å¤ã¯æè¨ç³»ãæã¯æ¼ç¿ç³»ã«åãã");
+  if (reasons.some((reason) => reason.includes("Ã¦ÂºÂÃ¥ÂÂ"))) {
+    suggestions.push("Ã©ÂÂÃ¥Â§ÂÃ¥ÂÂÃ£ÂÂ®Ã¦ÂºÂÃ¥ÂÂÃ£ÂÂ¯2Ã¥ÂÂÃ£ÂÂ¦Ã£ÂÂ©Ã£ÂÂ¼Ã£ÂÂ Ã£ÂÂ¢Ã£ÂÂÃ£ÂÂÃ£ÂÂ«Ã¥ÂÂÃ£ÂÂÃ£ÂÂ");
+  } else if (reasons.some((reason) => reason.includes("Ã£ÂÂ¿Ã£ÂÂ¹Ã£ÂÂ¯"))) {
+    suggestions.push("Ã¥Â¤ÂÃ£ÂÂ¯Ã¦ÂÂÃ¨Â¨ÂÃ§Â³Â»Ã£ÂÂÃ¦ÂÂÃ£ÂÂ¯Ã¦Â¼ÂÃ§Â¿ÂÃ§Â³Â»Ã£ÂÂ«Ã¥ÂÂÃ£ÂÂÃ£ÂÂ");
   } else {
-    suggestions.push("æ¬¡ã®1æ¬ã¯âååã ãâã¾ã§ã«åã£ã¦ãã");
+    suggestions.push("Ã¦Â¬Â¡Ã£ÂÂ®1Ã¦ÂÂ¬Ã£ÂÂ¯Ã¢ÂÂÃ¥ÂÂÃ¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¢ÂÂÃ£ÂÂ¾Ã£ÂÂ§Ã£ÂÂ«Ã¥ÂÂÃ£ÂÂ£Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂ");
   }
 
   while (suggestions.length < 3) {
-    suggestions.push("ä»é±ã®å°éç¹ã¯1æ®µã ãå°ãããã");
+    suggestions.push("Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹Ã£ÂÂ¯1Ã¦Â®ÂµÃ£ÂÂ Ã£ÂÂÃ¥Â°ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ");
   }
 
   return suggestions.slice(0, 3);
@@ -4278,51 +4290,51 @@ function generateReplanPreview(mode, text, currentState) {
   const nextItem = getNextRoadmapItem(roadmap);
   const todayPlan = getRecommendedPlan(currentState);
   const nextPlan = nextPlanDown(todayPlan);
-  const heavyReason = normalized.includes("æ®æ¥­") || normalized.includes("å¿");
-  const fatigueReason = normalized.includes("ç²") || normalized.includes("ç ");
-  const prepReason = normalized.includes("æºå") || normalized.includes("é¢å");
+  const heavyReason = normalized.includes("Ã¦Â®ÂÃ¦Â¥Â­") || normalized.includes("Ã¥Â¿Â");
+  const fatigueReason = normalized.includes("Ã§ÂÂ²") || normalized.includes("Ã§ÂÂ ");
+  const prepReason = normalized.includes("Ã¦ÂºÂÃ¥ÂÂ") || normalized.includes("Ã©ÂÂ¢Ã¥ÂÂ");
 
   if (mode === "retarget_goal") {
     const retargeted = buildRetargetResult(currentState);
     const nextWeek = getWeekRoadmapItem(retargeted.roadmap);
     const nextRoadmapStep = getNextRoadmapItem(retargeted.roadmap);
     return [
-      `ç®æ¨ãã${currentState.setup.goal}ã -> ã${retargeted.setup.goal}ãã«æ´æ°`,
-      `ä»æ¥ã®ããã·ã§ã³ãã${currentState.today.missionTitle}ã -> ã${retargeted.today.missionTitle}ãã«æ´æ°`,
-      `ä»é±ã®å°éç¹ãã${weekItem ? weekItem.label : "ä»é±ã®å°éç¹"}ã -> ã${nextWeek ? nextWeek.label : "ä»é±ã®å°éç¹"}ãã«æ´æ°`,
-      `æ¬¡ã®ä¸æ­©ãã${nextItem ? nextItem.label : "æ¬¡ã®ä¸æ­©"}ã -> ã${nextRoadmapStep ? nextRoadmapStep.label : "æ¬¡ã®ä¸æ­©"}ãã«æ´æ°`,
-      "æ®ãã®Roadmapã¯ç®æ¨ã¨ç¾å¨å°ããèªåã§ä½ãç´ãã¾ãã",
+      `Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂÃ£ÂÂ${currentState.setup.goal}Ã£ÂÂ -> Ã£ÂÂ${retargeted.setup.goal}Ã£ÂÂÃ£ÂÂ«Ã¦ÂÂ´Ã¦ÂÂ°`,
+      `Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã£ÂÂÃ£ÂÂÃ£ÂÂ·Ã£ÂÂ§Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ${currentState.today.missionTitle}Ã£ÂÂ -> Ã£ÂÂ${retargeted.today.missionTitle}Ã£ÂÂÃ£ÂÂ«Ã¦ÂÂ´Ã¦ÂÂ°`,
+      `Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹Ã£ÂÂÃ£ÂÂ${weekItem ? weekItem.label : "Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹"}Ã£ÂÂ -> Ã£ÂÂ${nextWeek ? nextWeek.label : "Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹"}Ã£ÂÂÃ£ÂÂ«Ã¦ÂÂ´Ã¦ÂÂ°`,
+      `Ã¦Â¬Â¡Ã£ÂÂ®Ã¤Â¸ÂÃ¦Â­Â©Ã£ÂÂÃ£ÂÂ${nextItem ? nextItem.label : "Ã¦Â¬Â¡Ã£ÂÂ®Ã¤Â¸ÂÃ¦Â­Â©"}Ã£ÂÂ -> Ã£ÂÂ${nextRoadmapStep ? nextRoadmapStep.label : "Ã¦Â¬Â¡Ã£ÂÂ®Ã¤Â¸ÂÃ¦Â­Â©"}Ã£ÂÂÃ£ÂÂ«Ã¦ÂÂ´Ã¦ÂÂ°`,
+      "Ã¦Â®ÂÃ£ÂÂÃ£ÂÂ®RoadmapÃ£ÂÂ¯Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ¨Ã§ÂÂ¾Ã¥ÂÂ¨Ã¥ÂÂ°Ã£ÂÂÃ£ÂÂÃ¨ÂÂªÃ¥ÂÂÃ£ÂÂ§Ã¤Â½ÂÃ£ÂÂÃ§ÂÂ´Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ",
     ];
   }
 
   if (mode === "lighten_today") {
     return [
-      `ä»æ¥ã®éå§ãã©ã³ã ${PLAN_META[todayPlan].label} -> ${PLAN_META[nextPlan].label} ã«å¤æ´`,
-      `ä»æ¥ã®ããã·ã§ã³ãã${currentState.today.missionTitle}ã -> ã${shortenMission(currentState.today.missionTitle)}ãã«ç­ç¸®`,
-      heavyReason ? `ä»æ¥ã¯ä¸»æ ãè¿½ãããäºåæ  ${currentState.setup.backupWindow} ãåªåè¡¨ç¤º` : `ææ¸ã®å®ç¾©ãã${currentState.plans.C.description}ãã®ã¾ã¾åºå®`,
+      `Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã©ÂÂÃ¥Â§ÂÃ£ÂÂÃ£ÂÂ©Ã£ÂÂ³Ã£ÂÂ ${PLAN_META[todayPlan].label} -> ${PLAN_META[nextPlan].label} Ã£ÂÂ«Ã¥Â¤ÂÃ¦ÂÂ´`,
+      `Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã£ÂÂÃ£ÂÂÃ£ÂÂ·Ã£ÂÂ§Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ${currentState.today.missionTitle}Ã£ÂÂ -> Ã£ÂÂ${shortenMission(currentState.today.missionTitle)}Ã£ÂÂÃ£ÂÂ«Ã§ÂÂ­Ã§Â¸Â®`,
+      heavyReason ? `Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ¯Ã¤Â¸Â»Ã¦ÂÂ Ã£ÂÂÃ¨Â¿Â½Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¤ÂºÂÃ¥ÂÂÃ¦ÂÂ  ${currentState.setup.backupWindow} Ã£ÂÂÃ¥ÂÂªÃ¥ÂÂÃ¨Â¡Â¨Ã§Â¤Âº` : `Ã¦ÂÂÃ¦Â¸ÂÃ£ÂÂ®Ã¥Â®ÂÃ§Â¾Â©Ã£ÂÂÃ£ÂÂ${currentState.plans.C.description}Ã£ÂÂÃ£ÂÂ®Ã£ÂÂ¾Ã£ÂÂ¾Ã¥ÂÂºÃ¥Â®Â`,
     ];
   }
 
   if (mode === "reset_week") {
     return [
-      `${weekdayLabel("Tue")}ã®éå§ãã©ã³ã Plan A -> Plan B ã«å¤æ´`,
-      `${weekdayLabel("Fri")}ã¯ææ¸æ  ${currentState.setup.rescueWindow} ãä¸»æ æ±ãã«ãã`,
-      `ä»é±ã®å°éç¹ãã${weekItem ? weekItem.label : "ä»é±ã®å°éç¹"}ã -> ãä»é±: ${lighterWeeklyFocus(weekItem ? weekItem.label : "ä»é±: åå")}ãã«ä¿®æ­£`,
+      `${weekdayLabel("Tue")}Ã£ÂÂ®Ã©ÂÂÃ¥Â§ÂÃ£ÂÂÃ£ÂÂ©Ã£ÂÂ³Ã£ÂÂ Plan A -> Plan B Ã£ÂÂ«Ã¥Â¤ÂÃ¦ÂÂ´`,
+      `${weekdayLabel("Fri")}Ã£ÂÂ¯Ã¦ÂÂÃ¦Â¸ÂÃ¦ÂÂ  ${currentState.setup.rescueWindow} Ã£ÂÂÃ¤Â¸Â»Ã¦ÂÂ Ã¦ÂÂ±Ã£ÂÂÃ£ÂÂ«Ã£ÂÂÃ£ÂÂ`,
+      `Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹Ã£ÂÂÃ£ÂÂ${weekItem ? weekItem.label : "Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹"}Ã£ÂÂ -> Ã£ÂÂÃ¤Â»ÂÃ©ÂÂ±: ${lighterWeeklyFocus(weekItem ? weekItem.label : "Ã¤Â»ÂÃ©ÂÂ±: Ã¥ÂÂÃ¥ÂÂ")}Ã£ÂÂÃ£ÂÂ«Ã¤Â¿Â®Ã¦Â­Â£`,
     ];
   }
 
   if (mode === "break_goal") {
     return [
-      `æ¬¡ã®ä¸æ­©ãã${nextItem ? nextItem.label : "æ¬¡ã®ä¸æ­©"}ã -> ãæ¬¡: ${microStepFromMission(currentState.today.missionTitle)}ãã«å¤æ´`,
-      `ä»é±ã®å°éç¹ãã${weekItem ? weekItem.label : "ä»é±ã®å°éç¹"}ã -> ãä»é±: ååã ãå®äºãã«åè§£`,
-      `æå°å­¦ç¿ä¾ã«ã${warmupExample(currentState.setup.minimumExample)}ããè¿½å `,
+      `Ã¦Â¬Â¡Ã£ÂÂ®Ã¤Â¸ÂÃ¦Â­Â©Ã£ÂÂÃ£ÂÂ${nextItem ? nextItem.label : "Ã¦Â¬Â¡Ã£ÂÂ®Ã¤Â¸ÂÃ¦Â­Â©"}Ã£ÂÂ -> Ã£ÂÂÃ¦Â¬Â¡: ${microStepFromMission(currentState.today.missionTitle)}Ã£ÂÂÃ£ÂÂ«Ã¥Â¤ÂÃ¦ÂÂ´`,
+      `Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹Ã£ÂÂÃ£ÂÂ${weekItem ? weekItem.label : "Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹"}Ã£ÂÂ -> Ã£ÂÂÃ¤Â»ÂÃ©ÂÂ±: Ã¥ÂÂÃ¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¥Â®ÂÃ¤ÂºÂÃ£ÂÂÃ£ÂÂ«Ã¥ÂÂÃ¨Â§Â£`,
+      `Ã¦ÂÂÃ¥Â°ÂÃ¥Â­Â¦Ã§Â¿ÂÃ¤Â¾ÂÃ£ÂÂ«Ã£ÂÂ${warmupExample(currentState.setup.minimumExample)}Ã£ÂÂÃ£ÂÂÃ¨Â¿Â½Ã¥ÂÂ `,
     ];
   }
 
   return [
-    heavyReason ? `æ®æ¥­ãç¶ãåæã§ã${weekdayLabel("Tue")}ã¨${weekdayLabel("Thu")}ãæåããPlan Bã«å¤æ´` : "è©°ã¾ããåºãããææ¥ãPlan Bå§ã¾ãã«å¤æ´",
-    fatigueReason ? `éå¸¸å­¦ç¿æéã ${currentState.setup.normalMinutes}å -> ${Math.max(10, currentState.setup.normalMinutes - 5)}å ã«èª¿æ´` : "éå§ãã¼ãã«ãä¸ãããããæå°åä½ãå®ã£ãã¾ã¾ä¸»æ ã®è² è·ã ãä¸ãã",
-    prepReason ? `éå§å2åã®ã¦ã©ã¼ã ã¢ããã${warmupExample(currentState.setup.minimumExample)}ããè¿½å ` : "ä»æ¥ã®ããã·ã§ã³ã®åã«2åã®ã¦ã©ã¼ã ã¢ãããè¿½å ",
+    heavyReason ? `Ã¦Â®ÂÃ¦Â¥Â­Ã£ÂÂÃ§Â¶ÂÃ£ÂÂÃ¥ÂÂÃ¦ÂÂÃ£ÂÂ§Ã£ÂÂ${weekdayLabel("Tue")}Ã£ÂÂ¨${weekdayLabel("Thu")}Ã£ÂÂÃ¦ÂÂÃ¥ÂÂÃ£ÂÂÃ£ÂÂPlan BÃ£ÂÂ«Ã¥Â¤ÂÃ¦ÂÂ´` : "Ã¨Â©Â°Ã£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ¥ÂÂºÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ¦ÂÂÃ¦ÂÂ¥Ã£ÂÂPlan BÃ¥Â§ÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ«Ã¥Â¤ÂÃ¦ÂÂ´",
+    fatigueReason ? `Ã©ÂÂÃ¥Â¸Â¸Ã¥Â­Â¦Ã§Â¿ÂÃ¦ÂÂÃ©ÂÂÃ£ÂÂ ${currentState.setup.normalMinutes}Ã¥ÂÂ -> ${Math.max(10, currentState.setup.normalMinutes - 5)}Ã¥ÂÂ Ã£ÂÂ«Ã¨ÂªÂ¿Ã¦ÂÂ´` : "Ã©ÂÂÃ¥Â§ÂÃ£ÂÂÃ£ÂÂ¼Ã£ÂÂÃ£ÂÂ«Ã£ÂÂÃ¤Â¸ÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ¦ÂÂÃ¥Â°ÂÃ¥ÂÂÃ¤Â½ÂÃ£ÂÂÃ¥Â®ÂÃ£ÂÂ£Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂ¾Ã¤Â¸Â»Ã¦ÂÂ Ã£ÂÂ®Ã¨Â²Â Ã¨ÂÂ·Ã£ÂÂ Ã£ÂÂÃ¤Â¸ÂÃ£ÂÂÃ£ÂÂ",
+    prepReason ? `Ã©ÂÂÃ¥Â§ÂÃ¥ÂÂ2Ã¥ÂÂÃ£ÂÂ®Ã£ÂÂ¦Ã£ÂÂ©Ã£ÂÂ¼Ã£ÂÂ Ã£ÂÂ¢Ã£ÂÂÃ£ÂÂÃ£ÂÂ${warmupExample(currentState.setup.minimumExample)}Ã£ÂÂÃ£ÂÂÃ¨Â¿Â½Ã¥ÂÂ ` : "Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ®Ã£ÂÂÃ£ÂÂÃ£ÂÂ·Ã£ÂÂ§Ã£ÂÂ³Ã£ÂÂ®Ã¥ÂÂÃ£ÂÂ«2Ã¥ÂÂÃ£ÂÂ®Ã£ÂÂ¦Ã£ÂÂ©Ã£ÂÂ¼Ã£ÂÂ Ã£ÂÂ¢Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¨Â¿Â½Ã¥ÂÂ ",
   ];
 }
 
@@ -4344,7 +4356,7 @@ function applyReplan(mode, preview) {
   if (mode === "lighten_today") {
     state.today.recommendedPlan = nextPlanDown(getRecommendedPlan(state));
     state.today.missionTitle = shortenMission(state.today.missionTitle);
-    state.today.missionNote = `ä»æ¥ã¯è»½éçã§ã¤ãªãæ¥ã§ãã${state.today.missionNote}`;
+    state.today.missionNote = `Ã¤Â»ÂÃ¦ÂÂ¥Ã£ÂÂ¯Ã¨Â»Â½Ã©ÂÂÃ§ÂÂÃ£ÂÂ§Ã£ÂÂ¤Ã£ÂÂªÃ£ÂÂÃ¦ÂÂ¥Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ${state.today.missionNote}`;
     state.plans = buildPlans(state.setup, state.today.missionTitle);
     return;
   }
@@ -4353,7 +4365,7 @@ function applyReplan(mode, preview) {
     state.planTuning.defaultPlanByDay.Tue = "B";
     state.planTuning.rescuePrimaryDays = Array.from(new Set([...state.planTuning.rescuePrimaryDays, "Fri"]));
     state.roadmap = state.roadmap.map((item) =>
-      item.id === "week" ? { ...item, label: `ä»é±: ${lighterWeeklyFocus(item.label)}` } : item,
+      item.id === "week" ? { ...item, label: `Ã¤Â»ÂÃ©ÂÂ±: ${lighterWeeklyFocus(item.label)}` } : item,
     );
     return;
   }
@@ -4361,10 +4373,10 @@ function applyReplan(mode, preview) {
   if (mode === "break_goal") {
     state.roadmap = state.roadmap.map((item) => {
       if (item.id === "week") {
-        return { ...item, label: "ä»é±: ååã ãå®äº" };
+        return { ...item, label: "Ã¤Â»ÂÃ©ÂÂ±: Ã¥ÂÂÃ¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¥Â®ÂÃ¤ÂºÂ" };
       }
       if (item.id === "next") {
-        return { ...item, label: `æ¬¡: ${microStepFromMission(state.today.missionTitle)}` };
+        return { ...item, label: `Ã¦Â¬Â¡: ${microStepFromMission(state.today.missionTitle)}` };
       }
       return item;
     });
@@ -4426,15 +4438,15 @@ function buildPlans(setup, missionTitle) {
   return {
     A: {
       minutes: normalMinutes,
-      description: `${baseMission} + 1åã ãæ¯ãè¿ã`,
+      description: `${baseMission} + 1Ã¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¦ÂÂ¯Ã£ÂÂÃ¨Â¿ÂÃ£ÂÂ`,
     },
     B: {
       minutes: shortMinutes,
-      description: `${shortenMission(baseMission)}ã ãé²ãã`,
+      description: `${shortenMission(baseMission)}Ã£ÂÂ Ã£ÂÂÃ©ÂÂ²Ã£ÂÂÃ£ÂÂ`,
     },
     C: {
       minutes: minimumMinutes,
-      description: `${warmupExample(setup.minimumExample)}ã ããã`,
+      description: `${warmupExample(setup.minimumExample)}Ã£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ`,
     },
   };
 }
@@ -4446,8 +4458,8 @@ function buildInitialRoadmap(setup) {
     { id: "goal", kind: "system", target: ROADMAP_TARGETS.goal, label: shortenGoal(setup.goal), deadline: setup.deadline, note: "" },
     { id: "checkpoint", kind: "system", target: ROADMAP_TARGETS.checkpoint, label: profile.checkpointLabel, deadline: "", note: "" },
     { id: "foundation", kind: "system", target: ROADMAP_TARGETS.foundation, label: profile.foundationLabel, deadline: "", note: "" },
-    { id: "week", kind: "system", target: ROADMAP_TARGETS.week, label: `ä»é±: ${profile.weeklyFocus}`, deadline: "", note: "" },
-    { id: "next", kind: "system", target: ROADMAP_TARGETS.next, label: `æ¬¡: ${profile.nextStepLabel}`, deadline: "", note: "" },
+    { id: "week", kind: "system", target: ROADMAP_TARGETS.week, label: `Ã¤Â»ÂÃ©ÂÂ±: ${profile.weeklyFocus}`, deadline: "", note: "" },
+    { id: "next", kind: "system", target: ROADMAP_TARGETS.next, label: `Ã¦Â¬Â¡: ${profile.nextStepLabel}`, deadline: "", note: "" },
   ]);
 }
 
@@ -4466,9 +4478,9 @@ function buildSeedState() {
   const today = new Date();
   const deadline = addDays(today, 114);
   const setup = {
-    goal: "3ãæå¾ã«ç°¿è¨2ç´ã«åæ ¼",
+    goal: "3Ã£ÂÂÃ¦ÂÂÃ¥Â¾ÂÃ£ÂÂ«Ã§Â°Â¿Ã¨Â¨Â2Ã§Â´ÂÃ£ÂÂ«Ã¥ÂÂÃ¦Â Â¼",
     deadline: toISODate(deadline),
-    currentLevel: "åç°¿ 60% / å·¥ç°¿ 10%",
+    currentLevel: "Ã¥ÂÂÃ§Â°Â¿ 60% / Ã¥Â·Â¥Ã§Â°Â¿ 10%",
     flowerType: "sunflower",
     studyMode: "night",
     primaryWindow: "21:30-22:00",
@@ -4477,7 +4489,7 @@ function buildSeedState() {
     normalMinutes: 30,
     shortMinutes: 10,
     minimumMinutes: 2,
-    minimumExample: "åèª5å / 1åã ãè§£ã / 1ãã¼ã¸ã ãèª­ã",
+    minimumExample: "Ã¥ÂÂÃ¨ÂªÂ5Ã¥ÂÂ / 1Ã¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¨Â§Â£Ã£ÂÂ / 1Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ¸Ã£ÂÂ Ã£ÂÂÃ¨ÂªÂ­Ã£ÂÂ",
   };
   const goalId = createGoalId();
   const goalRecord = createGoalRecord({
@@ -4511,17 +4523,17 @@ function buildSeedState() {
 function buildSeedLogs(today) {
   const patterns = [
     { outcome: "A", reason: null },
-    { outcome: "miss", reason: "éå§åã®æºåãé¢å" },
-    { outcome: "B", reason: "ç²å´" },
+    { outcome: "miss", reason: "Ã©ÂÂÃ¥Â§ÂÃ¥ÂÂÃ£ÂÂ®Ã¦ÂºÂÃ¥ÂÂÃ£ÂÂÃ©ÂÂ¢Ã¥ÂÂ" },
+    { outcome: "B", reason: "Ã§ÂÂ²Ã¥ÂÂ´" },
     { outcome: "A", reason: null },
-    { outcome: "C", reason: "æ®æ¥­ã§éå§ãéãã" },
+    { outcome: "C", reason: "Ã¦Â®ÂÃ¦Â¥Â­Ã£ÂÂ§Ã©ÂÂÃ¥Â§ÂÃ£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ" },
     { outcome: "A", reason: null },
-    { outcome: "miss", reason: "äºå®å¤æ´" },
+    { outcome: "miss", reason: "Ã¤ÂºÂÃ¥Â®ÂÃ¥Â¤ÂÃ¦ÂÂ´" },
     { outcome: "A", reason: null },
-    { outcome: "miss", reason: "æ®æ¥­ã§éå§ãéãã" },
-    { outcome: "B", reason: "ã¿ã¹ã¯ãéããã" },
+    { outcome: "miss", reason: "Ã¦Â®ÂÃ¦Â¥Â­Ã£ÂÂ§Ã©ÂÂÃ¥Â§ÂÃ£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ" },
+    { outcome: "B", reason: "Ã£ÂÂ¿Ã£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ" },
     { outcome: "A", reason: null },
-    { outcome: "C", reason: "ç²å´" },
+    { outcome: "C", reason: "Ã§ÂÂ²Ã¥ÂÂ´" },
     { outcome: "A", reason: null },
     { outcome: "A", reason: null },
   ];
@@ -4530,7 +4542,7 @@ function buildSeedLogs(today) {
     date: toISODate(addDays(today, index - (patterns.length - 1))),
     outcome: pattern.outcome,
     reason: pattern.reason,
-    missionTitle: "ç´æ¥åä¾¡è¨ç®ã®ä¾é¡ã1ã»ããè§£ã",
+    missionTitle: "Ã§ÂÂ´Ã¦ÂÂ¥Ã¥ÂÂÃ¤Â¾Â¡Ã¨Â¨ÂÃ§Â®ÂÃ£ÂÂ®Ã¤Â¾ÂÃ©Â¡ÂÃ£ÂÂ1Ã£ÂÂ»Ã£ÂÂÃ£ÂÂÃ¨Â§Â£Ã£ÂÂ",
     recordedAt: new Date().toISOString(),
   }));
 }
@@ -4588,7 +4600,7 @@ function normalizeRoadmapItems(items, setup) {
   if (Array.isArray(items)) {
     return orderRoadmapItems(items.map((item, index) => ({
       id: typeof item.id === "string" && item.id ? item.id : `custom-${index + 1}`,
-      label: String(item.label || `ãã¤ã«ã¹ãã¼ã³ ${index + 1}`),
+      label: String(item.label || `Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ³ ${index + 1}`),
       deadline: deriveRoadmapDeadline(item, setup),
       note: String(item.note || ""),
       target: Number.isFinite(Number(item.target)) ? Number(item.target) : (ROADMAP_TARGETS[item.id] ?? Math.max(0, 100 - (index * 12))),
@@ -4601,7 +4613,7 @@ function normalizeRoadmapItems(items, setup) {
 
 function getWeekRoadmapItem(roadmap) {
   return roadmap.find((item) => item.id === "week")
-    || roadmap.find((item) => String(item.label || "").startsWith("ä»é±:"))
+    || roadmap.find((item) => String(item.label || "").startsWith("Ã¤Â»ÂÃ©ÂÂ±:"))
     || roadmap[roadmap.length - 2]
     || roadmap[0]
     || null;
@@ -4609,7 +4621,7 @@ function getWeekRoadmapItem(roadmap) {
 
 function getNextRoadmapItem(roadmap) {
   return roadmap.find((item) => item.id === "next")
-    || roadmap.find((item) => String(item.label || "").startsWith("æ¬¡:"))
+    || roadmap.find((item) => String(item.label || "").startsWith("Ã¦Â¬Â¡:"))
     || roadmap[roadmap.length - 1]
     || roadmap[0]
     || null;
@@ -4821,8 +4833,8 @@ function commitGoalLibraryDraft() {
       goalDraft: nextSetup.goal,
       currentLevelDraft: "",
       missionDraft: nextToday.missionTitle,
-      weekDraft: stripRoadmapPrefix(weekly?.label || "", "ä»é±:"),
-      nextDraft: stripRoadmapPrefix(nextStep?.label || "", "æ¬¡:"),
+      weekDraft: stripRoadmapPrefix(weekly?.label || "", "Ã¤Â»ÂÃ©ÂÂ±:"),
+      nextDraft: stripRoadmapPrefix(nextStep?.label || "", "Ã¦Â¬Â¡:"),
     },
     logs: goal.logs,
     activeSession: goal.activeSession,
@@ -4898,8 +4910,8 @@ function syncRetargetDraftFromState() {
   state.replan.goalDraft = state.setup.goal;
   state.replan.currentLevelDraft = "";
   state.replan.missionDraft = state.today.missionTitle;
-  state.replan.weekDraft = stripRoadmapPrefix(weekly?.label || "", "ä»é±:");
-  state.replan.nextDraft = stripRoadmapPrefix(nextStep?.label || "", "æ¬¡:");
+  state.replan.weekDraft = stripRoadmapPrefix(weekly?.label || "", "Ã¤Â»ÂÃ©ÂÂ±:");
+  state.replan.nextDraft = stripRoadmapPrefix(nextStep?.label || "", "Ã¦Â¬Â¡:");
 }
 
 function buildRetargetResult(currentState) {
@@ -4911,18 +4923,18 @@ function buildRetargetResult(currentState) {
   const currentCustomMilestones = normalizeRoadmapItems(currentState.roadmap, currentState.setup)
     .filter((item) => item.kind === "custom");
   let nextRoadmap = orderRoadmapItems([...buildInitialRoadmap(nextSetup), ...currentCustomMilestones]);
-  const weekDraft = stripRoadmapPrefix(currentState.replan.weekDraft || "", "ä»é±:");
-  const nextDraft = stripRoadmapPrefix(currentState.replan.nextDraft || "", "æ¬¡:");
+  const weekDraft = stripRoadmapPrefix(currentState.replan.weekDraft || "", "Ã¤Â»ÂÃ©ÂÂ±:");
+  const nextDraft = stripRoadmapPrefix(currentState.replan.nextDraft || "", "Ã¦Â¬Â¡:");
 
   if (weekDraft) {
     nextRoadmap = nextRoadmap.map((item) => (
-      item.id === "week" ? { ...item, label: `ä»é±: ${weekDraft}` } : item
+      item.id === "week" ? { ...item, label: `Ã¤Â»ÂÃ©ÂÂ±: ${weekDraft}` } : item
     ));
   }
 
   if (nextDraft) {
     nextRoadmap = nextRoadmap.map((item) => (
-      item.id === "next" ? { ...item, label: `æ¬¡: ${nextDraft}` } : item
+      item.id === "next" ? { ...item, label: `Ã¦Â¬Â¡: ${nextDraft}` } : item
     ));
   }
 
@@ -4945,7 +4957,7 @@ function composeMissionNote(roadmap) {
   const items = Array.isArray(roadmap) ? roadmap : [];
   const weekly = getWeekRoadmapItem(items);
   const nextStep = getNextRoadmapItem(items);
-  return `${weekly ? weekly.label : "ä»é±ã®å°éç¹"}ããéç®ãã1æ¬ã§ãã${nextStep ? nextStep.label : "æ¬¡ã®ä¸æ­©ã¯Roadmapã§è¿½å ã§ãã¾ãã"}`;
+  return `${weekly ? weekly.label : "Ã¤Â»ÂÃ©ÂÂ±Ã£ÂÂ®Ã¥ÂÂ°Ã©ÂÂÃ§ÂÂ¹"}Ã£ÂÂÃ£ÂÂÃ©ÂÂÃ§Â®ÂÃ£ÂÂÃ£ÂÂ1Ã¦ÂÂ¬Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ${nextStep ? nextStep.label : "Ã¦Â¬Â¡Ã£ÂÂ®Ã¤Â¸ÂÃ¦Â­Â©Ã£ÂÂ¯RoadmapÃ£ÂÂ§Ã¨Â¿Â½Ã¥ÂÂ Ã£ÂÂ§Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ"}`;
 }
 
 function stripRoadmapPrefix(value, prefix) {
@@ -4959,12 +4971,12 @@ function commitSetupDraft() {
   const primaryEnd = normalizeTimeValue(draft.primaryEnd);
 
   if (!primaryStart || !primaryEnd) {
-    showToast("å®æ½æéã¯ 05:30 ã®ããã«å¥åãã¦ãã ããã");
+    showToast("Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ¯ 05:30 Ã£ÂÂ®Ã£ÂÂÃ£ÂÂÃ£ÂÂ«Ã¥ÂÂ¥Ã¥ÂÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return null;
   }
 
   if (parseWindow(`${primaryStart}-${primaryEnd}`).start >= parseWindow(`${primaryStart}-${primaryEnd}`).end) {
-    showToast("å®æ½æéã®çµäºã¯éå§ããå¾ã«ãã¦ãã ããã");
+    showToast("Ã¥Â®ÂÃ¦ÂÂ½Ã¦ÂÂÃ©ÂÂÃ£ÂÂ®Ã§ÂµÂÃ¤ÂºÂÃ£ÂÂ¯Ã©ÂÂÃ¥Â§ÂÃ£ÂÂÃ£ÂÂÃ¥Â¾ÂÃ£ÂÂ«Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     return null;
   }
 
@@ -5289,7 +5301,7 @@ function exportData() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  showToast("ãã¼ã¿ãã¨ã¯ã¹ãã¼ããã¾ããã");
+  showToast("Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ¿Ã£ÂÂÃ£ÂÂ¨Ã£ÂÂ¯Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
 }
 
 function importData(file) {
@@ -5304,9 +5316,9 @@ function importData(file) {
       ensureGoalCollection();
       saveState();
       render();
-      showToast("ãã¼ã¿ãå¾©åãã¾ããã");
+      showToast("Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ¿Ã£ÂÂÃ¥Â¾Â©Ã¥ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     } catch (_err) {
-      showToast("ãã¡ã¤ã«ã®èª­ã¿è¾¼ã¿ã«å¤±æãã¾ããã");
+      showToast("Ã£ÂÂÃ£ÂÂ¡Ã£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ®Ã¨ÂªÂ­Ã£ÂÂ¿Ã¨Â¾Â¼Ã£ÂÂ¿Ã£ÂÂ«Ã¥Â¤Â±Ã¦ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
     }
   };
   reader.readAsText(file);
@@ -5332,7 +5344,7 @@ function startClock() {
 
 function startSessionTicker() {
   if (ui.focusPausedAt) return;
-  // Already running correctly â don't reset the interval
+  // Already running correctly Ã¢ÂÂ don't reset the interval
   if (ui.sessionTimer && state.activeSession && !ui.finishDraft) {
     return;
   }
@@ -5353,7 +5365,7 @@ function startSessionTicker() {
     }
 
     const remaining = getRemainingMs(state.activeSession.endsAt);
-    timerValue.textContent = remaining <= 0 ? "æéã§ã" : formatCountdown(remaining);
+    timerValue.textContent = remaining <= 0 ? "Ã¦ÂÂÃ©ÂÂÃ£ÂÂ§Ã£ÂÂ" : formatCountdown(remaining);
   };
 
   updateTimerValue();
@@ -5368,13 +5380,13 @@ function startSessionTicker() {
     const remaining = getRemainingMs(state.activeSession.endsAt);
     const timerValue = sessionSheet.querySelector("#session-timer-value");
     if (timerValue) {
-      timerValue.textContent = remaining <= 0 ? "æéã§ã" : formatCountdown(remaining);
+      timerValue.textContent = remaining <= 0 ? "Ã¦ÂÂÃ©ÂÂÃ£ÂÂ§Ã£ÂÂ" : formatCountdown(remaining);
     }
 
     if (remaining <= 0) {
       window.clearInterval(ui.sessionTimer);
       ui.sessionTimer = null;
-      showToast("äºå®æéã§ããå®äºãè»½éçå°ãé¸ã¹ã¾ãã");
+      showToast("Ã¤ÂºÂÃ¥Â®ÂÃ¦ÂÂÃ©ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂÃ¥Â®ÂÃ¤ÂºÂÃ£ÂÂÃ¨Â»Â½Ã©ÂÂÃ§ÂÂÃ¥ÂÂ°Ã£ÂÂÃ©ÂÂ¸Ã£ÂÂ¹Ã£ÂÂ¾Ã£ÂÂÃ£ÂÂ");
     }
   }, 1000);
 }
@@ -5419,14 +5431,14 @@ function formatElapsedForInput(totalSeconds) {
 
 function parseElapsedInput(str) {
   const t = (str || "").trim();
-  // "M:SS" format â minutes:seconds
+  // "M:SS" format Ã¢ÂÂ minutes:seconds
   const colonMatch = t.match(/^(\d{1,3}):(\d{2})$/);
   if (colonMatch) {
     const m = parseInt(colonMatch[1], 10);
     const s = parseInt(colonMatch[2], 10);
     if (s < 60) return m * 60 + s;
   }
-  // Plain number â treated as minutes
+  // Plain number Ã¢ÂÂ treated as minutes
   const numMatch = t.match(/^(\d{1,4})$/);
   if (numMatch) {
     return parseInt(numMatch[1], 10) * 60;
@@ -5441,15 +5453,15 @@ function formatLoggedDuration(totalSeconds) {
   const seconds = safeSeconds % 60;
 
   if (hours > 0) {
-    return `${hours}æé${String(minutes).padStart(2, "0")}å`;
+    return `${hours}Ã¦ÂÂÃ©ÂÂ${String(minutes).padStart(2, "0")}Ã¥ÂÂ`;
   }
   if (minutes > 0 && seconds === 0) {
-    return `${minutes}å`;
+    return `${minutes}Ã¥ÂÂ`;
   }
   if (minutes > 0) {
-    return `${minutes}å${String(seconds).padStart(2, "0")}ç§`;
+    return `${minutes}Ã¥ÂÂ${String(seconds).padStart(2, "0")}Ã§Â§Â`;
   }
-  return `${seconds}ç§`;
+  return `${seconds}Ã§Â§Â`;
 }
 
 function formatRemainingSpan(totalDays) {
@@ -5458,30 +5470,30 @@ function formatRemainingSpan(totalDays) {
   const days = safeDays % 30;
 
   if (months <= 0) {
-    return `${days}æ¥`;
+    return `${days}Ã¦ÂÂ¥`;
   }
   if (days === 0) {
-    return `${months}ãæ`;
+    return `${months}Ã£ÂÂÃ¦ÂÂ`;
   }
-  return `${months}ãæ${days}æ¥`;
+  return `${months}Ã£ÂÂÃ¦ÂÂ${days}Ã¦ÂÂ¥`;
 }
 function buildLogSummary(entry) {
   const parts = [outcomeLabel(entry.outcome)];
   const loggedSeconds = getLoggedSeconds(entry);
   if (loggedSeconds > 0) {
-    parts.push(`å®è¡ ${formatLoggedDuration(loggedSeconds)}`);
+    parts.push(`Ã¥Â®ÂÃ¨Â¡Â ${formatLoggedDuration(loggedSeconds)}`);
   }
   if (entry.milestoneLabel) {
-    parts.push(`ç¯ç® ${entry.milestoneLabel}${entry.milestoneStatus === "complete" ? " å®äº" : " éä¸­"}`);
+    parts.push(`Ã§Â¯ÂÃ§ÂÂ® ${entry.milestoneLabel}${entry.milestoneStatus === "complete" ? " Ã¥Â®ÂÃ¤ÂºÂ" : " Ã©ÂÂÃ¤Â¸Â­"}`);
   }
   if (entry.progressText) {
-    parts.push(`å°é ${entry.progressText}`);
+    parts.push(`Ã¥ÂÂ°Ã©ÂÂ ${entry.progressText}`);
   }
   if (entry.reflection) {
-    parts.push(`ã¡ã¢ ${entry.reflection}`);
+    parts.push(`Ã£ÂÂ¡Ã£ÂÂ¢ ${entry.reflection}`);
   }
   if (entry.reason) {
-    parts.push(`çç± ${entry.reason}`);
+    parts.push(`Ã§ÂÂÃ§ÂÂ± ${entry.reason}`);
   }
   return parts.join(" / ");
 }
@@ -5510,7 +5522,7 @@ function showToast(message) {
 }
 function isBlankCurrentLevel(currentLevel) {
   const text = (currentLevel || "").trim();
-  return !text || /^(ä½ã(ãã¦ããªã|ãã¦ãªã|ãªã)|ãªã|æªçæ|æªè¨­å®|ã¼ã­|0|0%)?[ã.\s]*$/.test(text);
+  return !text || /^(Ã¤Â½ÂÃ£ÂÂ(Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂªÃ£ÂÂ|Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂªÃ£ÂÂ|Ã£ÂÂªÃ£ÂÂ)|Ã£ÂÂªÃ£ÂÂ|Ã¦ÂÂªÃ§ÂÂÃ¦ÂÂ|Ã¦ÂÂªÃ¨Â¨Â­Ã¥Â®Â|Ã£ÂÂ¼Ã£ÂÂ­|0|0%)?[Ã£ÂÂ.\s]*$/.test(text);
 }
 
 function getGoalProfile(setup) {
@@ -5518,47 +5530,47 @@ function getGoalProfile(setup) {
   const weakArea = detectWeakArea(setup.currentLevel);
   const blankLevel = isBlankCurrentLevel(setup.currentLevel);
 
-  if (goal.includes("ç°¿è¨")) {
+  if (goal.includes("Ã§Â°Â¿Ã¨Â¨Â")) {
     return {
-      track: "ç°¿è¨2ç´ / å·¥æ¥­ç°¿è¨",
-      missionTitle: "ç´æ¥åä¾¡è¨ç®ã®ä¾é¡ã1ã»ããè§£ã",
-      foundationLabel: `${weakArea}ãä¸å¨`,
-      weeklyFocus: weakArea.includes("å·¥") ? "CVPçè§£" : `${weakArea}ã®åºç¤`,
-      checkpointLabel: "æ¨¡è©¦ã§70%",
-      nextStepLabel: "ä¾é¡1ã»ãã",
+      track: "Ã§Â°Â¿Ã¨Â¨Â2Ã§Â´Â / Ã¥Â·Â¥Ã¦Â¥Â­Ã§Â°Â¿Ã¨Â¨Â",
+      missionTitle: "Ã§ÂÂ´Ã¦ÂÂ¥Ã¥ÂÂÃ¤Â¾Â¡Ã¨Â¨ÂÃ§Â®ÂÃ£ÂÂ®Ã¤Â¾ÂÃ©Â¡ÂÃ£ÂÂ1Ã£ÂÂ»Ã£ÂÂÃ£ÂÂÃ¨Â§Â£Ã£ÂÂ",
+      foundationLabel: `${weakArea}Ã£ÂÂÃ¤Â¸ÂÃ¥ÂÂ¨`,
+      weeklyFocus: weakArea.includes("Ã¥Â·Â¥") ? "CVPÃ§ÂÂÃ¨Â§Â£" : `${weakArea}Ã£ÂÂ®Ã¥ÂÂºÃ§Â¤Â`,
+      checkpointLabel: "Ã¦Â¨Â¡Ã¨Â©Â¦Ã£ÂÂ§70%",
+      nextStepLabel: "Ã¤Â¾ÂÃ©Â¡Â1Ã£ÂÂ»Ã£ÂÂÃ£ÂÂ",
     };
   }
 
-  if (goal.includes("ITãã¹ãã¼ã")) {
+  if (goal.includes("ITÃ£ÂÂÃ£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ")) {
     return {
-      track: "ITãã¹ãã¼ã / åºç¤",
-      missionTitle: blankLevel ? "ç¨èªã10åã ãç¢ºèªãã¦éå»åã3åã ãè§¦ã" : "éå»åã5åã ãè§£ãã¦ãç¥ããªãç¨èªãæ¾ã",
-      foundationLabel: blankLevel ? "3åéã®å¨ä½åãä¸å¨" : `${weakArea}ãä¸å¨`,
-      weeklyFocus: blankLevel ? "ã¹ãã©ãã¸ç³»ã®åºç¤" : `${weakArea}ã®åºç¤`,
-      checkpointLabel: "æ¨¡è©¦ã§700ç¹",
-      nextStepLabel: "éå»å3å",
+      track: "ITÃ£ÂÂÃ£ÂÂ¹Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ / Ã¥ÂÂºÃ§Â¤Â",
+      missionTitle: blankLevel ? "Ã§ÂÂ¨Ã¨ÂªÂÃ£ÂÂ10Ã¥ÂÂÃ£ÂÂ Ã£ÂÂÃ§Â¢ÂºÃ¨ÂªÂÃ£ÂÂÃ£ÂÂ¦Ã©ÂÂÃ¥ÂÂ»Ã¥ÂÂÃ£ÂÂ3Ã¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¨Â§Â¦Ã£ÂÂ" : "Ã©ÂÂÃ¥ÂÂ»Ã¥ÂÂÃ£ÂÂ5Ã¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¨Â§Â£Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ§ÂÂ¥Ã£ÂÂÃ£ÂÂªÃ£ÂÂÃ§ÂÂ¨Ã¨ÂªÂÃ£ÂÂÃ¦ÂÂ¾Ã£ÂÂ",
+      foundationLabel: blankLevel ? "3Ã¥ÂÂÃ©ÂÂÃ£ÂÂ®Ã¥ÂÂ¨Ã¤Â½ÂÃ¥ÂÂÃ£ÂÂÃ¤Â¸ÂÃ¥ÂÂ¨" : `${weakArea}Ã£ÂÂÃ¤Â¸ÂÃ¥ÂÂ¨`,
+      weeklyFocus: blankLevel ? "Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂ©Ã£ÂÂÃ£ÂÂ¸Ã§Â³Â»Ã£ÂÂ®Ã¥ÂÂºÃ§Â¤Â" : `${weakArea}Ã£ÂÂ®Ã¥ÂÂºÃ§Â¤Â`,
+      checkpointLabel: "Ã¦Â¨Â¡Ã¨Â©Â¦Ã£ÂÂ§700Ã§ÂÂ¹",
+      nextStepLabel: "Ã©ÂÂÃ¥ÂÂ»Ã¥ÂÂ3Ã¥ÂÂ",
     };
   }
 
-  if (goal.includes("è±èª")) {
+  if (goal.includes("Ã¨ÂÂ±Ã¨ÂªÂ")) {
     return {
-      track: "è±èª / èª­è§£",
-      missionTitle: "é·æã1é¡ã ãèª­ã¿ãè¦ç¹ã3è¡ã§ã¾ã¨ãã",
-      foundationLabel: blankLevel ? "åºç¤åèªãä¸å¨" : `${weakArea}ãä¸å¨`,
-      weeklyFocus: blankLevel ? "é·æã®åºç¤" : `${weakArea}ã®åºç¤`,
-      checkpointLabel: "æ¨¡è©¦ã§70%",
-      nextStepLabel: "é·æ1é¡",
+      track: "Ã¨ÂÂ±Ã¨ÂªÂ / Ã¨ÂªÂ­Ã¨Â§Â£",
+      missionTitle: "Ã©ÂÂ·Ã¦ÂÂÃ£ÂÂ1Ã©Â¡ÂÃ£ÂÂ Ã£ÂÂÃ¨ÂªÂ­Ã£ÂÂ¿Ã£ÂÂÃ¨Â¦ÂÃ§ÂÂ¹Ã£ÂÂ3Ã¨Â¡ÂÃ£ÂÂ§Ã£ÂÂ¾Ã£ÂÂ¨Ã£ÂÂÃ£ÂÂ",
+      foundationLabel: blankLevel ? "Ã¥ÂÂºÃ§Â¤ÂÃ¥ÂÂÃ¨ÂªÂÃ£ÂÂÃ¤Â¸ÂÃ¥ÂÂ¨" : `${weakArea}Ã£ÂÂÃ¤Â¸ÂÃ¥ÂÂ¨`,
+      weeklyFocus: blankLevel ? "Ã©ÂÂ·Ã¦ÂÂÃ£ÂÂ®Ã¥ÂÂºÃ§Â¤Â" : `${weakArea}Ã£ÂÂ®Ã¥ÂÂºÃ§Â¤Â`,
+      checkpointLabel: "Ã¦Â¨Â¡Ã¨Â©Â¦Ã£ÂÂ§70%",
+      nextStepLabel: "Ã©ÂÂ·Ã¦ÂÂ1Ã©Â¡Â",
     };
   }
 
-  const goalLabel = goal.replace(/ã«åæ ¼ãã|ãéæãã|åæ ¼|éæ/g, "").trim() || "ç®æ¨";
+  const goalLabel = goal.replace(/Ã£ÂÂ«Ã¥ÂÂÃ¦Â Â¼Ã£ÂÂÃ£ÂÂ|Ã£ÂÂÃ©ÂÂÃ¦ÂÂÃ£ÂÂÃ£ÂÂ|Ã¥ÂÂÃ¦Â Â¼|Ã©ÂÂÃ¦ÂÂ/g, "").trim() || "Ã§ÂÂ®Ã¦Â¨Â";
   return {
     track: blankLevel ? goalLabel : `${goalLabel} / ${weakArea}`,
-    missionTitle: blankLevel ? `${goalLabel}ã«åãã¦æåã®1ã¦ãããã«è§¦ã` : `${weakArea}ã®æåã®1ã¦ãããã«è§¦ã`,
-    foundationLabel: blankLevel ? "åºç¤ãä¸å¨" : `${weakArea}ãä¸å¨`,
-    weeklyFocus: blankLevel ? "åºç¤ã«è§¦ã" : `${weakArea}ã®åºç¤`,
-    checkpointLabel: goal.includes("åæ ¼") ? "ä¸­éãã§ãã¯ãéé" : "ä¸­éå°ç¹ã¾ã§é²ãã",
-    nextStepLabel: "æåã®1ã¦ããã",
+    missionTitle: blankLevel ? `${goalLabel}Ã£ÂÂ«Ã¥ÂÂÃ£ÂÂÃ£ÂÂ¦Ã¦ÂÂÃ¥ÂÂÃ£ÂÂ®1Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ«Ã¨Â§Â¦Ã£ÂÂ` : `${weakArea}Ã£ÂÂ®Ã¦ÂÂÃ¥ÂÂÃ£ÂÂ®1Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ«Ã¨Â§Â¦Ã£ÂÂ`,
+    foundationLabel: blankLevel ? "Ã¥ÂÂºÃ§Â¤ÂÃ£ÂÂÃ¤Â¸ÂÃ¥ÂÂ¨" : `${weakArea}Ã£ÂÂÃ¤Â¸ÂÃ¥ÂÂ¨`,
+    weeklyFocus: blankLevel ? "Ã¥ÂÂºÃ§Â¤ÂÃ£ÂÂ«Ã¨Â§Â¦Ã£ÂÂ" : `${weakArea}Ã£ÂÂ®Ã¥ÂÂºÃ§Â¤Â`,
+    checkpointLabel: goal.includes("Ã¥ÂÂÃ¦Â Â¼") ? "Ã¤Â¸Â­Ã©ÂÂÃ£ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂ¯Ã£ÂÂÃ©ÂÂÃ©ÂÂ" : "Ã¤Â¸Â­Ã©ÂÂÃ¥ÂÂ°Ã§ÂÂ¹Ã£ÂÂ¾Ã£ÂÂ§Ã©ÂÂ²Ã£ÂÂÃ£ÂÂ",
+    nextStepLabel: "Ã¦ÂÂÃ¥ÂÂÃ£ÂÂ®1Ã£ÂÂ¦Ã£ÂÂÃ£ÂÂÃ£ÂÂ",
   };
 }
 
@@ -5572,29 +5584,29 @@ function inferMissionTitle(setup) {
 
 function detectWeakArea(currentLevel) {
   if (isBlankCurrentLevel(currentLevel)) {
-    return "åºç¤";
+    return "Ã¥ÂÂºÃ§Â¤Â";
   }
 
   const segments = currentLevel.split("/").map((item) => item.trim()).filter(Boolean);
   if (!segments.length) {
-    return "åºç¤";
+    return "Ã¥ÂÂºÃ§Â¤Â";
   }
 
   const scoredSegments = segments
     .map((segment) => {
       const match = segment.match(/(\d+)/);
       return match
-        ? { label: segment.replace(/\d+%?/, "").trim() || "åºç¤", score: Number(match[1]) }
+        ? { label: segment.replace(/\d+%?/, "").trim() || "Ã¥ÂÂºÃ§Â¤Â", score: Number(match[1]) }
         : null;
     })
     .filter(Boolean);
 
   if (!scoredSegments.length) {
-    return "åºç¤";
+    return "Ã¥ÂÂºÃ§Â¤Â";
   }
 
   scoredSegments.sort((left, right) => left.score - right.score);
-  return scoredSegments[0].label || "åºç¤";
+  return scoredSegments[0].label || "Ã¥ÂÂºÃ§Â¤Â";
 }
 
 function parseCurrentLevel(currentLevel) {
@@ -5610,51 +5622,51 @@ function parseCurrentLevel(currentLevel) {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 function shortReason(reason) {
-  if (reason.includes("æ®æ¥­")) return "æ®æ¥­";
-  if (reason.includes("ã¿ã¹ã¯")) return "éã";
-  if (reason.includes("æºå")) return "æºå";
-  if (reason.includes("äºå®")) return "äºå®";
-  if (reason.includes("ç²")) return "ç²å´";
+  if (reason.includes("Ã¦Â®ÂÃ¦Â¥Â­")) return "Ã¦Â®ÂÃ¦Â¥Â­";
+  if (reason.includes("Ã£ÂÂ¿Ã£ÂÂ¹Ã£ÂÂ¯")) return "Ã©ÂÂÃ£ÂÂ";
+  if (reason.includes("Ã¦ÂºÂÃ¥ÂÂ")) return "Ã¦ÂºÂÃ¥ÂÂ";
+  if (reason.includes("Ã¤ÂºÂÃ¥Â®Â")) return "Ã¤ÂºÂÃ¥Â®Â";
+  if (reason.includes("Ã§ÂÂ²")) return "Ã§ÂÂ²Ã¥ÂÂ´";
   return reason;
 }
 
 function shortenMission(mission) {
-  if (mission.includes("1ã»ãã")) {
-    return mission.replace("1ã»ãã", "åå");
+  if (mission.includes("1Ã£ÂÂ»Ã£ÂÂÃ£ÂÂ")) {
+    return mission.replace("1Ã£ÂÂ»Ã£ÂÂÃ£ÂÂ", "Ã¥ÂÂÃ¥ÂÂ");
   }
-  if (mission.includes("è§£ã")) {
-    return mission.replace("è§£ã", "ååã ãè§£ã");
+  if (mission.includes("Ã¨Â§Â£Ã£ÂÂ")) {
+    return mission.replace("Ã¨Â§Â£Ã£ÂÂ", "Ã¥ÂÂÃ¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¨Â§Â£Ã£ÂÂ");
   }
-  if (mission.includes("èª­ã")) {
-    return mission.replace("èª­ã", "æåã ãèª­ã");
+  if (mission.includes("Ã¨ÂªÂ­Ã£ÂÂ")) {
+    return mission.replace("Ã¨ÂªÂ­Ã£ÂÂ", "Ã¦ÂÂÃ¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¨ÂªÂ­Ã£ÂÂ");
   }
-  return `${mission}ã®ååã ã`;
+  return `${mission}Ã£ÂÂ®Ã¥ÂÂÃ¥ÂÂÃ£ÂÂ Ã£ÂÂ`;
 }
 
 function lighterWeeklyFocus(label) {
-  const clean = label.replace(/^ä»é±:\s*/, "");
-  if (clean.includes("çè§£")) {
-    return clean.replace("çè§£", "åå");
+  const clean = label.replace(/^Ã¤Â»ÂÃ©ÂÂ±:\s*/, "");
+  if (clean.includes("Ã§ÂÂÃ¨Â§Â£")) {
+    return clean.replace("Ã§ÂÂÃ¨Â§Â£", "Ã¥ÂÂÃ¥ÂÂ");
   }
-  return `${clean}ã®åå`;
+  return `${clean}Ã£ÂÂ®Ã¥ÂÂÃ¥ÂÂ`;
 }
 
 function microStepFromMission(mission) {
-  if (mission.includes("ä¾é¡")) {
-    return "ä¾é¡1åã ã";
+  if (mission.includes("Ã¤Â¾ÂÃ©Â¡Â")) {
+    return "Ã¤Â¾ÂÃ©Â¡Â1Ã¥ÂÂÃ£ÂÂ Ã£ÂÂ";
   }
-  if (mission.includes("é·æ")) {
-    return "æåã®1æ®µè½ã ã";
+  if (mission.includes("Ã©ÂÂ·Ã¦ÂÂ")) {
+    return "Ã¦ÂÂÃ¥ÂÂÃ£ÂÂ®1Ã¦Â®ÂµÃ¨ÂÂ½Ã£ÂÂ Ã£ÂÂ";
   }
-  return `${mission}ã®æåã ã`;
+  return `${mission}Ã£ÂÂ®Ã¦ÂÂÃ¥ÂÂÃ£ÂÂ Ã£ÂÂ`;
 }
 
 function warmupExample(example) {
-  if (!example) return "æºãéãã¦2åã ãæºåãã";
-  if (example.includes("1å")) {
-    return "å¬å¼ã1ã¤ã ãè¦è¿ã";
+  if (!example) return "Ã¦ÂÂºÃ£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ¦2Ã¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¦ÂºÂÃ¥ÂÂÃ£ÂÂÃ£ÂÂ";
+  if (example.includes("1Ã¥ÂÂ")) {
+    return "Ã¥ÂÂ¬Ã¥Â¼ÂÃ£ÂÂ1Ã£ÂÂ¤Ã£ÂÂ Ã£ÂÂÃ¨Â¦ÂÃ¨Â¿ÂÃ£ÂÂ";
   }
-  return "æºãéãã¦2åã ãæºåãã";
+  return "Ã¦ÂÂºÃ£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ¦2Ã¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¦ÂºÂÃ¥ÂÂÃ£ÂÂÃ£ÂÂ";
 }
 
 function joinExamples(current, addition) {
@@ -5663,62 +5675,62 @@ function joinExamples(current, addition) {
 
 function shortenGoal(goal, limit = 16) {
   const safeGoal = String(goal || "");
-  return safeGoal.length > limit ? `${safeGoal.slice(0, limit)}â¦` : safeGoal;
+  return safeGoal.length > limit ? `${safeGoal.slice(0, limit)}Ã¢ÂÂ¦` : safeGoal;
 }
 
 function outcomeLabel(outcome) {
-  if (outcome === "A") return "Plan Aã§å®äº";
-  if (outcome === "B") return "Plan Bã§ç­ç¸®";
-  if (outcome === "C") return "Plan Cã§ææ¸";
-  if (outcome === "miss") return "æªå®æ½";
-  return "æªè¨é²";
+  if (outcome === "A") return "Plan AÃ£ÂÂ§Ã¥Â®ÂÃ¤ÂºÂ";
+  if (outcome === "B") return "Plan BÃ£ÂÂ§Ã§ÂÂ­Ã§Â¸Â®";
+  if (outcome === "C") return "Plan CÃ£ÂÂ§Ã¦ÂÂÃ¦Â¸Â";
+  if (outcome === "miss") return "Ã¦ÂÂªÃ¥Â®ÂÃ¦ÂÂ½";
+  return "Ã¦ÂÂªÃ¨Â¨ÂÃ©ÂÂ²";
 }
 
 function logSymbol(outcome) {
   if (outcome === "A") return "A";
   if (outcome === "B") return "B";
   if (outcome === "C") return "C";
-  if (outcome === "miss") return "æª";
+  if (outcome === "miss") return "Ã¦ÂÂª";
   return "-";
 }
 
 function logSmallLabel(outcome) {
-  if (outcome === "A") return "ä¸»";
-  if (outcome === "B") return "äº";
-  if (outcome === "C") return "æ";
-  if (outcome === "miss") return "ä¼";
+  if (outcome === "A") return "Ã¤Â¸Â»";
+  if (outcome === "B") return "Ã¤ÂºÂ";
+  if (outcome === "C") return "Ã¦ÂÂ";
+  if (outcome === "miss") return "Ã¤Â¼Â";
   return "";
 }
 
 function weekdayLabel(key) {
   const map = {
-    Mon: "ææ",
-    Tue: "ç«æ",
-    Wed: "æ°´æ",
-    Thu: "æ¨æ",
-    Fri: "éæ",
-    Sat: "åæ",
-    Sun: "æ¥æ",
+    Mon: "Ã¦ÂÂÃ¦ÂÂ",
+    Tue: "Ã§ÂÂ«Ã¦ÂÂ",
+    Wed: "Ã¦Â°Â´Ã¦ÂÂ",
+    Thu: "Ã¦ÂÂ¨Ã¦ÂÂ",
+    Fri: "Ã©ÂÂÃ¦ÂÂ",
+    Sat: "Ã¥ÂÂÃ¦ÂÂ",
+    Sun: "Ã¦ÂÂ¥Ã¦ÂÂ",
   };
   return map[key] || key;
 }
 
 function weekdayShortLabel(key) {
   const map = {
-    Mon: "æ",
-    Tue: "ç«",
-    Wed: "æ°´",
-    Thu: "æ¨",
-    Fri: "é",
-    Sat: "å",
-    Sun: "æ¥",
+    Mon: "Ã¦ÂÂ",
+    Tue: "Ã§ÂÂ«",
+    Wed: "Ã¦Â°Â´",
+    Thu: "Ã¦ÂÂ¨",
+    Fri: "Ã©ÂÂ",
+    Sat: "Ã¥ÂÂ",
+    Sun: "Ã¦ÂÂ¥",
   };
   return map[key] || key;
 }
 
 function shortWeekday(dateString) {
   const date = new Date(dateString);
-  return ["æ¥", "æ", "ç«", "æ°´", "æ¨", "é", "å"][date.getDay()];
+  return ["Ã¦ÂÂ¥", "Ã¦ÂÂ", "Ã§ÂÂ«", "Ã¦Â°Â´", "Ã¦ÂÂ¨", "Ã©ÂÂ", "Ã¥ÂÂ"][date.getDay()];
 }
 
 function weekdayKeyFromDate(date) {
@@ -5743,7 +5755,7 @@ function splitWindow(windowValue) {
 }
 
 function normalizeTimeValue(value) {
-  const raw = String(value || "").trim().replace(/[ï¼]/g, ":");
+  const raw = String(value || "").trim().replace(/[Ã¯Â¼Â]/g, ":");
   if (!raw) {
     return "";
   }
@@ -5831,7 +5843,7 @@ let _appInitialized = false;
 let _syncTimer = null;
 let _supabaseLoadedSuccessfully = false;
 
-// ââ Supabase â ã­ã¼ã«ã«åæ ââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Supabase Ã¢ÂÂ Ã£ÂÂ­Ã£ÂÂ¼Ã£ÂÂ«Ã£ÂÂ«Ã¥ÂÂÃ¦ÂÂ Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 async function loadStateFromSupabase(userId) {
   try {
@@ -5911,7 +5923,7 @@ function scheduleSyncToSupabase() {
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(pushStateToSupabase, 2000);
 }
-// ââ Auth UI ââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Auth UI Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 const _authOverlay = document.querySelector("#auth-overlay");
 const _authForm = document.querySelector("#auth-form");
@@ -5956,41 +5968,41 @@ function _switchAuthMode(mode) {
   _authMode = mode;
   _authClearError();
 
-  // ãã¹ã¯ã¼ããªã»ãããªã³ã¯ã1åã ãä½æ
+  // Ã£ÂÂÃ£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂ¼Ã£ÂÂÃ£ÂÂªÃ£ÂÂ»Ã£ÂÂÃ£ÂÂÃ£ÂÂªÃ£ÂÂ³Ã£ÂÂ¯Ã£ÂÂ1Ã¥ÂÂÃ£ÂÂ Ã£ÂÂÃ¤Â½ÂÃ¦ÂÂ
   if (!document.querySelector("#auth-reset-link")) {
     const p = document.createElement("p");
     p.className = "auth-hint";
     p.id = "auth-reset-link";
-    p.innerHTML = `<button type="button" class="auth-switch" id="auth-reset-btn">ãã¹ã¯ã¼ãããå¿ãã®æ¹ã¯ãã¡ã</button>`;
+    p.innerHTML = `<button type="button" class="auth-switch" id="auth-reset-btn">Ã£ÂÂÃ£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂ¼Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¥Â¿ÂÃ£ÂÂÃ£ÂÂ®Ã¦ÂÂ¹Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂ¡Ã£ÂÂ</button>`;
     _authHintEl.insertAdjacentElement("afterend", p);
   }
   const resetLink = document.querySelector("#auth-reset-link");
 
   if (mode === "login") {
-    _authSubmitEl.textContent = "ã­ã°ã¤ã³";
+    _authSubmitEl.textContent = "Ã£ÂÂ­Ã£ÂÂ°Ã£ÂÂ¤Ã£ÂÂ³";
     _authTabBtns.forEach(b => b.classList.toggle("is-active", b.dataset.authTab === "login"));
-    _authHintEl.innerHTML = `ã¢ã«ã¦ã³ãããæã¡ã§ãªãã§ããï¼ <button type="button" class="auth-switch" id="auth-switch-btn">æ°è¦ç»é²ã¯ãã¡ã</button>`;
+    _authHintEl.innerHTML = `Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂ¦Ã£ÂÂ³Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¦ÂÂÃ£ÂÂ¡Ã£ÂÂ§Ã£ÂÂªÃ£ÂÂÃ£ÂÂ§Ã£ÂÂÃ£ÂÂÃ¯Â¼Â <button type="button" class="auth-switch" id="auth-switch-btn">Ã¦ÂÂ°Ã¨Â¦ÂÃ§ÂÂ»Ã©ÂÂ²Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂ¡Ã£ÂÂ</button>`;
     resetLink.hidden = false;
   } else if (mode === "signup") {
-    _authSubmitEl.textContent = "æ°è¦ç»é²";
+    _authSubmitEl.textContent = "Ã¦ÂÂ°Ã¨Â¦ÂÃ§ÂÂ»Ã©ÂÂ²";
     _authTabBtns.forEach(b => b.classList.toggle("is-active", b.dataset.authTab === "signup"));
-    _authHintEl.innerHTML = `ãã§ã«ã¢ã«ã¦ã³ãããæã¡ã®æ¹ã¯ <button type="button" class="auth-switch" id="auth-switch-btn">ã­ã°ã¤ã³ã¯ãã¡ã</button>`;
+    _authHintEl.innerHTML = `Ã£ÂÂÃ£ÂÂ§Ã£ÂÂ«Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂ¦Ã£ÂÂ³Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¦ÂÂÃ£ÂÂ¡Ã£ÂÂ®Ã¦ÂÂ¹Ã£ÂÂ¯ <button type="button" class="auth-switch" id="auth-switch-btn">Ã£ÂÂ­Ã£ÂÂ°Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂ¡Ã£ÂÂ</button>`;
     resetLink.hidden = true;
   } else if (mode === "reset") {
-    _authSubmitEl.textContent = "ãªã»ããã¡ã¼ã«ãéã";
+    _authSubmitEl.textContent = "Ã£ÂÂªÃ£ÂÂ»Ã£ÂÂÃ£ÂÂÃ£ÂÂ¡Ã£ÂÂ¼Ã£ÂÂ«Ã£ÂÂÃ©ÂÂÃ£ÂÂ";
     _authTabBtns.forEach(b => b.classList.remove("is-active"));
-    _authHintEl.innerHTML = `<button type="button" class="auth-switch" id="auth-switch-btn">â ã­ã°ã¤ã³ã«æ»ã</button>`;
+    _authHintEl.innerHTML = `<button type="button" class="auth-switch" id="auth-switch-btn">Ã¢ÂÂ Ã£ÂÂ­Ã£ÂÂ°Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ«Ã¦ÂÂ»Ã£ÂÂ</button>`;
     resetLink.hidden = true;
   }
   _rebindSwitchBtn();
 }
 
-// ã¿ããã¿ã³ã®ã¤ãã³ã
+// Ã£ÂÂ¿Ã£ÂÂÃ£ÂÂÃ£ÂÂ¿Ã£ÂÂ³Ã£ÂÂ®Ã£ÂÂ¤Ã£ÂÂÃ£ÂÂ³Ã£ÂÂ
 _authTabBtns.forEach(btn => {
   btn.addEventListener("click", () => _switchAuthMode(btn.dataset.authTab));
 });
 
-// ãã©ã¼ã éä¿¡
+// Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ¼Ã£ÂÂ Ã©ÂÂÃ¤Â¿Â¡
 _authForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   _authClearError();
@@ -6001,7 +6013,7 @@ _authForm.addEventListener("submit", async (e) => {
     if (_authMode === "login") {
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      // Credential Management API: Chromeã«ãã¹ã¯ã¼ãä¿å­ãä¿ã
+      // Credential Management API: ChromeÃ£ÂÂ«Ã£ÂÂÃ£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂ¼Ã£ÂÂÃ¤Â¿ÂÃ¥Â­ÂÃ£ÂÂÃ¤Â¿ÂÃ£ÂÂ
       if (window.PasswordCredential) {
         try {
           const cred = new PasswordCredential({ id: email, password });
@@ -6011,24 +6023,24 @@ _authForm.addEventListener("submit", async (e) => {
     } else if (_authMode === "signup") {
       const { error } = await sb.auth.signUp({ email, password });
       if (error) throw error;
-      _authShowError("ç¢ºèªã¡ã¼ã«ãéãã¾ãããã¡ã¼ã«ããç¢ºèªã®ããã­ã°ã¤ã³ãã¦ãã ããã");
+      _authShowError("Ã§Â¢ÂºÃ¨ÂªÂÃ£ÂÂ¡Ã£ÂÂ¼Ã£ÂÂ«Ã£ÂÂÃ©ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¡Ã£ÂÂ¼Ã£ÂÂ«Ã£ÂÂÃ£ÂÂÃ§Â¢ÂºÃ¨ÂªÂÃ£ÂÂ®Ã£ÂÂÃ£ÂÂÃ£ÂÂ­Ã£ÂÂ°Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ¦Ã£ÂÂÃ£ÂÂ Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
       return;
     } else if (_authMode === "reset") {
       const { error } = await sb.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
       });
       if (error) throw error;
-      _authShowError("ãã¹ã¯ã¼ããªã»ããã¡ã¼ã«ãéä¿¡ãã¾ããã");
+      _authShowError("Ã£ÂÂÃ£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂ¼Ã£ÂÂÃ£ÂÂªÃ£ÂÂ»Ã£ÂÂÃ£ÂÂÃ£ÂÂ¡Ã£ÂÂ¼Ã£ÂÂ«Ã£ÂÂÃ©ÂÂÃ¤Â¿Â¡Ã£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂÃ£ÂÂ");
       return;
     }
   } catch (err) {
-    _authShowError(err.message || "ã¨ã©ã¼ãçºçãã¾ãã");
+    _authShowError(err.message || "Ã£ÂÂ¨Ã£ÂÂ©Ã£ÂÂ¼Ã£ÂÂÃ§ÂÂºÃ§ÂÂÃ£ÂÂÃ£ÂÂ¾Ã£ÂÂÃ£ÂÂ");
   } finally {
     _authSetLoading(false);
   }
 });
 
-// ââ Auth state ã®ç£è¦ âââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Auth state Ã£ÂÂ®Ã§ÂÂ£Ã¨Â¦Â Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
@@ -6050,7 +6062,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
   }
 });
 
-// ââ ã­ã°ã¢ã¦ã ââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂ Ã£ÂÂ­Ã£ÂÂ°Ã£ÂÂ¢Ã£ÂÂ¦Ã£ÂÂ Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 async function signOut() {
   clearTimeout(_syncTimer);
