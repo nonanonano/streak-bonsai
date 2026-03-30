@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
@@ -43,7 +43,9 @@
       .auth-error { font-size: .83rem; color: var(--danger, #b04040); text-align: center; margin: 0; line-height: 1.4; }
       .auth-hint { font-size: .82rem; color: var(--muted, #7e7265); text-align: center; margin: 0; }
       .auth-switch { background: none; border: none; color: var(--accent, #c75e33); cursor: pointer; font-size: inherit; padding: 0; text-decoration: underline; font-family: inherit; }
-      .auth-loading { font-size: .82rem; color: var(--muted, #7e7265); text-align: center; margin: 0; }
+      .auth-loading { display:flex; align-items:center; justify-content:center; margin:10px 0; }
+      .auth-spinner { width:26px; height:26px; border:2.5px solid rgba(126,114,101,0.2); border-top-color:var(--muted,#7e7265); border-radius:50%; animation:spin .75s linear infinite; }
+      @keyframes spin { to { transform:rotate(360deg); } }
       .auth-submit { width: 100%; }
     </style>
   </head>
@@ -153,7 +155,7 @@
       <button type="button" class="auth-switch" id="auth-switch-btn">新規登録はこちら</button>
     </p>
 
-    <p class="auth-loading" id="auth-loading" hidden>読み込み中...</p>
+    <div class="auth-loading" id="auth-loading" hidden><div class="auth-spinner"></div></div>
   </div>
 </div>
 
