@@ -3984,6 +3984,7 @@ function renderSessionSheet() {
               <div class="panel panel--cool">
                 ${state.setup.goal ? `<p style="font-size:0.8rem;font-weight:600;opacity:0.6;text-align:center;margin:0 0 2px;letter-spacing:0.02em">${escapeHtml(state.setup.goal)}</p>` : ""}
                 <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : (ui.focusPausedAt ? "⏸" : formatCountdown(remaining))}</p>
+                <button onclick="openTimerPiP()" style="margin-top:6px;padding:4px 14px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:12px;color:rgba(255,255,255,0.85);font-size:0.73rem;cursor:pointer;" title="小窓タイマー">&#x1FA9F; PiP</button>
                 ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession.departures}回</p>` : ""}
               </div>
             `
@@ -5430,6 +5431,44 @@ function startClock() {
   }, 60000);
 }
 
+function openTimerPiP() {
+  if (!window.documentPictureInPicture) {
+    alert('フローティングタイマーはChrome 116以上でサポートされています');
+    return;
+  }
+  if (_pipWindow && !_pipWindow.closed) {
+    _pipWindow.close();
+    _pipWindow = null;
+    return;
+  }
+  window.documentPictureInPicture.requestWindow({ width: 220, height: 150 }).then(function(pipWin) {
+    _pipWindow = pipWin;
+    pipWin.document.documentElement.innerHTML = '<html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#fff;gap:6px}#pip-goal{font-size:0.72rem;color:#aaa;text-align:center;padding:0 8px;max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}#pip-timer{font-size:2.4rem;font-weight:bold;color:#7ec8e3;letter-spacing:0.05em}#pip-dep{font-size:0.7rem;color:#f0a500}<\/style><\/head><body><div id=\"pip-goal\"><\/div><div id=\"pip-timer\">--:--<\/div><div id=\"pip-dep\"><\/div><\/body><\/html>';
+    updatePiP();
+    pipWin.addEventListener('pagehide', function() { _pipWindow = null; });
+  }).catch(function(e) { console.warn('PiP error:', e); });
+}
+
+function updatePiP() {
+  if (!_pipWindow || _pipWindow.closed) return;
+  var pipDoc = _pipWindow.document;
+  var timerEl = pipDoc.getElementById('pip-timer');
+  if (!timerEl) return;
+  var mainTimer = document.getElementById('session-timer-value');
+  if (mainTimer) timerEl.textContent = mainTimer.textContent;
+  var goalEl = pipDoc.getElementById('pip-goal');
+  if (goalEl && state && state.setup) goalEl.textContent = state.setup.goal || '';
+  var depEl = pipDoc.getElementById('pip-dep');
+  if (depEl && state && state.activeSession) {
+    var d = state.activeSession.departures || 0;
+    depEl.textContent = d > 0 ? '離脱 ' + d + '回' : '';
+  }
+}
+
+function closePiP() {
+  if (_pipWindow) { try { _pipWindow.close(); } catch(e){} _pipWindow = null; }
+}
+
 function startSessionTicker() {
   // Don't tick while focus-paused
   if (ui.focusPausedAt) return;
@@ -5458,6 +5497,7 @@ function startSessionTicker() {
   };
 
   updateTimerValue();
+  updatePiP();
 
   ui.sessionTimer = window.setInterval(() => {
     if (!state.activeSession || ui.finishDraft) {
@@ -5932,6 +5972,7 @@ function escapeHtml(value) {
 let _appInitialized = false;
 let _syncTimer = null;
 let _realtimeChannel = null;
+let _pipWindow = null;
 let _supabaseLoadedSuccessfully = false;
 let _wakeLock = null;
 
