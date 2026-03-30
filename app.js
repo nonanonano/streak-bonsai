@@ -1,11 +1,11 @@
-// =========================================================
+﻿// =========================================================
 // SUPABASE 設定
 // =========================================================
 const SUPABASE_URL = "https://kyzyyciutnkhaxadwdlx.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_8BS-Guu8UUfb3sEHRfHGRg_vTvB0FyB";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-﻿const STORAGE_KEY = "tomosu-state-v1";
+const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
 const PLAN_RANK = { C: 1, B: 2, A: 3 };
@@ -150,7 +150,7 @@ let ui = {
   focusPausedAt: null,
 };
 
-init();
+// init() は Supabase auth 解決後に呼ばれます（ファイル末尾参照）
 
 function buildInitialPlanTuning() {
   return {
@@ -622,13 +622,14 @@ function init() {
   ensureGoalCollection();
   if (state.meta.demoMode && state.meta.currentView === "setup") {
     state.meta.currentView = "today";
-    saveState();
+    saveNavState();
   }
   syncSelectedSessionPlan(true);
   startClock();
   startSessionTicker();
   bindEvents();
   render();
+  // 3分ごとに他デバイスの変更を自動取得
   setInterval(() => {
     if (!state.activeSession) _resyncFromSupabase();
   }, 3 * 60 * 1000);
@@ -647,6 +648,7 @@ function bindEvents() {
     setTimeout(updateVH, 300);
   });
 
+  // iOS/Android: 最初のユーザー操作でAudioContextを解禁
   document.addEventListener("touchstart", _ensureAudioCtx, { once: true });
   document.addEventListener("click", _ensureAudioCtx, { once: true });
 
@@ -657,7 +659,12 @@ function bindEvents() {
     if (document.hidden) {
       pauseFocusSession();
     } else {
-      if (state.activeSession && !ui.finishDraft) resumeFocusSession();
+      if (state.activeSession && !ui.finishDraft) {
+        resumeFocusSession();
+        // 画面復帰時にウェイクロックを再取得（スリープ解除後も継続）
+        requestWakeLock();
+      }
+      // タブに戻ったとき他のデバイスの変更を取得
       _resyncFromSupabase();
     }
   });
@@ -671,7 +678,6 @@ function bindEvents() {
   window.addEventListener("focus", () => {
     if (!document.hidden && state.activeSession && !ui.finishDraft) {
       resumeFocusSession();
-      requestWakeLock();
     }
   });
 }
@@ -913,6 +919,11 @@ function handleClick(event) {
 
   if (action === "export-data") {
     exportData();
+    return;
+  }
+
+  if (action === "sign-out") {
+    signOut();
     return;
   }
 
@@ -1159,7 +1170,7 @@ function handleClick(event) {
     ui.showAbortConfirm = false;
     saveState();
     render();
-    showToast(`セッションを取り消しました。`);
+    showToast("セッションを取り消しました。");
     return;
   }
 
@@ -1493,6 +1504,7 @@ function render() {
   renderSessionSheet();
   startSessionTicker();
 
+  // 習慣 / 目標でアンビエント背景色を切り替え
   const ambientLeft = document.querySelector(".ambient--left");
   const ambientRight = document.querySelector(".ambient--right");
   if (ambientLeft && ambientRight) {
@@ -2202,6 +2214,7 @@ function renderSetupView() {
           <div class="setup-nav__data-actions">
             <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">エクスポート</button>
             <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">インポート</button>
+            <button type="button" class="ghost-button setup-nav__data-btn" data-action="sign-out">ログアウト</button>
           </div>
         </aside>
 
@@ -2485,7 +2498,9 @@ function renderRoadmapCurrentStatus(roadmap) {
 }
 
 function renderRoadmapView() {
-  if (state.setup.goalType === "habit") return renderHabitStreakRoadmap();
+  if (state.setup.goalType === "habit") {
+    return renderHabitStreakRoadmap();
+  }
   const roadmap = computeRoadmap(state);
 
   return `
@@ -2518,6 +2533,7 @@ function renderHabitStreakRoadmap() {
   const growth = getBonsaiGrowth(state.logs || []);
   const executedDays = growth.executedDays;
   const bonsaiMeta = getBonsaiTypeMeta(state.setup.bonsaiKey || "pine");
+
   const milestones = [
     { days: 7,   label: "7日",   desc: "最初の壁を越えた",       emoji: "🌱" },
     { days: 21,  label: "21日",  desc: "リズムが生まれてくる",   emoji: "🪴" },
@@ -2525,19 +2541,36 @@ function renderHabitStreakRoadmap() {
     { days: 100, label: "100日", desc: "本物の習慣へ",           emoji: "🎋" },
     { days: 365, label: "1年",   desc: "人生が変わった",         emoji: "⛩️" },
   ];
+
   const nextMilestone = milestones.find(m => executedDays < m.days);
   const daysToNext = nextMilestone ? nextMilestone.days - executedDays : 0;
+
   return `
     <section class="screen">
-      <div class="hero"><div class="hero__sticky"><div class="hero__accent"></div>${renderActiveGoalContext()}</div></div>
-      <section class="panel panel--cool stack">
-        <div class="status-strip"><span class="status-badge">${escapeHtml(bonsaiMeta.label)} / ${escapeHtml(growth.stageLabel)}</span></div>
-        <div style="text-align:center;padding:8px 0 4px">
-          <p style="font-size:3rem;margin:0;line-height:1.1">${executedDays}</p>
-          <p style="font-size:0.85rem;color:var(--muted);margin:4px 0 0">実施した日数</p>
+      <div class="hero">
+        <div class="hero__sticky">
+          <div class="hero__accent"></div>
+          ${renderActiveGoalContext()}
         </div>
-        ${nextMilestone ? `<div style="font-size:0.82rem;color:var(--muted);text-align:center">次のマイルストーン「${escapeHtml(nextMilestone.label)}」まで あと <strong style="color:var(--ink)">${daysToNext}日</strong></div>` : `<div style="font-size:0.88rem;text-align:center;color:var(--accent)">🎉 すべてのマイルストーンを達成！</div>`}
+      </div>
+
+      <section class="panel panel--cool stack">
+        <div class="status-strip">
+          <span class="status-badge">${bonsaiMeta.label} / ${escapeHtml(growth.stageLabel)}</span>
+        </div>
+        <div style="text-align:center; padding: 8px 0 4px">
+          <p style="font-size:3rem; margin:0; line-height:1.1">${executedDays}</p>
+          <p style="font-size:0.85rem; color:var(--muted); margin:4px 0 0">実施した日数</p>
+        </div>
+        ${nextMilestone ? `
+          <div style="font-size:0.82rem; color:var(--muted); text-align:center">
+            次のマイルストーン「${escapeHtml(nextMilestone.label)}」まで あと <strong style="color:var(--ink)">${daysToNext}日</strong>
+          </div>
+        ` : `
+          <div style="font-size:0.88rem; text-align:center; color:var(--accent)">🎉 すべてのマイルストーンを達成！</div>
+        `}
       </section>
+
       <section class="panel stack">
         <h2 class="section-title">習慣の道のり</h2>
         <div class="stack" style="gap:10px">
@@ -2545,19 +2578,31 @@ function renderHabitStreakRoadmap() {
             const done = executedDays >= m.days;
             const isCurrent = nextMilestone && nextMilestone.days === m.days;
             const pct = Math.min(100, Math.round(executedDays / m.days * 100));
-            return `<div style="border-radius:14px;padding:14px 16px;background:${done ? "var(--panel-bg,rgba(255,253,246,0.9))" : "rgba(0,0,0,0.03)"};border:1.5px solid ${done ? "var(--accent,#c75e33)" : isCurrent ? "rgba(0,0,0,0.15)" : "rgba(0,0,0,0.07)"};opacity:${done || isCurrent ? "1" : "0.55"}">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isCurrent ? "8px" : "0"}">
-                <span style="font-size:1.4rem">${m.emoji}</span>
-                <div style="flex:1">
-                  <div style="display:flex;justify-content:space-between;align-items:baseline">
-                    <strong style="font-size:0.95rem">${escapeHtml(m.label)}</strong>
-                    <span style="font-size:0.78rem;color:var(--muted)">${done ? "✓ 達成" : `${executedDays}/${m.days}日`}</span>
+            return `
+              <div style="
+                border-radius:14px;
+                padding:14px 16px;
+                background:${done ? "var(--panel-bg, rgba(255,253,246,0.9))" : "rgba(0,0,0,0.03)"};
+                border:1.5px solid ${done ? "var(--accent, #c75e33)" : isCurrent ? "rgba(0,0,0,0.15)" : "rgba(0,0,0,0.07)"};
+                opacity:${done || isCurrent ? "1" : "0.55"};
+              ">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isCurrent ? "8px" : "0"}">
+                  <span style="font-size:1.4rem">${m.emoji}</span>
+                  <div style="flex:1">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline">
+                      <strong style="font-size:0.95rem">${escapeHtml(m.label)}</strong>
+                      <span style="font-size:0.78rem;color:var(--muted)">${done ? "✓ 達成" : `${executedDays}/${m.days}日`}</span>
+                    </div>
+                    <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0">${escapeHtml(m.desc)}</p>
                   </div>
-                  <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0">${escapeHtml(m.desc)}</p>
                 </div>
+                ${isCurrent ? `
+                  <div style="background:rgba(0,0,0,0.08);border-radius:99px;height:5px;overflow:hidden">
+                    <div style="height:100%;width:${pct}%;background:var(--accent,#c75e33);border-radius:99px;transition:width .4s"></div>
+                  </div>
+                ` : ""}
               </div>
-              ${isCurrent ? `<div style="background:rgba(0,0,0,0.08);border-radius:99px;height:5px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--accent,#c75e33);border-radius:99px"></div></div>` : ""}
-            </div>`;
+            `;
           }).join("")}
         </div>
       </section>
@@ -3937,7 +3982,7 @@ function renderSessionSheet() {
               <div class="panel panel--cool">
                 ${state.setup.goal ? `<p style="font-size:0.8rem;font-weight:600;opacity:0.6;text-align:center;margin:0 0 2px;letter-spacing:0.02em">${escapeHtml(state.setup.goal)}</p>` : ""}
                 <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : (ui.focusPausedAt ? "⏸" : formatCountdown(remaining))}</p>
-                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession.departures}回<\/p>` : ""}
+                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession.departures}回</p>` : ""}
               </div>
             `
         }
@@ -3977,7 +4022,7 @@ function renderSessionSheet() {
 function openFinishDraft(planKey) {
   ui.selectedSessionPlan = planKey;
   const rawElapsed = state.activeSession
-    ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt - (state.activeSession.totalPausedMs || 0)) / 1000))
+    ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
     : state.plans[planKey].minutes * 60;
   const elapsedSeconds = Math.max(1, rawElapsed);
   const roadmap = computeRoadmap(state);
@@ -4016,29 +4061,19 @@ function pauseFocusSession() {
   if (!state.activeSession || ui.finishDraft || ui.focusPausedAt) return;
   ui.focusPausedAt = Date.now();
   state.activeSession.departures = (state.activeSession.departures || 0) + 1;
-  if (ui.sessionTimer) { window.clearInterval(ui.sessionTimer); ui.sessionTimer = null; }
+  if (ui.sessionTimer) {
+    window.clearInterval(ui.sessionTimer);
+    ui.sessionTimer = null;
+  }
   showFocusLostOverlay();
-  sendFocusNotification();
   saveState();
   render();
-}
-
-function sendFocusNotification() {
-  if (!("Notification" in window)) return;
-  if (Notification.permission === "granted") {
-    new Notification("⏸ 作業中です！", { body: "StreakBonsaiに戻ってタイマーを再開してください", icon: "./bonsai-favicon.svg" });
-  } else if (Notification.permission !== "denied") {
-    Notification.requestPermission().then(p => {
-      if (p === "granted") new Notification("⏸ 作業中です！", { body: "StreakBonsaiに戻ってタイマーを再開してください", icon: "./bonsai-favicon.svg" });
-    });
-  }
 }
 
 function resumeFocusSession() {
   if (!state.activeSession || ui.finishDraft || !ui.focusPausedAt) return;
   const pauseDuration = Date.now() - ui.focusPausedAt;
   state.activeSession.endsAt += pauseDuration;
-  state.activeSession.totalPausedMs = (state.activeSession.totalPausedMs || 0) + pauseDuration;
   ui.focusPausedAt = null;
   hideFocusLostOverlay();
   const d = state.activeSession.departures || 0;
@@ -4053,8 +4088,17 @@ function showFocusLostOverlay() {
   if (!overlay) {
     overlay = document.createElement("div");
     overlay.id = "focus-lost-overlay";
-    overlay.style.cssText = "position:fixed;inset:0;z-index:9998;background:rgba(20,16,10,0.82);backdrop-filter:blur(4px);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;gap:14px";
-    overlay.innerHTML = '<div style="font-size:2.8rem">⏸<\/div><p style="font-size:1.1rem;font-weight:700;margin:0">タイマーを一時停止しました<\/p><p style="font-size:0.88rem;opacity:0.75;margin:0">このタブに戻ると再開します<\/p>';
+    overlay.style.cssText = [
+      "position:fixed", "inset:0", "z-index:9998",
+      "background:rgba(20,16,10,0.82)", "backdrop-filter:blur(4px)",
+      "display:flex", "flex-direction:column", "align-items:center",
+      "justify-content:center", "color:#fff", "text-align:center", "gap:14px",
+    ].join(";");
+    overlay.innerHTML = `
+      <div style="font-size:2.8rem">⏸</div>
+      <p style="font-size:1.1rem;font-weight:700;margin:0">タイマーを一時停止しました</p>
+      <p style="font-size:0.88rem;opacity:0.75;margin:0">このタブに戻ると再開します</p>
+    `;
     document.body.appendChild(overlay);
   }
   overlay.hidden = false;
@@ -4065,12 +4109,6 @@ function hideFocusLostOverlay() {
   if (overlay) overlay.hidden = true;
 }
 
-function requestNotificationPermission() {
-  if ("Notification" in window && Notification.permission === "default") {
-    Notification.requestPermission();
-  }
-}
-
 function beginSession(planKey) {
   const now = Date.now();
   state.activeSession = {
@@ -4078,12 +4116,10 @@ function beginSession(planKey) {
     startedAt: now,
     endsAt: now + state.plans[planKey].minutes * 60 * 1000,
     departures: 0,
-    totalPausedMs: 0,
   };
   ui.selectedSessionPlan = planKey;
   ui.finishDraft = null;
   ui.sessionOpen = true;
-  requestNotificationPermission();
   requestWakeLock();
   saveState();
   startSessionTicker();
@@ -4101,7 +4137,7 @@ function recordLog(outcome, reason, details = {}) {
   const date = toISODate(new Date());
   const defaultPlannedSeconds = state.plans[outcome] ? state.plans[outcome].minutes * 60 : 0;
   const sessionElapsedSeconds = state.activeSession
-    ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt - (state.activeSession.totalPausedMs || 0)) / 1000))
+    ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
     : 0;
   const elapsedSeconds = Number(details.elapsedSeconds || sessionElapsedSeconds || defaultPlannedSeconds || 0);
   const plannedSeconds = Number(details.plannedSeconds || defaultPlannedSeconds || 0);
@@ -5326,11 +5362,15 @@ function mergeState(base, saved) {
 function saveState() {
   syncActiveGoalRecord();
   if (!state.meta) state.meta = {};
-  state.meta.lastSavedAt = Date.now();
+  state.meta.lastSavedAt = Date.now(); // 最終保存タイムスタンプ（デバイス間競合解決用）
   localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
-  if (_supabaseLoadedSuccessfully) scheduleSyncToSupabase();
+  if (_supabaseLoadedSuccessfully) {
+    scheduleSyncToSupabase(); // Supabase接続済みのときだけ同期（古いデータで上書きを防ぐ）
+  }
 }
 
+// ナビゲーション状態のみ保存（タイムスタンプ更新・Supabase同期なし）
+// タブ切り替えなどのUI操作でタイムスタンプが更新されてデータ競合が起きるのを防ぐ
 function saveNavState() {
   localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
 }
@@ -5389,6 +5429,7 @@ function startClock() {
 }
 
 function startSessionTicker() {
+  // Don't tick while focus-paused
   if (ui.focusPausedAt) return;
   // Already running correctly — don't reset the interval
   if (ui.sessionTimer && state.activeSession && !ui.finishDraft) {
@@ -5895,7 +5936,9 @@ async function requestWakeLock() {
   if (!("wakeLock" in navigator)) return;
   try {
     _wakeLock = await navigator.wakeLock.request("screen");
-  } catch (e) {}
+  } catch (e) {
+    // 権限拒否やブラウザ非対応は無視
+  }
 }
 
 function releaseWakeLock() {
@@ -5904,6 +5947,8 @@ function releaseWakeLock() {
     _wakeLock = null;
   }
 }
+
+// ── 音声（お寺の鐘） ──────────────────────────────────────
 
 let _audioCtx = null;
 
@@ -5925,6 +5970,8 @@ function playTempleBell() {
     if (!ctx) return;
     const now = ctx.currentTime;
     const decay = 4.5;
+
+    // お寺の鐘：やや非調波な倍音構成（ブロンズ製鐘の特性）
     const partials = [
       { freq: 120,  amp: 0.55 },
       { freq: 240,  amp: 0.28 },
@@ -5933,11 +5980,13 @@ function playTempleBell() {
       { freq: 762,  amp: 0.04 },
       { freq: 1020, amp: 0.02 },
     ];
+
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.001, now);
     master.gain.linearRampToValueAtTime(0.75, now + 0.015);
     master.gain.exponentialRampToValueAtTime(0.001, now + decay);
     master.connect(ctx.destination);
+
     partials.forEach(({ freq, amp }) => {
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
@@ -5952,11 +6001,11 @@ function playTempleBell() {
   } catch (e) {}
 }
 
-
 // ── Supabase ↔ ローカル同期 ──────────────────────────────
 
-async function loadStateFromSupabase(userId) {
+async function loadStateFromSupabase(userId, { force = false } = {}) {
   try {
+    // モバイル回線対策: 7秒でタイムアウトしてローカルデータで起動
     const fetchPromise = sb
       .from("user_data")
       .select("state")
@@ -5966,9 +6015,12 @@ async function loadStateFromSupabase(userId) {
       setTimeout(() => resolve({ data: null, error: { code: "TIMEOUT" } }), 7000)
     );
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
     if (error?.code === "TIMEOUT") {
-      console.warn("Supabase load timeout: will retry in 15s");
+      console.warn("Supabase load timeout: using local state, will retry");
+      // タイムアウトでもフラグを立てて、以降のsaveStateがSupabaseに届くようにする
       _supabaseLoadedSuccessfully = true;
+      // 15秒後にバックグラウンドで再試行（他デバイスの最新データを取得する）
       setTimeout(() => _resyncFromSupabase(), 15000);
       return;
     }
@@ -5976,14 +6028,20 @@ async function loadStateFromSupabase(userId) {
       console.warn("Supabase load error:", error);
       return;
     }
+
     _supabaseLoadedSuccessfully = true;
+
     if (data?.state && Object.keys(data.state).length > 0) {
       const supabaseTs = data.state.meta?.lastSavedAt || 0;
       const localTs = state.meta?.lastSavedAt || 0;
-      if (supabaseTs >= localTs) {
+      // force=true（ログイン時）: Supabaseを常に優先。タイムスタンプ比較はしない。
+      // これにより「PCで少し前に操作→スマホで完了→PCでログイン」でも正しく同期される。
+      if (force || supabaseTs >= localTs) {
+        // Supabaseデータで上書き
         state = mergeState(buildSeedState(), data.state);
         localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
       } else {
+        // バックグラウンド再同期時のみ: ローカルが新しければSupabaseに同期
         scheduleSyncToSupabase();
       }
     }
@@ -5992,6 +6050,7 @@ async function loadStateFromSupabase(userId) {
   }
 }
 
+// タブに戻ったとき・タイムアウト後の再同期
 async function _resyncFromSupabase() {
   if (!_appInitialized || state.activeSession) return;
   try {
@@ -5999,7 +6058,9 @@ async function _resyncFromSupabase() {
     if (!user) return;
     const prevTs = state.meta?.lastSavedAt || 0;
     await loadStateFromSupabase(user.id);
-    if ((state.meta?.lastSavedAt || 0) !== prevTs) render();
+    if ((state.meta?.lastSavedAt || 0) !== prevTs) {
+      render(); // データが更新されたら再描画
+    }
   } catch (err) {
     console.warn("Resync error:", err);
   }
@@ -6010,10 +6071,16 @@ async function pushStateToSupabase() {
   if (!user) return;
   syncActiveGoalRecord();
   try {
-    const { data: existing } = await sb.from("user_data").select("state").eq("user_id", user.id).single();
+    // プッシュ前に競合チェック: Supabaseが新しければローカルを更新してプッシュしない
+    const { data: existing } = await sb
+      .from("user_data")
+      .select("state")
+      .eq("user_id", user.id)
+      .single();
     const supabaseTs = existing?.state?.meta?.lastSavedAt || 0;
     const localTs = state.meta?.lastSavedAt || 0;
     if (supabaseTs > localTs) {
+      // Supabaseの方が新しい（他デバイスで更新あり）→ ローカルに取り込む
       state = mergeState(buildSeedState(), existing.state);
       localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
       render();
@@ -6025,6 +6092,7 @@ async function pushStateToSupabase() {
     );
   } catch (err) {
     console.warn("Supabase sync error:", err);
+    // 失敗時は30秒後にリトライ
     setTimeout(() => pushStateToSupabase(), 30000);
   }
 }
@@ -6033,6 +6101,7 @@ function scheduleSyncToSupabase() {
   clearTimeout(_syncTimer);
   _syncTimer = setTimeout(pushStateToSupabase, 2000);
 }
+
 // ── Auth UI ──────────────────────────────────────────────
 
 const _authOverlay = document.querySelector("#auth-overlay");
@@ -6155,15 +6224,17 @@ _authForm.addEventListener("submit", async (e) => {
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
     if (!_appInitialized) {
-      await loadStateFromSupabase(session.user.id);
+      // ログイン時は必ずSupabaseを優先（force=true）
+      await loadStateFromSupabase(session.user.id, { force: true });
       _authOverlay.hidden = true;
-      window.scrollTo(0, 0);
+      window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       _appInitialized = true;
       init();
     } else if (event === "SIGNED_IN") {
-      await loadStateFromSupabase(session.user.id);
+      // 再ログイン時も必ずSupabaseを優先（force=true）
+      await loadStateFromSupabase(session.user.id, { force: true });
       _authOverlay.hidden = true;
-      window.scrollTo(0, 0);
+      window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       render();
     }
   } else {
