@@ -1,4 +1,4 @@
-﻿// =========================================================
+// =========================================================
 // SUPABASE 設定
 // =========================================================
 const SUPABASE_URL = "https://kyzyyciutnkhaxadwdlx.supabase.co";
@@ -702,6 +702,7 @@ function handleKeydown(event) {
     state.meta.currentView = tabViews[viewIndex];
     saveNavState();
     render();
+    if (screenFrame) screenFrame.scrollTop = 0;
     return;
   }
 
@@ -757,6 +758,7 @@ function handleClick(event) {
     state.meta.currentView = target.dataset.view;
     saveNavState();
     render();
+    if (screenFrame) screenFrame.scrollTop = 0;
     return;
   }
 
@@ -6230,12 +6232,16 @@ sb.auth.onAuthStateChange(async (event, session) => {
       window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       _appInitialized = true;
       init();
+      if (screenFrame) screenFrame.scrollTop = 0;
+      setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100);
     } else if (event === "SIGNED_IN") {
       // 再ログイン時も必ずSupabaseを優先（force=true）
       await loadStateFromSupabase(session.user.id, { force: true });
       _authOverlay.hidden = true;
       window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       render();
+      if (screenFrame) screenFrame.scrollTop = 0;
+      setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100);
     }
   } else {
     _appInitialized = false;
