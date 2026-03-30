@@ -5442,24 +5442,28 @@ function openTimerPiP() {
     _pipWindow = null;
     return;
   }
-  window.documentPictureInPicture.requestWindow({ width: 220, height: 150 }).then(function(pipWin) {
+  window.documentPictureInPicture.requestWindow({ width: 220, height: 130 }).then(function(pipWin) {
     _pipWindow = pipWin;
-    pipWin.document.documentElement.innerHTML = '<html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{background:linear-gradient(150deg,rgba(248,253,255,0.96) 0%,rgba(235,246,246,0.92) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:\"BIZ UDPGothic\",\"Hiragino Sans\",\"Yu Gothic UI\",sans-serif;color:#2c2820;gap:4px;padding:12px}#pip-goal{font-size:0.68rem;color:rgba(44,40,32,0.55);text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}#pip-timer{font-size:2.8rem;font-weight:800;letter-spacing:-0.05em;line-height:1;color:#2c2820}<\/style><\/head><body><div id=\"pip-goal\"><\/div><div id=\"pip-timer\">--:--<\/div><\/body><\/html>';
+    var style = pipWin.document.createElement('style');
+    style.textContent = '*{margin:0;padding:0;box-sizing:border-box}body{background:linear-gradient(150deg,rgba(248,253,255,0.96) 0%,rgba(235,246,246,0.92) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;color:#2c2820;gap:4px;padding:12px}#pip-goal{font-size:0.68rem;color:rgba(44,40,32,0.55);text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}#pip-timer{font-size:2.8rem;font-weight:800;letter-spacing:-0.05em;line-height:1;color:#2c2820}';
+    pipWin.document.head.appendChild(style);
+    pipWin.document.body.innerHTML = '<div id="pip-goal"></div><div id="pip-timer">--:--</div>';
     updatePiP();
-    pipWin.addEventListener('pagehide', function() { _pipWindow = null; });
   }).catch(function(e) { console.warn('PiP error:', e); });
 }
 
 function updatePiP() {
-  if (!_pipWindow || _pipWindow.closed) return;
-  var pipDoc = _pipWindow.document;
-  var timerEl = pipDoc.getElementById('pip-timer');
-  if (!timerEl) return;
-  var mainTimer = document.getElementById('session-timer-value');
-  if (mainTimer) timerEl.textContent = mainTimer.textContent;
-  var goalEl = pipDoc.getElementById('pip-goal');
-  if (goalEl && state && state.setup) goalEl.textContent = state.setup.goal || '';
-
+  if (!_pipWindow) return;
+  try {
+    if (_pipWindow.closed) { _pipWindow = null; return; }
+    var pipDoc = _pipWindow.document;
+    var timerEl = pipDoc.getElementById('pip-timer');
+    if (!timerEl) return;
+    var mainTimer = document.getElementById('session-timer-value');
+    if (mainTimer) timerEl.textContent = mainTimer.textContent;
+    var goalEl = pipDoc.getElementById('pip-goal');
+    if (goalEl && state && state.setup) goalEl.textContent = state.setup.goal || '';
+  } catch(e) { _pipWindow = null; }
 }
 
 function closePiP() {
