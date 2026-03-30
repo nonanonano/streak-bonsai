@@ -657,7 +657,7 @@ function bindEvents() {
   document.addEventListener("keydown", handleKeydown);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
-      pauseFocusSession();
+      // tab visibility pause disabled
     } else {
       if (state.activeSession && !ui.finishDraft) {
         resumeFocusSession();
@@ -5443,7 +5443,7 @@ function openTimerPiP() {
   }
   window.documentPictureInPicture.requestWindow({ width: 220, height: 150 }).then(function(pipWin) {
     _pipWindow = pipWin;
-    pipWin.document.documentElement.innerHTML = '<html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#fff;gap:6px}#pip-goal{font-size:0.72rem;color:#aaa;text-align:center;padding:0 8px;max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}#pip-timer{font-size:2.4rem;font-weight:bold;color:#7ec8e3;letter-spacing:0.05em}#pip-dep{font-size:0.7rem;color:#f0a500}<\/style><\/head><body><div id=\"pip-goal\"><\/div><div id=\"pip-timer\">--:--<\/div><div id=\"pip-dep\"><\/div><\/body><\/html>';
+    pipWin.document.documentElement.innerHTML = '<html><head><style>*{margin:0;padding:0;box-sizing:border-box}body{background:linear-gradient(150deg,rgba(248,253,255,0.96) 0%,rgba(235,246,246,0.92) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:\"BIZ UDPGothic\",\"Hiragino Sans\",\"Yu Gothic UI\",sans-serif;color:#2c2820;gap:4px;padding:12px}#pip-goal{font-size:0.68rem;color:rgba(44,40,32,0.55);text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}#pip-timer{font-size:2.8rem;font-weight:800;letter-spacing:-0.05em;line-height:1;color:#2c2820}<\/style><\/head><body><div id=\"pip-goal\"><\/div><div id=\"pip-timer\">--:--<\/div><\/body><\/html>';
     updatePiP();
     pipWin.addEventListener('pagehide', function() { _pipWindow = null; });
   }).catch(function(e) { console.warn('PiP error:', e); });
@@ -5458,11 +5458,7 @@ function updatePiP() {
   if (mainTimer) timerEl.textContent = mainTimer.textContent;
   var goalEl = pipDoc.getElementById('pip-goal');
   if (goalEl && state && state.setup) goalEl.textContent = state.setup.goal || '';
-  var depEl = pipDoc.getElementById('pip-dep');
-  if (depEl && state && state.activeSession) {
-    var d = state.activeSession.departures || 0;
-    depEl.textContent = d > 0 ? '離脱 ' + d + '回' : '';
-  }
+
 }
 
 function closePiP() {
