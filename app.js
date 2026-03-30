@@ -4061,6 +4061,7 @@ function saveFinishDraft() {
 }
 
 function pauseFocusSession() {
+  return; // focus pause disabled
   if (!state.activeSession || ui.finishDraft || ui.focusPausedAt) return;
   ui.focusPausedAt = Date.now();
   state.activeSession.departures = (state.activeSession.departures || 0) + 1;
