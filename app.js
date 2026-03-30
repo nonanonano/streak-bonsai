@@ -1,4 +1,11 @@
-﻿const STORAGE_KEY = "tomosu-state-v1";
+﻿// =========================================================
+// SUPABASE 設定
+// =========================================================
+const SUPABASE_URL = "https://kyzyyciutnkhaxadwdlx.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_8BS-Guu8UUfb3sEHRfHGRg_vTvB0FyB";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
 const PLAN_RANK = { C: 1, B: 2, A: 3 };
@@ -136,12 +143,14 @@ let ui = {
   sessionOpen: false,
   selectedSessionPlan: "A",
   finishDraft: null,
+  showAbortConfirm: false,
   toastTimer: null,
   clockTimer: null,
   sessionTimer: null,
+  focusPausedAt: null,
 };
 
-init();
+// init() は Supabase auth 解決後に呼ばれます（ファイル末尾参照）
 
 function buildInitialPlanTuning() {
   return {
@@ -579,7 +588,8 @@ function listGoalsForToday(date = new Date()) {
         return !(todayLog && todayLog.outcome !== "miss" && todayLog.outcome !== "none");
       }
       return !getGoalMissionStateForDate(goal, date).isClosed;
-    });
+    })
+    .sort(compareGoalsByPrimaryWindow);
 }
 
 function activateGoal(goalId) {
@@ -612,19 +622,64 @@ function init() {
   ensureGoalCollection();
   if (state.meta.demoMode && state.meta.currentView === "setup") {
     state.meta.currentView = "today";
-    saveState();
+    saveNavState();
   }
   syncSelectedSessionPlan(true);
   startClock();
   startSessionTicker();
   bindEvents();
   render();
+  // 3分ごとに他デバイスの変更を自動取得
+  setInterval(() => {
+    if (!state.activeSession) _resyncFromSupabase();
+  }, 3 * 60 * 1000);
+}
+
+function updateVH() {
+  document.documentElement.style.setProperty("--real-100vh", window.innerHeight + "px");
 }
 
 function bindEvents() {
+  // 画面の向き切り替え時にビューポート高さを再計算
+  updateVH();
+  window.addEventListener("resize", updateVH);
+  window.addEventListener("orientationchange", () => {
+    setTimeout(updateVH, 50);
+    setTimeout(updateVH, 300);
+  });
+
+  // iOS/Android: 最初のユーザー操作でAudioContextを解禁
+  document.addEventListener("touchstart", _ensureAudioCtx, { once: true });
+  document.addEventListener("click", _ensureAudioCtx, { once: true });
+
   document.addEventListener("click", handleClick);
   document.addEventListener("input", handleInput);
   document.addEventListener("keydown", handleKeydown);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      pauseFocusSession();
+    } else {
+      if (state.activeSession && !ui.finishDraft) {
+        resumeFocusSession();
+        // 画面復帰時にウェイクロックを再取得（スリープ解除後も継続）
+        requestWakeLock();
+      }
+      // タブに戻ったとき他のデバイスの変更を取得
+      _resyncFromSupabase();
+    }
+  });
+
+  window.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (!document.hidden) pauseFocusSession();
+    }, 200);
+  });
+
+  window.addEventListener("focus", () => {
+    if (!document.hidden && state.activeSession && !ui.finishDraft) {
+      resumeFocusSession();
+    }
+  });
 }
 
 function handleKeydown(event) {
@@ -638,8 +693,14 @@ function handleKeydown(event) {
   const tabViews = ["today", "roadmap", "review", "garden"];
   const viewIndex = Number(event.key) - 1;
   if (viewIndex >= 0 && viewIndex < tabViews.length) {
+    if (state.activeSession) {
+      ui.sessionOpen = true;
+      render();
+      showToast("セッション中は画面を切り替えられません");
+      return;
+    }
     state.meta.currentView = tabViews[viewIndex];
-    saveState();
+    saveNavState();
     render();
     return;
   }
@@ -653,6 +714,9 @@ function handleKeydown(event) {
       state.meta.currentView = "today";
       render();
     } else if (ui.sessionOpen || state.activeSession) {
+      if (state.activeSession && !ui.finishDraft) {
+        pauseFocusSession();
+      }
       ui.sessionOpen = false;
       render();
     }
@@ -679,18 +743,31 @@ function handleClick(event) {
   const { action } = target.dataset;
 
   if (action === "navigate") {
+    if (state.activeSession) {
+      ui.sessionOpen = true;
+      render();
+      showToast("セッション中は画面を切り替えられません");
+      return;
+    }
     ui.missPanelOpen = false;
     if (target.dataset.view !== "review") {
       ui.reviewLogDraft = null;
       ui.reviewLogExpanded = false;
     }
     state.meta.currentView = target.dataset.view;
-    saveState();
+    saveNavState();
     render();
+    if (screenFrame) screenFrame.scrollTop = 0; // タブ切り替え時にスクロールをトップに戻す
     return;
   }
 
   if (action === "open-setup") {
+    if (state.activeSession) {
+      ui.sessionOpen = true;
+      render();
+      showToast("セッション中は設定を開けません");
+      return;
+    }
     ui.setupMode = "edit";
     ui.setupDraft = expandSetup(state.setup);
     ui.goalLibraryDraft = null;
@@ -846,6 +923,11 @@ function handleClick(event) {
     return;
   }
 
+  if (action === "sign-out") {
+    signOut();
+    return;
+  }
+
   if (action === "import-data") {
     const fileInput = document.createElement("input");
     fileInput.type = "file";
@@ -992,6 +1074,9 @@ function handleClick(event) {
   }
 
   if (action === "close-session") {
+    if (state.activeSession && !ui.finishDraft) {
+      pauseFocusSession();
+    }
     ui.sessionOpen = false;
     render();
     return;
@@ -1033,9 +1118,15 @@ function handleClick(event) {
   }
 
   if (action === "downgrade-session") {
-    const basePlan = state.activeSession ? state.activeSession.planKey : ui.selectedSessionPlan;
-    const lighterPlan = nextPlanDown(basePlan);
-    openFinishDraft(lighterPlan);
+    const rawElapsed = state.activeSession
+      ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
+      : 0;
+    const elapsedMinutes = Math.max(1, Math.round(rawElapsed / 60));
+    // Pick the heaviest plan whose minutes fit within elapsed time; fallback to lightest
+    const plans = Object.entries(state.plans).sort((a, b) => b[1].minutes - a[1].minutes);
+    const fit = plans.find(([, p]) => p.minutes <= elapsedMinutes);
+    const appropriatePlan = fit ? fit[0] : plans[plans.length - 1][0];
+    openFinishDraft(appropriatePlan);
     render();
     return;
   }
@@ -1051,6 +1142,36 @@ function handleClick(event) {
     ui.finishDraft = null;
     startSessionTicker();
     render();
+    return;
+  }
+
+  if (action === "confirm-abort-session") {
+    ui.showAbortConfirm = true;
+    render();
+    return;
+  }
+
+  if (action === "cancel-abort-confirm") {
+    ui.showAbortConfirm = false;
+    render();
+    return;
+  }
+
+  if (action === "abort-session") {
+    if (ui.sessionTimer) {
+      window.clearInterval(ui.sessionTimer);
+      ui.sessionTimer = null;
+    }
+    hideFocusLostOverlay();
+    releaseWakeLock();
+    state.activeSession = null;
+    ui.sessionOpen = false;
+    ui.finishDraft = null;
+    ui.focusPausedAt = null;
+    ui.showAbortConfirm = false;
+    saveState();
+    render();
+    showToast("セッションを取り消しました。");
     return;
   }
 
@@ -1382,6 +1503,21 @@ function render() {
     screenRoot.innerHTML = `<div class="screen" style="padding:32px 24px;text-align:center;"><p style="font-size:1.1rem;margin-bottom:8px;">表示エラーが発生しました</p><p style="font-size:0.82rem;color:var(--muted)">${escapeHtml(String(err.message || err))}</p></div>`;
   }
   renderSessionSheet();
+  startSessionTicker();
+
+  // 習慣 / 目標でアンビエント背景色を切り替え
+  const ambientLeft = document.querySelector(".ambient--left");
+  const ambientRight = document.querySelector(".ambient--right");
+  if (ambientLeft && ambientRight) {
+    const isHabitGoal = state.setup.goalType === "habit";
+    if (isHabitGoal) {
+      ambientLeft.style.background = "radial-gradient(circle, rgba(130,190,155,0.8) 0%, rgba(130,190,155,0) 70%)";
+      ambientRight.style.background = "radial-gradient(circle, rgba(90,160,120,0.65) 0%, rgba(90,160,120,0) 70%)";
+    } else {
+      ambientLeft.style.background = "radial-gradient(circle, rgba(218,120,100,0.75) 0%, rgba(218,120,100,0) 70%)";
+      ambientRight.style.background = "radial-gradient(circle, rgba(195,90,80,0.6) 0%, rgba(195,90,80,0) 70%)";
+    }
+  }
 }
 
 function deriveShortMinutes(normalMinutes, minimumMinutes) {
@@ -1946,6 +2082,7 @@ function renderTodayHabitCard(goal, index) {
         </div>
         <div class="focus-launch__goal-timing">
           <span class="focus-launch__goal-slot">${escapeHtml(bonsaiMeta.label)} / ${escapeHtml(growth.stageLabel)}</span>
+          ${(() => { const w = goal.setup.primaryWindow || (goal.setup.primaryStart && goal.setup.primaryEnd ? `${goal.setup.primaryStart}-${goal.setup.primaryEnd}` : ""); return w ? `<span class="focus-launch__goal-slot">実施時間 ${escapeHtml(w)}</span>` : ""; })()}
         </div>
       </div>
       <div class="focus-launch__title-row">
@@ -1985,10 +2122,12 @@ function renderActiveGoalContext(options = {}) {
       <div class="goal-selector__body">
         ${goals.map((goal) => {
           const isActive = goal.id === state.meta.activeGoalId;
+          const isHabit = goal.setup?.goalType === "habit";
+          const typeClass = isHabit ? "goal-selector__option--habit" : "goal-selector__option--goal";
           return `
             <button
               type="button"
-              class="goal-selector__option ${isActive ? "is-active" : ""}"
+              class="goal-selector__option ${typeClass} ${isActive ? "is-active" : ""}"
               data-action="activate-goal"
               data-goal-id="${goal.id}"
               ${isActive ? "disabled" : ""}
@@ -2020,6 +2159,7 @@ function renderSetupView() {
     ? (isNewGoal ? "今の Today は変えずに、新しい目標を追加します。" : activeSection.copy)
     : (isNewGoal ? newGoalSectionCopy[activeSectionKey] || activeSection.copy : activeSection.copy);
   const showSaveAction = !(activeSectionKey === "goal" && !isNewGoal);
+  const isHabitMode = isNewGoal ? draft.goalType === "habit" : state.setup.goalType === "habit";
   const setupMenu = [
     renderSetupMenuItem({
       action: "start-new-goal",
@@ -2037,7 +2177,7 @@ function renderSetupView() {
       iconKey: "goal",
       active: !isNewGoal && activeSectionKey === "goal",
     }),
-    renderSetupMenuItem({
+    !isHabitMode && renderSetupMenuItem({
       action: "select-setup-section",
       section: "roadmap",
       label: "Roadmap",
@@ -2061,7 +2201,7 @@ function renderSetupView() {
       iconKey: "plan",
       active: activeSectionKey === "plan",
     }),
-  ].join("");
+  ].filter(Boolean).join("");
 
   return `
     <section class="screen screen--setup">
@@ -2075,6 +2215,7 @@ function renderSetupView() {
           <div class="setup-nav__data-actions">
             <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">エクスポート</button>
             <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">インポート</button>
+            <button type="button" class="ghost-button setup-nav__data-btn" data-action="sign-out">ログアウト</button>
           </div>
         </aside>
 
@@ -2113,7 +2254,6 @@ function renderTodayView() {
 
   return `
     <section class="screen screen--today screen--today-minimal">
-      ${renderActiveGoalContext()}
       <div class="focus-goal-list">
         ${goals.length
           ? goals.map((goal, index) => renderTodayGoalCard(goal, index)).join("")
@@ -2340,18 +2480,17 @@ function renderRoadmapCurrentStatus(roadmap) {
           <span class="status-badge ${milestone.isComplete ? "status-badge--done" : "status-badge--accent"}">${escapeHtml(statusLabel)}</span>
           <h2 class="section-title">${escapeHtml(milestone.label)}</h2>
           <p class="section-copy">${escapeHtml(deadlineLabel)}</p>
-          <p class="roadmap-focus-card__metric-label">全体進捗 ${overallProgress}%</p>
         </div>
         <div class="roadmap-focus-card__value-block">
-          <strong class="roadmap-focus-card__value">${achievementRate}%</strong>
-          <span class="roadmap-focus-card__value-label">節目進捗</span>
+          <strong class="roadmap-focus-card__value">${overallProgress}%</strong>
+          <span class="roadmap-focus-card__value-label">全体進捗</span>
         </div>
       </div>
 
       <div class="bullet-list">
         <div class="bullet-row">
           <div class="bullet">
-            <span class="bullet__fill bullet__fill--sage" style="--fill:${achievementRate}%"></span>
+            <span class="bullet__fill bullet__fill--sage" style="--fill:${overallProgress}%"></span>
           </div>
         </div>
       </div>
@@ -2360,6 +2499,9 @@ function renderRoadmapCurrentStatus(roadmap) {
 }
 
 function renderRoadmapView() {
+  if (state.setup.goalType === "habit") {
+    return renderHabitStreakRoadmap();
+  }
   const roadmap = computeRoadmap(state);
 
   return `
@@ -2383,6 +2525,87 @@ function renderRoadmapView() {
           <h2 class="section-title">全体のロードマップ</h2>
         </div>
         ${renderRoadmapMilestoneList(roadmap)}
+      </section>
+    </section>
+  `;
+}
+
+function renderHabitStreakRoadmap() {
+  const growth = getBonsaiGrowth(state.logs || []);
+  const executedDays = growth.executedDays;
+  const bonsaiMeta = getBonsaiTypeMeta(state.setup.bonsaiKey || "pine");
+
+  const milestones = [
+    { days: 7,   label: "7日",   desc: "最初の壁を越えた",       emoji: "🌱" },
+    { days: 21,  label: "21日",  desc: "リズムが生まれてくる",   emoji: "🪴" },
+    { days: 66,  label: "66日",  desc: "自動化の入り口",         emoji: "🌳" },
+    { days: 100, label: "100日", desc: "本物の習慣へ",           emoji: "🎋" },
+    { days: 365, label: "1年",   desc: "人生が変わった",         emoji: "⛩️" },
+  ];
+
+  const nextMilestone = milestones.find(m => executedDays < m.days);
+  const daysToNext = nextMilestone ? nextMilestone.days - executedDays : 0;
+
+  return `
+    <section class="screen">
+      <div class="hero">
+        <div class="hero__sticky">
+          <div class="hero__accent"></div>
+          ${renderActiveGoalContext()}
+        </div>
+      </div>
+
+      <section class="panel panel--cool stack">
+        <div class="status-strip">
+          <span class="status-badge">${bonsaiMeta.label} / ${escapeHtml(growth.stageLabel)}</span>
+        </div>
+        <div style="text-align:center; padding: 8px 0 4px">
+          <p style="font-size:3rem; margin:0; line-height:1.1">${executedDays}</p>
+          <p style="font-size:0.85rem; color:var(--muted); margin:4px 0 0">実施した日数</p>
+        </div>
+        ${nextMilestone ? `
+          <div style="font-size:0.82rem; color:var(--muted); text-align:center">
+            次のマイルストーン「${escapeHtml(nextMilestone.label)}」まで あと <strong style="color:var(--ink)">${daysToNext}日</strong>
+          </div>
+        ` : `
+          <div style="font-size:0.88rem; text-align:center; color:var(--accent)">🎉 すべてのマイルストーンを達成！</div>
+        `}
+      </section>
+
+      <section class="panel stack">
+        <h2 class="section-title">習慣の道のり</h2>
+        <div class="stack" style="gap:10px">
+          ${milestones.map(m => {
+            const done = executedDays >= m.days;
+            const isCurrent = nextMilestone && nextMilestone.days === m.days;
+            const pct = Math.min(100, Math.round(executedDays / m.days * 100));
+            return `
+              <div style="
+                border-radius:14px;
+                padding:14px 16px;
+                background:${done ? "var(--panel-bg, rgba(255,253,246,0.9))" : "rgba(0,0,0,0.03)"};
+                border:1.5px solid ${done ? "var(--accent, #c75e33)" : isCurrent ? "rgba(0,0,0,0.15)" : "rgba(0,0,0,0.07)"};
+                opacity:${done || isCurrent ? "1" : "0.55"};
+              ">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:${isCurrent ? "8px" : "0"}">
+                  <span style="font-size:1.4rem">${m.emoji}</span>
+                  <div style="flex:1">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline">
+                      <strong style="font-size:0.95rem">${escapeHtml(m.label)}</strong>
+                      <span style="font-size:0.78rem;color:var(--muted)">${done ? "✓ 達成" : `${executedDays}/${m.days}日`}</span>
+                    </div>
+                    <p style="font-size:0.8rem;color:var(--muted);margin:2px 0 0">${escapeHtml(m.desc)}</p>
+                  </div>
+                </div>
+                ${isCurrent ? `
+                  <div style="background:rgba(0,0,0,0.08);border-radius:99px;height:5px;overflow:hidden">
+                    <div style="height:100%;width:${pct}%;background:var(--accent,#c75e33);border-radius:99px;transition:width .4s"></div>
+                  </div>
+                ` : ""}
+              </div>
+            `;
+          }).join("")}
+        </div>
       </section>
     </section>
   `;
@@ -2759,7 +2982,7 @@ function renderGardenShelfCard(goal, options = {}) {
     const bonsaiKey = goal.setup.bonsaiKey || "pine";
     const bonsaiMeta = getBonsaiTypeMeta(bonsaiKey);
     return `
-      <div class="garden-card">
+      <div class="garden-card garden-card--bonsai">
         <div class="garden-card__art" aria-hidden="true">
           <div class="garden-card__glow"></div>
           <div class="garden-card__flower">
@@ -3019,32 +3242,19 @@ function renderBonsaiPicker(selectedKey, actionName = "select-setup-bonsai") {
 }
 
 function renderFlowerPicker(selectedType, actionName, options = {}) {
-  const compact = Boolean(options.compact);
   const currentType = normalizeFlowerType(selectedType);
-  const currentFlower = FLOWER_LIBRARY[currentType];
 
   return `
-    <div class="field flower-picker ${compact ? "flower-picker--compact" : ""}">
-      <div>
-        <span class="field__label">育てる植物</span>
-        <p class="section-copy">目標の種類に合った植物を選びます。咲く木として成長します。</p>
-        <p class="flower-picker__current">選択中: ${escapeHtml(currentFlower.label)}</p>
-      </div>
-      <div class="flower-choice-grid ${compact ? "flower-choice-grid--compact" : ""}">
+    <div class="field">
+      <span class="field__label">育てる植物</span>
+      <p class="section-copy">目標の種類に合った植物を選びます。咲く木として成長します。</p>
+      <div class="flower-choice-grid">
         ${Object.entries(FLOWER_LIBRARY)
           .map(([key, flower]) => `
             <button type="button" class="flower-choice ${currentType === key ? "is-active" : ""}" data-action="${actionName}" data-flower-type="${key}" aria-pressed="${currentType === key ? "true" : "false"}">
-              <div class="flower-choice__art">
-                ${renderFlowerArtwork(key, 8, { size: compact ? "picker-compact" : "picker" })}
-              </div>
-              <div class="flower-choice__body">
-                <div class="flower-choice__head">
-                  <strong class="flower-choice__label">${escapeHtml(flower.label)}</strong>
-                  ${currentType === key ? `<span class="flower-choice__selected">選択中</span>` : ""}
-                </div>
-                <span class="flower-choice__trait">${escapeHtml(flower.trait)}</span>
-                <span class="flower-choice__copy">${escapeHtml(flower.copy)}</span>
-              </div>
+              ${renderFlowerArtwork(key, 8, { size: "picker" })}
+              <span class="flower-choice__label">${escapeHtml(flower.label)}</span>
+              <span class="flower-choice__trait">${escapeHtml(flower.trait)}</span>
             </button>
           `)
           .join("")}
@@ -3737,15 +3947,16 @@ function renderSessionSheet() {
                     inputmode="decimal"
                     autocomplete="off"
                     data-finish-field="elapsedInput"
-                    placeholder="H:MM"
+                    placeholder="分"
                     value="${escapeHtml(formatElapsedForInput(ui.finishDraft.elapsedSeconds))}"
                   />
-                  <span class="elapsed-timer-unit">${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : ""}</span>
+                  <span class="elapsed-timer-unit">${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : "分:秒"}</span>
                 </div>
-                <p class="sheet__caption">実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">⏱ タップして時間を修正（例: 1:30 または 分数）</span></p>
+                <p class="sheet__caption">実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">⏱ タップして修正（例: 10 または 1:30）</span></p>
               </div>
               <div class="panel stack">
                 <h3 class="panel__title">記録の仕上げ</h3>
+                ${state.setup.goalType !== "habit" ? `
                 <div class="field-grid field-grid--two">
                   <label class="field">
                     <span class="field__label">進んだマイルストーン</span>
@@ -3761,7 +3972,7 @@ function renderSessionSheet() {
                       <option value="complete" ${ui.finishDraft.milestoneStatus === "complete" ? "selected" : ""}>ここまで完了</option>
                     </select>
                   </label>
-                </div>
+                </div>` : ""}
                 <label class="field">
                   <span class="field__label">ひとこと</span>
                   <textarea data-finish-field="reflection" placeholder="任意。気づきがあれば一言だけ">${escapeHtml(ui.finishDraft.reflection)}</textarea>
@@ -3770,7 +3981,9 @@ function renderSessionSheet() {
             `
             : `
               <div class="panel panel--cool">
-                <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : formatCountdown(remaining)}</p>
+                ${state.setup.goal ? `<p style="font-size:0.8rem;font-weight:600;opacity:0.6;text-align:center;margin:0 0 2px;letter-spacing:0.02em">${escapeHtml(state.setup.goal)}</p>` : ""}
+                <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : (ui.focusPausedAt ? "⏸" : formatCountdown(remaining))}</p>
+                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession.departures}回</p>` : ""}
               </div>
             `
         }
@@ -3783,10 +3996,18 @@ function renderSessionSheet() {
                 <button type="button" class="soft-button" data-action="cancel-finish">タイマーに戻る</button>
               `
               : state.activeSession
-                ? `
+                ? ui.showAbortConfirm
+                  ? `
+                    <div class="abort-confirm">
+                      <p class="abort-confirm__message">記録は保存されませんが、<br>よろしいですか？</p>
+                      <button type="button" class="action-button action-button--danger" data-action="abort-session">キャンセルする</button>
+                      <button type="button" class="soft-button" data-action="cancel-abort-confirm">戻る</button>
+                    </div>
+                  `
+                  : `
                   <button type="button" class="action-button action-button--primary" data-action="complete-session">完了を記録する</button>
                   <button type="button" class="action-button" data-action="downgrade-session">もっと軽くして着地する</button>
-                  <button type="button" class="soft-button" data-action="close-session">閉じる</button>
+                  <button type="button" class="soft-button soft-button--danger" data-action="confirm-abort-session">キャンセル</button>
                 `
                 : `
                   <button type="button" class="action-button action-button--primary" data-action="begin-session">このプランで始める</button>
@@ -3801,9 +4022,10 @@ function renderSessionSheet() {
 
 function openFinishDraft(planKey) {
   ui.selectedSessionPlan = planKey;
-  const elapsedSeconds = state.activeSession
+  const rawElapsed = state.activeSession
     ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
     : state.plans[planKey].minutes * 60;
+  const elapsedSeconds = Math.max(1, rawElapsed);
   const roadmap = computeRoadmap(state);
 
   ui.finishDraft = {
@@ -3832,7 +4054,60 @@ function saveFinishDraft() {
   ui.finishDraft = null;
   ui.sessionOpen = false;
   state.activeSession = null;
+  releaseWakeLock();
   saveState();
+}
+
+function pauseFocusSession() {
+  if (!state.activeSession || ui.finishDraft || ui.focusPausedAt) return;
+  ui.focusPausedAt = Date.now();
+  state.activeSession.departures = (state.activeSession.departures || 0) + 1;
+  if (ui.sessionTimer) {
+    window.clearInterval(ui.sessionTimer);
+    ui.sessionTimer = null;
+  }
+  showFocusLostOverlay();
+  saveState();
+  render();
+}
+
+function resumeFocusSession() {
+  if (!state.activeSession || ui.finishDraft || !ui.focusPausedAt) return;
+  const pauseDuration = Date.now() - ui.focusPausedAt;
+  state.activeSession.endsAt += pauseDuration;
+  ui.focusPausedAt = null;
+  hideFocusLostOverlay();
+  const d = state.activeSession.departures || 0;
+  showToast(`作業再開！ 離脱: ${d}回`);
+  startSessionTicker();
+  saveState();
+  render();
+}
+
+function showFocusLostOverlay() {
+  let overlay = document.getElementById("focus-lost-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "focus-lost-overlay";
+    overlay.style.cssText = [
+      "position:fixed", "inset:0", "z-index:9998",
+      "background:rgba(20,16,10,0.82)", "backdrop-filter:blur(4px)",
+      "display:flex", "flex-direction:column", "align-items:center",
+      "justify-content:center", "color:#fff", "text-align:center", "gap:14px",
+    ].join(";");
+    overlay.innerHTML = `
+      <div style="font-size:2.8rem">⏸</div>
+      <p style="font-size:1.1rem;font-weight:700;margin:0">タイマーを一時停止しました</p>
+      <p style="font-size:0.88rem;opacity:0.75;margin:0">このタブに戻ると再開します</p>
+    `;
+    document.body.appendChild(overlay);
+  }
+  overlay.hidden = false;
+}
+
+function hideFocusLostOverlay() {
+  const overlay = document.getElementById("focus-lost-overlay");
+  if (overlay) overlay.hidden = true;
 }
 
 function beginSession(planKey) {
@@ -3841,10 +4116,12 @@ function beginSession(planKey) {
     planKey,
     startedAt: now,
     endsAt: now + state.plans[planKey].minutes * 60 * 1000,
+    departures: 0,
   };
   ui.selectedSessionPlan = planKey;
   ui.finishDraft = null;
   ui.sessionOpen = true;
+  requestWakeLock();
   saveState();
   startSessionTicker();
 }
@@ -3852,6 +4129,7 @@ function completeSession(planKey) {
   recordLog(planKey, null);
   state.activeSession = null;
   ui.sessionOpen = false;
+  releaseWakeLock();
   saveState();
   startSessionTicker();
 }
@@ -5084,6 +5362,17 @@ function mergeState(base, saved) {
 
 function saveState() {
   syncActiveGoalRecord();
+  if (!state.meta) state.meta = {};
+  state.meta.lastSavedAt = Date.now(); // 最終保存タイムスタンプ（デバイス間競合解決用）
+  localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+  if (_supabaseLoadedSuccessfully) {
+    scheduleSyncToSupabase(); // Supabase接続済みのときだけ同期（古いデータで上書きを防ぐ）
+  }
+}
+
+// ナビゲーション状態のみ保存（タイムスタンプ更新・Supabase同期なし）
+// タブ切り替えなどのUI操作でタイムスタンプが更新されてデータ競合が起きるのを防ぐ
+function saveNavState() {
   localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -5141,8 +5430,16 @@ function startClock() {
 }
 
 function startSessionTicker() {
+  // Don't tick while focus-paused
+  if (ui.focusPausedAt) return;
+  // Already running correctly — don't reset the interval
+  if (ui.sessionTimer && state.activeSession && !ui.finishDraft) {
+    return;
+  }
+
   if (ui.sessionTimer) {
     window.clearInterval(ui.sessionTimer);
+    ui.sessionTimer = null;
   }
 
   if (!state.activeSession || ui.finishDraft) {
@@ -5177,6 +5474,7 @@ function startSessionTicker() {
     if (remaining <= 0) {
       window.clearInterval(ui.sessionTimer);
       ui.sessionTimer = null;
+      playTempleBell();
       showToast("予定時間です。完了か軽量着地を選べます。");
     }
   }, 1000);
@@ -5215,19 +5513,19 @@ function resolveWorkingMilestoneProgress(target, roadmapItems) {
 
 function formatElapsedForInput(totalSeconds) {
   const s = Math.max(0, Math.round(totalSeconds || 0));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return `${h}:${String(m).padStart(2, "0")}`;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
 function parseElapsedInput(str) {
   const t = (str || "").trim();
-  // "H:MM" or "HH:MM" format
-  const colonMatch = t.match(/^(\d{1,3}):(\d{1,2})$/);
+  // "M:SS" format → minutes:seconds
+  const colonMatch = t.match(/^(\d{1,3}):(\d{2})$/);
   if (colonMatch) {
-    const h = parseInt(colonMatch[1], 10);
-    const m = parseInt(colonMatch[2], 10);
-    if (m < 60) return h * 3600 + m * 60;
+    const m = parseInt(colonMatch[1], 10);
+    const s = parseInt(colonMatch[2], 10);
+    if (s < 60) return m * 60 + s;
   }
   // Plain number → treated as minutes
   const numMatch = t.match(/^(\d{1,4})$/);
@@ -5624,6 +5922,339 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+// =========================================================
+// SUPABASE AUTH & SYNC
+// =========================================================
+
+let _appInitialized = false;
+let _syncTimer = null;
+let _supabaseLoadedSuccessfully = false;
+let _wakeLock = null;
+
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    _wakeLock = await navigator.wakeLock.request("screen");
+  } catch (e) {
+    // 権限拒否やブラウザ非対応は無視
+  }
+}
+
+function releaseWakeLock() {
+  if (_wakeLock) {
+    _wakeLock.release().catch(() => {});
+    _wakeLock = null;
+  }
+}
+
+// ── 音声（お寺の鐘） ──────────────────────────────────────
+
+let _audioCtx = null;
+
+function _ensureAudioCtx() {
+  if (!_audioCtx) {
+    try {
+      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {}
+  }
+  if (_audioCtx && _audioCtx.state === "suspended") {
+    _audioCtx.resume().catch(() => {});
+  }
+  return _audioCtx;
+}
+
+function playTempleBell() {
+  try {
+    const ctx = _ensureAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const decay = 4.5;
+
+    // お寺の鐘：やや非調波な倍音構成（ブロンズ製鐘の特性）
+    const partials = [
+      { freq: 120,  amp: 0.55 },
+      { freq: 240,  amp: 0.28 },
+      { freq: 378,  amp: 0.16 },
+      { freq: 510,  amp: 0.09 },
+      { freq: 762,  amp: 0.04 },
+      { freq: 1020, amp: 0.02 },
+    ];
+
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.001, now);
+    master.gain.linearRampToValueAtTime(0.75, now + 0.015);
+    master.gain.exponentialRampToValueAtTime(0.001, now + decay);
+    master.connect(ctx.destination);
+
+    partials.forEach(({ freq, amp }) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      g.gain.value = amp;
+      osc.connect(g);
+      g.connect(master);
+      osc.start(now);
+      osc.stop(now + decay + 0.2);
+    });
+  } catch (e) {}
+}
+
+// ── Supabase ↔ ローカル同期 ──────────────────────────────
+
+async function loadStateFromSupabase(userId, { force = false } = {}) {
+  try {
+    // モバイル回線対策: 7秒でタイムアウトしてローカルデータで起動
+    const fetchPromise = sb
+      .from("user_data")
+      .select("state")
+      .eq("user_id", userId)
+      .single();
+    const timeoutPromise = new Promise((resolve) =>
+      setTimeout(() => resolve({ data: null, error: { code: "TIMEOUT" } }), 7000)
+    );
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+    if (error?.code === "TIMEOUT") {
+      console.warn("Supabase load timeout: using local state, will retry");
+      // タイムアウトでもフラグを立てて、以降のsaveStateがSupabaseに届くようにする
+      _supabaseLoadedSuccessfully = true;
+      // 15秒後にバックグラウンドで再試行（他デバイスの最新データを取得する）
+      setTimeout(() => _resyncFromSupabase(), 15000);
+      return;
+    }
+    if (error && error.code !== "PGRST116") {
+      console.warn("Supabase load error:", error);
+      return;
+    }
+
+    _supabaseLoadedSuccessfully = true;
+
+    if (data?.state && Object.keys(data.state).length > 0) {
+      const supabaseTs = data.state.meta?.lastSavedAt || 0;
+      const localTs = state.meta?.lastSavedAt || 0;
+      // force=true（ログイン時）: Supabaseを常に優先。タイムスタンプ比較はしない。
+      // これにより「PCで少し前に操作→スマホで完了→PCでログイン」でも正しく同期される。
+      if (force || supabaseTs >= localTs) {
+        // Supabaseデータで上書き
+        state = mergeState(buildSeedState(), data.state);
+        localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+      } else {
+        // バックグラウンド再同期時のみ: ローカルが新しければSupabaseに同期
+        scheduleSyncToSupabase();
+      }
+    }
+  } catch (err) {
+    console.warn("Supabase load error:", err);
+  }
+}
+
+// タブに戻ったとき・タイムアウト後の再同期
+async function _resyncFromSupabase() {
+  if (!_appInitialized || state.activeSession) return;
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+    const prevTs = state.meta?.lastSavedAt || 0;
+    await loadStateFromSupabase(user.id);
+    if ((state.meta?.lastSavedAt || 0) !== prevTs) {
+      render(); // データが更新されたら再描画
+    }
+  } catch (err) {
+    console.warn("Resync error:", err);
+  }
+}
+
+async function pushStateToSupabase() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+  syncActiveGoalRecord();
+  try {
+    // プッシュ前に競合チェック: Supabaseが新しければローカルを更新してプッシュしない
+    const { data: existing } = await sb
+      .from("user_data")
+      .select("state")
+      .eq("user_id", user.id)
+      .single();
+    const supabaseTs = existing?.state?.meta?.lastSavedAt || 0;
+    const localTs = state.meta?.lastSavedAt || 0;
+    if (supabaseTs > localTs) {
+      // Supabaseの方が新しい（他デバイスで更新あり）→ ローカルに取り込む
+      state = mergeState(buildSeedState(), existing.state);
+      localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+      render();
+      return;
+    }
+    await sb.from("user_data").upsert(
+      { user_id: user.id, state: JSON.parse(JSON.stringify(state)) },
+      { onConflict: "user_id" }
+    );
+  } catch (err) {
+    console.warn("Supabase sync error:", err);
+    // 失敗時は30秒後にリトライ
+    setTimeout(() => pushStateToSupabase(), 30000);
+  }
+}
+
+function scheduleSyncToSupabase() {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(pushStateToSupabase, 2000);
+}
+
+// ── Auth UI ──────────────────────────────────────────────
+
+const _authOverlay = document.querySelector("#auth-overlay");
+const _authForm = document.querySelector("#auth-form");
+const _authEmailEl = document.querySelector("#auth-email");
+const _authPasswordEl = document.querySelector("#auth-password");
+const _authSubmitEl = document.querySelector("#auth-submit");
+const _authErrorEl = document.querySelector("#auth-error");
+const _authLoadingEl = document.querySelector("#auth-loading");
+const _authHintEl = document.querySelector("#auth-hint");
+const _authTabBtns = Array.from(document.querySelectorAll(".auth-tab"));
+let _authMode = "login";
+
+function _authShowError(msg) {
+  _authErrorEl.textContent = msg;
+  _authErrorEl.hidden = false;
+}
+
+function _authClearError() {
+  _authErrorEl.hidden = true;
+  _authErrorEl.textContent = "";
+}
+
+function _authSetLoading(on) {
+  _authLoadingEl.hidden = !on;
+  _authSubmitEl.disabled = on;
+}
+
+function _rebindSwitchBtn() {
+  const btn = document.querySelector("#auth-switch-btn");
+  if (btn) {
+    btn.addEventListener("click", () =>
+      _switchAuthMode(_authMode === "login" ? "signup" : "login")
+    );
+  }
+  const resetBtn = document.querySelector("#auth-reset-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => _switchAuthMode("reset"));
+  }
+}
+
+function _switchAuthMode(mode) {
+  _authMode = mode;
+  _authClearError();
+
+  // パスワードリセットリンクを1回だけ作成
+  if (!document.querySelector("#auth-reset-link")) {
+    const p = document.createElement("p");
+    p.className = "auth-hint";
+    p.id = "auth-reset-link";
+    p.innerHTML = `<button type="button" class="auth-switch" id="auth-reset-btn">パスワードをお忘れの方はこちら</button>`;
+    _authHintEl.insertAdjacentElement("afterend", p);
+  }
+  const resetLink = document.querySelector("#auth-reset-link");
+
+  if (mode === "login") {
+    _authSubmitEl.textContent = "ログイン";
+    _authTabBtns.forEach(b => b.classList.toggle("is-active", b.dataset.authTab === "login"));
+    _authHintEl.innerHTML = `アカウントをお持ちでないですか？ <button type="button" class="auth-switch" id="auth-switch-btn">新規登録はこちら</button>`;
+    resetLink.hidden = false;
+  } else if (mode === "signup") {
+    _authSubmitEl.textContent = "新規登録";
+    _authTabBtns.forEach(b => b.classList.toggle("is-active", b.dataset.authTab === "signup"));
+    _authHintEl.innerHTML = `すでにアカウントをお持ちの方は <button type="button" class="auth-switch" id="auth-switch-btn">ログインはこちら</button>`;
+    resetLink.hidden = true;
+  } else if (mode === "reset") {
+    _authSubmitEl.textContent = "リセットメールを送る";
+    _authTabBtns.forEach(b => b.classList.remove("is-active"));
+    _authHintEl.innerHTML = `<button type="button" class="auth-switch" id="auth-switch-btn">← ログインに戻る</button>`;
+    resetLink.hidden = true;
+  }
+  _rebindSwitchBtn();
+}
+
+// タブボタンのイベント
+_authTabBtns.forEach(btn => {
+  btn.addEventListener("click", () => _switchAuthMode(btn.dataset.authTab));
+});
+
+// フォーム送信
+_authForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  _authClearError();
+  const email = _authEmailEl.value.trim();
+  const password = _authPasswordEl.value;
+  _authSetLoading(true);
+  try {
+    if (_authMode === "login") {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      // Credential Management API: Chromeにパスワード保存を促す
+      if (window.PasswordCredential) {
+        try {
+          const cred = new PasswordCredential({ id: email, password });
+          await navigator.credentials.store(cred);
+        } catch (_) {}
+      }
+    } else if (_authMode === "signup") {
+      const { error } = await sb.auth.signUp({ email, password });
+      if (error) throw error;
+      _authShowError("確認メールを送りました。メールをご確認のうえログインしてください。");
+      return;
+    } else if (_authMode === "reset") {
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      _authShowError("パスワードリセットメールを送信しました。");
+      return;
+    }
+  } catch (err) {
+    _authShowError(err.message || "エラーが発生しました");
+  } finally {
+    _authSetLoading(false);
+  }
+});
+
+// ── Auth state の監視 ─────────────────────────────────────
+
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    if (!_appInitialized) {
+      // ログイン時は必ずSupabaseを優先（force=true）
+      await loadStateFromSupabase(session.user.id, { force: true });
+      _authOverlay.hidden = true;
+      window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
+      _appInitialized = true;
+      init();
+      if (screenFrame) screenFrame.scrollTop = 0; // screen-frameのスクロールもリセット
+      setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100); // キーボード消去後の遅延リセット
+    } else if (event === "SIGNED_IN") {
+      // 再ログイン時も必ずSupabaseを優先（force=true）
+      await loadStateFromSupabase(session.user.id, { force: true });
+      _authOverlay.hidden = true;
+      window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
+      render();
+      if (screenFrame) screenFrame.scrollTop = 0; // screen-frameのスクロールもリセット
+      setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100); // キーボード消去後の遅延リセット
+    }
+  } else {
+    _appInitialized = false;
+    _authOverlay.removeAttribute("hidden");
+  }
+});
+
+// ── ログアウト ────────────────────────────────────────────
+
+async function signOut() {
+  clearTimeout(_syncTimer);
+  await sb.auth.signOut();
+  localStorage.removeItem(CURRENT_STORAGE_KEY);
+  state = buildSeedState();
 }
 
 
