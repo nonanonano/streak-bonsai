@@ -5931,6 +5931,7 @@ function escapeHtml(value) {
 
 let _appInitialized = false;
 let _syncTimer = null;
+let _realtimeChannel = null;
 let _supabaseLoadedSuccessfully = false;
 let _wakeLock = null;
 
@@ -6101,7 +6102,32 @@ async function pushStateToSupabase() {
 
 function scheduleSyncToSupabase() {
   clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(pushStateToSupabase, 2000);
+  _syncTimer = setTimeout(pushStateToSupabase, 500);
+}
+
+// デバイス間リアルタイム同期
+function setupRealtimeSync(userId) {
+  if (_realtimeChannel) {
+    sb.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+  }
+  _realtimeChannel = sb.channel("user_data_realtime_" + userId)
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "user_data", filter: "user_id=eq." + userId },
+      (payload) => {
+        if (!payload.new?.state) return;
+        if (state.activeSession) return;
+        const remoteTs = payload.new.state.meta?.lastSavedAt || 0;
+        const localTs = state.meta?.lastSavedAt || 0;
+        if (remoteTs > localTs) {
+          state = mergeState(buildSeedState(), payload.new.state);
+          localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+          render();
+        }
+      }
+    )
+    .subscribe();
 }
 
 // ── Auth UI ──────────────────────────────────────────────
@@ -6232,6 +6258,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
       window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       _appInitialized = true;
       init();
+      setupRealtimeSync(session.user.id);
       if (screenFrame) screenFrame.scrollTop = 0;
       setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100);
     } else if (event === "SIGNED_IN") {
@@ -6240,11 +6267,13 @@ sb.auth.onAuthStateChange(async (event, session) => {
       _authOverlay.hidden = true;
       window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       render();
+      setupRealtimeSync(session.user.id);
       if (screenFrame) screenFrame.scrollTop = 0;
       setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100);
     }
   } else {
     _appInitialized = false;
+    if (_realtimeChannel) { sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
     _authOverlay.removeAttribute("hidden");
   }
 });
