@@ -1,4 +1,4 @@
-Ã¯Â»Â¿:root {
+﻿:root {
   --bg: #f2e9d8;
   --surface: rgba(255, 253, 246, 0.92);
   --ink: #2c2820;
@@ -308,7 +308,7 @@ button {
 }
 
 .goal-selector__button::after {
-  content: "Ã¢ÂÂ¾";
+  content: "▾";
   font-size: 0.68rem;
   color: var(--accent);
 }
@@ -319,7 +319,7 @@ button {
 }
 
 .goal-selector[open] .goal-selector__button::after {
-  content: "Ã¢ÂÂ´";
+  content: "▴";
 }
 
 .goal-selector__body {
@@ -373,13 +373,13 @@ button {
   white-space: nowrap;
 }
 
-/* Ã§Â¿ÂÃ¦ÂÂ£Ã¯Â¼ÂÃ§Â·ÂÃ£ÂÂ®Ã¥Â·Â¦Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂÃ£ÂÂ¼ */
+/* 習慣：緑の左ボーダー */
 .goal-selector__option--habit {
   border-left: 3px solid rgba(53, 120, 86, 0.55);
   background: rgba(225, 245, 232, 0.7);
 }
 
-/* Ã§ÂÂ®Ã¦Â¨ÂÃ¯Â¼ÂÃ¨ÂµÂ¤Ã£ÂÂ®Ã¥Â·Â¦Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂÃ£ÂÂ¼ */
+/* 目標：赤の左ボーダー */
 .goal-selector__option--goal {
   border-left: 3px solid rgba(168, 80, 64, 0.45);
   background: rgba(252, 235, 228, 0.7);
@@ -2145,7 +2145,7 @@ button {
   line-height: 1.6;
 }
 
-/* Elapsed timer input Ã¢ÂÂ replaces the old two-element (display + edit row) approach */
+/* Elapsed timer input — replaces the old two-element (display + edit row) approach */
 .elapsed-timer-wrap {
   display: flex;
   align-items: baseline;
@@ -3303,7 +3303,7 @@ button {
     color: var(--muted);
   }
 
-  /* Sheet panel always stays light Ã¢ÂÂ force dark text for all content inside */
+  /* Sheet panel always stays light — force dark text for all content inside */
   .sheet__panel {
     color: #2c2820;
   }
@@ -3319,7 +3319,7 @@ button {
     border-color: rgba(34, 32, 29, 0.06);
   }
 
-  /* Sheet panel stays light in dark mode Ã¢ÂÂ force dark text on its inputs */
+  /* Sheet panel stays light in dark mode — force dark text on its inputs */
   .sheet__panel input,
   .sheet__panel textarea,
   .sheet__panel select,
@@ -3354,13 +3354,13 @@ button {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 14px 32px rgba(0, 0, 0, 0.4);
   }
 
-  /* Review log editor Ã¢ÂÂ has a hardcoded light gradient that must be darkened */
+  /* Review log editor — has a hardcoded light gradient that must be darkened */
   .review-log-editor {
     background: rgba(44, 37, 28, 0.92);
     border-color: rgba(185, 78, 40, 0.18);
   }
 
-  /* Panel variants that override .panel's dark bg Ã¢ÂÂ restore dark surfaces */
+  /* Panel variants that override .panel's dark bg — restore dark surfaces */
   .panel--focus {
     background: linear-gradient(150deg, rgba(48, 32, 22, 0.94) 0%, rgba(54, 30, 18, 0.9) 100%);
     border-color: rgba(200, 92, 51, 0.22);
@@ -3378,7 +3378,7 @@ button {
     border-color: rgba(86, 112, 104, 0.18);
   }
 
-  /* Banners Ã¢ÂÂ light cream in light mode, need dark surface in dark mode */
+  /* Banners — light cream in light mode, need dark surface in dark mode */
   .banner {
     background: linear-gradient(135deg, rgba(54, 36, 26, 0.92), rgba(46, 32, 22, 0.88));
     border-color: rgba(185, 78, 40, 0.22);
@@ -3389,7 +3389,7 @@ button {
     border-color: rgba(185, 78, 40, 0.28);
   }
 
-  /* Active plan button Ã¢ÂÂ light cream with dark text in light mode */
+  /* Active plan button — light cream with dark text in light mode */
   .focus-plan-button.is-active {
     background: rgba(78, 122, 101, 0.26);
     border-color: rgba(78, 122, 101, 0.4);
@@ -3405,7 +3405,7 @@ button {
     border-color: rgba(185, 78, 40, 0.22);
   }
 
-  /* ---- Cards with own light backgrounds Ã¢ÂÂ give them dark surfaces in dark mode ---- */
+  /* ---- Cards with own light backgrounds — give them dark surfaces in dark mode ---- */
   .review-log-card,
   .review-pot-card__fact,
   .roadmap-focus-card,
@@ -3518,13 +3518,13 @@ button {
   .log-pill[data-outcome="C"] { border-color: rgba(78, 122, 101, 0.28); }
   .log-pill[data-outcome="miss"] { border-color: rgba(168, 66, 64, 0.28); }
 
-  /* Settings menu panel Ã¢ÂÂ replace bright sage gradient with dark surface */
+  /* Settings menu panel — replace bright sage gradient with dark surface */
   .setup-nav--menu {
     background: linear-gradient(180deg, rgba(50, 70, 62, 0.92) 0%, rgba(38, 54, 46, 0.90) 100%);
     box-shadow: 0 18px 34px rgba(0, 0, 0, 0.36);
   }
 
-  /* Active settings tab Ã¢ÂÂ swap light cream for dark highlight */
+  /* Active settings tab — swap light cream for dark highlight */
   .setup-tab.is-active {
     color: var(--ink);
   }
@@ -3655,7 +3655,7 @@ button {
   margin-bottom: 10px;
 }
 
-/* Ã£ÂÂ¹Ã£ÂÂÃ£ÂÂªÃ£ÂÂ¼Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂ */
+/* ストリークドット */
 .streak-dots {
   display: flex;
   align-items: center;
@@ -3685,7 +3685,7 @@ button {
   opacity: 0.25;
 }
 
-/* Review / Garden Ã£ÂÂ§Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ©Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ§Ã¤Â½Â¿Ã£ÂÂÃ¥Â Â´Ã¥ÂÂ */
+/* Review / Garden でインラインで使う場合 */
 .garden-card__streak {
   display: flex;
   align-items: center;
@@ -3697,7 +3697,7 @@ button {
 
 .focus-launch--habit {
   cursor: default;
-  /* Ã§Â¿ÂÃ¦ÂÂ£Ã£ÂÂ«Ã£ÂÂ¼Ã£ÂÂ: Ã§ÂÂÃ¦Â Â½Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ¦Â·Â±Ã§Â·Â/Ã¨ÂÂÃ¨ÂÂ² */
+  /* 習慣カード: 盆栽らしい深緑/苔色 */
   background:
     radial-gradient(circle at 88% 12%, rgba(220, 255, 210, 0.28), transparent 30%),
     radial-gradient(circle at 10% 88%, rgba(40, 90, 60, 0.42), transparent 28%),
@@ -3708,7 +3708,7 @@ button {
     0 6px 16px rgba(30, 80, 55, 0.14);
 }
 
-/* Ã§ÂÂ®Ã¦Â¨ÂÃ£ÂÂ«Ã£ÂÂ¼Ã£ÂÂ: Ã¤Â¸ÂÃ¦ÂÂÃ§ÂÂÃ£ÂÂªÃ©Â ÂÃ¥Â¼ÂµÃ£ÂÂÃ£ÂÂÃ¨Â¡Â¨Ã£ÂÂÃ¨ÂµÂ¤/Ã£ÂÂÃ£ÂÂ©Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ¿ */
+/* 目標カード: 一時的な頑張りを表す赤/テラコッタ */
 .focus-launch:not(.focus-launch--habit) {
   background:
     radial-gradient(circle at 88% 12%, rgba(255, 230, 190, 0.32), transparent 30%),
@@ -3720,7 +3720,7 @@ button {
     0 6px 16px rgba(130, 50, 35, 0.14);
 }
 
-/* ---- Ã¥ÂÂÃ©ÂÂ¤Ã£ÂÂÃ£ÂÂ¿Ã£ÂÂ³Ã¯Â¼ÂdangerÃ¯Â¼Â ---- */
+/* ---- 削除ボタン（danger） ---- */
 .goal-library-card__action--danger {
   color: var(--danger);
   border-color: rgba(176, 64, 64, 0.25);
@@ -3734,7 +3734,7 @@ button {
   margin: 4px 0 8px;
 }
 
-/* ---- Ã£ÂÂ¢Ã£ÂÂ«Ã£ÂÂÃ£ÂÂ Ã£ÂÂ»Ã£ÂÂ¯Ã£ÂÂ·Ã£ÂÂ§Ã£ÂÂ³ ---- */
+/* ---- アルバムセクション ---- */
 .garden-album {
   opacity: 0.88;
 }
@@ -3969,7 +3969,7 @@ button {
   }
 }
 
-/* Ã¢ÂÂÃ¢ÂÂ Ã£ÂÂ¢Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«: Ã£ÂÂÃ£ÂÂ«Ã£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂªÃ£ÂÂ¼Ã£ÂÂ³Ã¨Â¡Â¨Ã§Â¤ÂºÃ¯Â¼ÂÃ§Â¸Â¦Ã¥ÂÂÃ£ÂÂÃ¯Â¼Â Ã¢ÂÂÃ¢ÂÂ */
+/* ── モバイル: フルスクリーン表示（縦向き） ── */
 @media (max-width: 479px) {
   html, body {
     height: 100dvh;
@@ -3991,18 +3991,18 @@ button {
     border-right: none;
     border-bottom: none;
   }
-  /* Ã£ÂÂÃ£ÂÂ§Ã£ÂÂ¤Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ©ÂÂÃ¨Â¡Â¨Ã§Â¤Âº */
+  /* フェイクノッチを非表示 */
   .device-frame::before {
     display: none;
   }
-  /* Ã£ÂÂÃ£ÂÂÃ£ÂÂ / Dynamic Island Ã¥Â¯Â¾Ã¥Â¿Â */
+  /* ノッチ / Dynamic Island 対応 */
   .topbar {
     padding-top: max(16px, env(safe-area-inset-top));
     padding-left: max(22px, env(safe-area-inset-left));
     padding-right: max(22px, env(safe-area-inset-right));
     padding-bottom: 10px;
   }
-  /* Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ Ã£ÂÂ¤Ã£ÂÂ³Ã£ÂÂ¸Ã£ÂÂ±Ã£ÂÂ¼Ã£ÂÂ¿Ã£ÂÂ¼Ã¥Â¯Â¾Ã¥Â¿Â */
+  /* ホームインジケーター対応 */
   .tabbar {
     margin-left: max(8px, env(safe-area-inset-left));
     margin-right: max(8px, env(safe-area-inset-right));
@@ -4015,14 +4015,14 @@ button {
   }
 }
 
-/* Ã¢ÂÂÃ¢ÂÂ Ã£ÂÂ¢Ã£ÂÂÃ£ÂÂ¤Ã£ÂÂ«: Ã£ÂÂÃ£ÂÂ«Ã£ÂÂ¹Ã£ÂÂ¯Ã£ÂÂªÃ£ÂÂ¼Ã£ÂÂ³Ã¨Â¡Â¨Ã§Â¤ÂºÃ¯Â¼ÂÃ¦Â¨ÂªÃ¥ÂÂÃ£ÂÂÃ¯Â¼Â Ã¢ÂÂÃ¢ÂÂ */
+/* ── モバイル: フルスクリーン表示（横向き） ── */
 @media (max-height: 500px) and (orientation: landscape) {
   html, body {
     height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
   }
-  /* Ã¦Â¨ÂªÃ¥ÂÂÃ£ÂÂÃ£ÂÂ¯Ã§Â¸Â¦Ã¥Â¹ÂÃ£ÂÂÃ¥ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ¦Â¨ÂªÃ¥Â¹ÂÃ£ÂÂ¯430pxÃ¤Â¸ÂÃ©ÂÂÃ£ÂÂÃ§Â¶Â­Ã¦ÂÂÃ£ÂÂÃ£ÂÂ¦Ã£ÂÂ»Ã£ÂÂ³Ã£ÂÂ¿Ã£ÂÂªÃ£ÂÂ³Ã£ÂÂ° */
+  /* 横向きは縦幅を埋めるが、横幅は430px上限を維持してセンタリング */
   .app-shell {
     padding: 0 16px;
     align-items: flex-start;
@@ -4032,7 +4032,7 @@ button {
   }
   .device-frame {
     height: 100dvh;
-    /* width Ã£ÂÂ¯Ã£ÂÂÃ£ÂÂ¼Ã£ÂÂ¹Ã£ÂÂ¹Ã£ÂÂ¿Ã£ÂÂ¤Ã£ÂÂ«Ã£ÂÂ® min(100%, 430px) Ã£ÂÂÃ§Â¶ÂÃ¦ÂÂ¿ */
+    /* width はベーススタイルの min(100%, 430px) を継承 */
     min-height: auto;
     border-radius: var(--radius-xl);
     border-top: none;
@@ -4040,7 +4040,7 @@ button {
   .device-frame::before {
     display: none;
   }
-  /* Ã¦Â¨ÂªÃ¥ÂÂÃ£ÂÂÃ£ÂÂ¯Ã£ÂÂ³Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ¯Ã£ÂÂÃ£ÂÂªÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂÃ£ÂÂ¼ */
+  /* 横向きはコンパクトなトップバー */
   .topbar {
     padding-top: max(6px, env(safe-area-inset-top));
     padding-bottom: 4px;
@@ -4050,7 +4050,7 @@ button {
   .topbar__date {
     display: none;
   }
-  /* Ã¦Â¨ÂªÃ¥ÂÂÃ£ÂÂÃ£ÂÂ¿Ã£ÂÂÃ£ÂÂÃ£ÂÂ¼: Ã£ÂÂ³Ã£ÂÂ³Ã£ÂÂÃ£ÂÂ¯Ã£ÂÂÃ¥ÂÂ */
+  /* 横向きタブバー: コンパクト化 */
   .tabbar {
     margin-left: max(6px, env(safe-area-inset-left));
     margin-right: max(6px, env(safe-area-inset-right));
@@ -4069,7 +4069,7 @@ button {
     height: 18px;
   }
 
-  /* session sheet compact landscape */
+  /* session sheet compact - landscape */
   .sheet__panel {
     max-height: calc(100dvh - 20px);
     padding: 10px 16px 14px;
