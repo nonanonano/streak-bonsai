@@ -1,4 +1,4 @@
-﻿:root {
+ï»¿:root {
   --bg: #f2e9d8;
   --surface: rgba(255, 253, 246, 0.92);
   --ink: #2c2820;
@@ -308,7 +308,7 @@ button {
 }
 
 .goal-selector__button::after {
-  content: "▾";
+  content: "â¾";
   font-size: 0.68rem;
   color: var(--accent);
 }
@@ -319,7 +319,7 @@ button {
 }
 
 .goal-selector[open] .goal-selector__button::after {
-  content: "▴";
+  content: "â´";
 }
 
 .goal-selector__body {
@@ -373,13 +373,13 @@ button {
   white-space: nowrap;
 }
 
-/* 習慣：緑の左ボーダー */
+/* ç¿æ£ï¼ç·ã®å·¦ãã¼ãã¼ */
 .goal-selector__option--habit {
   border-left: 3px solid rgba(53, 120, 86, 0.55);
   background: rgba(225, 245, 232, 0.7);
 }
 
-/* 目標：赤の左ボーダー */
+/* ç®æ¨ï¼èµ¤ã®å·¦ãã¼ãã¼ */
 .goal-selector__option--goal {
   border-left: 3px solid rgba(168, 80, 64, 0.45);
   background: rgba(252, 235, 228, 0.7);
@@ -2145,7 +2145,7 @@ button {
   line-height: 1.6;
 }
 
-/* Elapsed timer input — replaces the old two-element (display + edit row) approach */
+/* Elapsed timer input â replaces the old two-element (display + edit row) approach */
 .elapsed-timer-wrap {
   display: flex;
   align-items: baseline;
@@ -3303,7 +3303,7 @@ button {
     color: var(--muted);
   }
 
-  /* Sheet panel always stays light — force dark text for all content inside */
+  /* Sheet panel always stays light â force dark text for all content inside */
   .sheet__panel {
     color: #2c2820;
   }
@@ -3319,7 +3319,7 @@ button {
     border-color: rgba(34, 32, 29, 0.06);
   }
 
-  /* Sheet panel stays light in dark mode — force dark text on its inputs */
+  /* Sheet panel stays light in dark mode â force dark text on its inputs */
   .sheet__panel input,
   .sheet__panel textarea,
   .sheet__panel select,
@@ -3354,13 +3354,13 @@ button {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 14px 32px rgba(0, 0, 0, 0.4);
   }
 
-  /* Review log editor — has a hardcoded light gradient that must be darkened */
+  /* Review log editor â has a hardcoded light gradient that must be darkened */
   .review-log-editor {
     background: rgba(44, 37, 28, 0.92);
     border-color: rgba(185, 78, 40, 0.18);
   }
 
-  /* Panel variants that override .panel's dark bg — restore dark surfaces */
+  /* Panel variants that override .panel's dark bg â restore dark surfaces */
   .panel--focus {
     background: linear-gradient(150deg, rgba(48, 32, 22, 0.94) 0%, rgba(54, 30, 18, 0.9) 100%);
     border-color: rgba(200, 92, 51, 0.22);
@@ -3378,7 +3378,7 @@ button {
     border-color: rgba(86, 112, 104, 0.18);
   }
 
-  /* Banners — light cream in light mode, need dark surface in dark mode */
+  /* Banners â light cream in light mode, need dark surface in dark mode */
   .banner {
     background: linear-gradient(135deg, rgba(54, 36, 26, 0.92), rgba(46, 32, 22, 0.88));
     border-color: rgba(185, 78, 40, 0.22);
@@ -3389,7 +3389,7 @@ button {
     border-color: rgba(185, 78, 40, 0.28);
   }
 
-  /* Active plan button — light cream with dark text in light mode */
+  /* Active plan button â light cream with dark text in light mode */
   .focus-plan-button.is-active {
     background: rgba(78, 122, 101, 0.26);
     border-color: rgba(78, 122, 101, 0.4);
@@ -3405,7 +3405,7 @@ button {
     border-color: rgba(185, 78, 40, 0.22);
   }
 
-  /* ---- Cards with own light backgrounds — give them dark surfaces in dark mode ---- */
+  /* ---- Cards with own light backgrounds â give them dark surfaces in dark mode ---- */
   .review-log-card,
   .review-pot-card__fact,
   .roadmap-focus-card,
@@ -3518,13 +3518,13 @@ button {
   .log-pill[data-outcome="C"] { border-color: rgba(78, 122, 101, 0.28); }
   .log-pill[data-outcome="miss"] { border-color: rgba(168, 66, 64, 0.28); }
 
-  /* Settings menu panel — replace bright sage gradient with dark surface */
+  /* Settings menu panel â replace bright sage gradient with dark surface */
   .setup-nav--menu {
     background: linear-gradient(180deg, rgba(50, 70, 62, 0.92) 0%, rgba(38, 54, 46, 0.90) 100%);
     box-shadow: 0 18px 34px rgba(0, 0, 0, 0.36);
   }
 
-  /* Active settings tab — swap light cream for dark highlight */
+  /* Active settings tab â swap light cream for dark highlight */
   .setup-tab.is-active {
     color: var(--ink);
   }
@@ -3655,7 +3655,7 @@ button {
   margin-bottom: 10px;
 }
 
-/* ストリークドット */
+/* ã¹ããªã¼ã¯ããã */
 .streak-dots {
   display: flex;
   align-items: center;
@@ -3685,7 +3685,7 @@ button {
   opacity: 0.25;
 }
 
-/* Review / Garden でインラインで使う場合 */
+/* Review / Garden ã§ã¤ã³ã©ã¤ã³ã§ä½¿ãå ´å */
 .garden-card__streak {
   display: flex;
   align-items: center;
@@ -3697,7 +3697,7 @@ button {
 
 .focus-launch--habit {
   cursor: default;
-  /* 習慣カード: 盆栽らしい深緑/苔色 */
+  /* ç¿æ£ã«ã¼ã: çæ ½ãããæ·±ç·/èè² */
   background:
     radial-gradient(circle at 88% 12%, rgba(220, 255, 210, 0.28), transparent 30%),
     radial-gradient(circle at 10% 88%, rgba(40, 90, 60, 0.42), transparent 28%),
@@ -3708,7 +3708,7 @@ button {
     0 6px 16px rgba(30, 80, 55, 0.14);
 }
 
-/* 目標カード: 一時的な頑張りを表す赤/テラコッタ */
+/* ç®æ¨ã«ã¼ã: ä¸æçãªé å¼µããè¡¨ãèµ¤/ãã©ã³ãã¿ */
 .focus-launch:not(.focus-launch--habit) {
   background:
     radial-gradient(circle at 88% 12%, rgba(255, 230, 190, 0.32), transparent 30%),
@@ -3720,7 +3720,7 @@ button {
     0 6px 16px rgba(130, 50, 35, 0.14);
 }
 
-/* ---- 削除ボタン（danger） ---- */
+/* ---- åé¤ãã¿ã³ï¼dangerï¼ ---- */
 .goal-library-card__action--danger {
   color: var(--danger);
   border-color: rgba(176, 64, 64, 0.25);
@@ -3734,7 +3734,7 @@ button {
   margin: 4px 0 8px;
 }
 
-/* ---- アルバムセクション ---- */
+/* ---- ã¢ã«ãã ã»ã¯ã·ã§ã³ ---- */
 .garden-album {
   opacity: 0.88;
 }
@@ -3969,7 +3969,7 @@ button {
   }
 }
 
-/* ── モバイル: フルスクリーン表示（縦向き） ── */
+/* ââ ã¢ãã¤ã«: ãã«ã¹ã¯ãªã¼ã³è¡¨ç¤ºï¼ç¸¦åãï¼ ââ */
 @media (max-width: 479px) {
   html, body {
     height: var(--real-100vh, 100dvh);
@@ -3991,34 +3991,38 @@ button {
     border-right: none;
     border-bottom: none;
   }
-  /* フェイクノッチを非表示 */
+  /* ãã§ã¤ã¯ããããéè¡¨ç¤º */
   .device-frame::before {
     display: none;
   }
-  /* ノッチ / Dynamic Island 対応 */
+  /* ããã / Dynamic Island å¯¾å¿ */
   .topbar {
     padding-top: max(16px, env(safe-area-inset-top));
     padding-left: max(22px, env(safe-area-inset-left));
     padding-right: max(22px, env(safe-area-inset-right));
     padding-bottom: 10px;
   }
-  /* ホームインジケーター対応 */
+  /* ãã¼ã ã¤ã³ã¸ã±ã¼ã¿ã¼å¯¾å¿ */
   .tabbar {
     margin-left: max(8px, env(safe-area-inset-left));
     margin-right: max(8px, env(safe-area-inset-right));
     margin-bottom: max(8px, env(safe-area-inset-bottom));
     margin-top: 0;
   }
+
+  .sheet__panel {
+    width: calc(100vw - 16px);
+  }
 }
 
-/* ── モバイル: フルスクリーン表示（横向き） ── */
+/* ââ ã¢ãã¤ã«: ãã«ã¹ã¯ãªã¼ã³è¡¨ç¤ºï¼æ¨ªåãï¼ ââ */
 @media (max-height: 500px) and (orientation: landscape) {
   html, body {
     height: var(--real-100vh, 100dvh);
     overflow: hidden;
     overscroll-behavior: none;
   }
-  /* 横向きは縦幅を埋めるが、横幅は430px上限を維持してセンタリング */
+  /* æ¨ªåãã¯ç¸¦å¹ãåããããæ¨ªå¹ã¯430pxä¸éãç¶­æãã¦ã»ã³ã¿ãªã³ã° */
   .app-shell {
     padding: 0 16px;
     align-items: flex-start;
@@ -4028,7 +4032,7 @@ button {
   }
   .device-frame {
     height: var(--real-100vh, 100dvh);
-    /* width はベーススタイルの min(100%, 430px) を継承 */
+    /* width ã¯ãã¼ã¹ã¹ã¿ã¤ã«ã® min(100%, 430px) ãç¶æ¿ */
     min-height: auto;
     border-radius: var(--radius-xl);
     border-top: none;
@@ -4036,7 +4040,7 @@ button {
   .device-frame::before {
     display: none;
   }
-  /* 横向きはコンパクトなトップバー */
+  /* æ¨ªåãã¯ã³ã³ãã¯ããªããããã¼ */
   .topbar {
     padding-top: max(6px, env(safe-area-inset-top));
     padding-bottom: 4px;
@@ -4046,7 +4050,7 @@ button {
   .topbar__date {
     display: none;
   }
-  /* 横向きタブバー: コンパクト化 */
+  /* æ¨ªåãã¿ããã¼: ã³ã³ãã¯ãå */
   .tabbar {
     margin-left: max(6px, env(safe-area-inset-left));
     margin-right: max(6px, env(safe-area-inset-right));
@@ -4063,5 +4067,25 @@ button {
   .tabbar__icon {
     width: 18px;
     height: 18px;
+  }
+
+  /* session sheet compact landscape */
+  .sheet__panel {
+    max-height: calc(var(--real-100vh, 100dvh) - 20px);
+    padding: 10px 16px 14px;
+  }
+  .sheet__timer {
+    font-size: clamp(1.4rem, 6vh, 2rem);
+    margin: 2px 0;
+  }
+  .sheet__caption {
+    font-size: 0.78rem;
+  }
+  .sheet__actions {
+    margin-top: 8px;
+    gap: 8px;
+  }
+  .screen-frame {
+    padding: 0 12px 8px;
   }
 }
