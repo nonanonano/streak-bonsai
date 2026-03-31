@@ -4089,3 +4089,14 @@ button {
     padding: 0 12px 8px;
   }
 }
+
+/* ===== Guest mode ===== */
+.auth-guest-sep { display:flex; align-items:center; gap:12px; margin:16px 0 12px; color:var(--muted); font-size:0.8rem; }
+.auth-guest-sep::before, .auth-guest-sep::after { content:''; flex:1; height:1px; background:rgba(44,40,32,0.12); }
+.auth-guest-btn { width:100%; padding:10px; background:transparent; border:1.5px dashed rgba(44,40,32,0.2); border-radius:12px; color:var(--muted); font-size:0.85rem; cursor:pointer; transition:border-color .2s, color .2s; }
+.auth-guest-btn:hover { border-color:var(--muted); color:var(--ink); }
+.guest-banner { margin:8px 16px 0; padding:8px 14px; background:rgba(255,253,246,0.92); border:1px solid rgba(44,40,32,0.1); border-radius:12px; display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:0.78rem; color:var(--muted); }
+.guest-banner[hidden] { display:none; }
+.guest-banner__text { flex:1; }
+.guest-banner__btn { white-space:nowrap; padding:4px 10px; background:var(--ink); color:#fff; border:none; border-radius:8px; font-size:0.75rem; cursor:pointer; }
+.guest-banner__close { background:none; border:none; color:var(--muted); font-size:1rem; cursor:pointer; padding:0 2px; line-height:1; }
