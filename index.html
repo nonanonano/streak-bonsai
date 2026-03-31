@@ -70,6 +70,12 @@
           </button>
         </header>
 
+        <div class="guest-banner" id="guest-banner" hidden>
+          <span class="guest-banner__text">💾 データはこの端末のみに保存中</span>
+          <button type="button" class="guest-banner__btn" onclick="showAuthFromBanner()">登録して保存</button>
+          <button type="button" class="guest-banner__close" onclick="dismissGuestBanner()" aria-label="閉じる">✕</button>
+        </div>
+
         <main class="screen-frame" id="screen-root" aria-live="polite"></main>
 
         <nav class="tabbar" id="bottom-nav" aria-label="主要画面">
@@ -156,6 +162,8 @@
     </p>
 
     <div class="auth-loading" id="auth-loading" hidden><div class="auth-spinner"></div></div>
+      <div class="auth-guest-sep"><span>または</span></div>
+      <button type="button" class="auth-guest-btn" id="auth-guest-btn">登録なしで試してみる →</button>
   </div>
 </div>
 
