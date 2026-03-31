@@ -4124,6 +4124,7 @@ function beginSession(planKey) {
   ui.selectedSessionPlan = planKey;
   ui.finishDraft = null;
   ui.sessionOpen = true;
+  requestNotificationPermission();
   requestWakeLock();
   saveState();
   startSessionTicker();
@@ -5526,6 +5527,7 @@ function startSessionTicker() {
       window.clearInterval(ui.sessionTimer);
       ui.sessionTimer = null;
       playTempleBell();
+      sendTimerEndNotification();
       showToast("予定時間です。完了か軽量着地を選べます。");
     }
   }, 1000);
@@ -6000,6 +6002,25 @@ function releaseWakeLock() {
     _wakeLock.release().catch(() => {});
     _wakeLock = null;
   }
+}
+
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function sendTimerEndNotification() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const goal = (state && state.setup && state.setup.goal) || '集中セッション';
+  try {
+    new Notification('⏰ StreakBonsai', {
+      body: goal + '\n予定時間です！',
+      icon: '/icon-192.png',
+      tag: 'session-end',
+      renotify: true
+    });
+  } catch(e) {}
 }
 
 // ── 音声（お寺の鐘） ──────────────────────────────────────
