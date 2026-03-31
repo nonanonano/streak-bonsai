@@ -1456,6 +1456,7 @@ function handleInput(event) {
 }
 
 function render() {
+  updateGuestBanner();
   let currentView = state.meta.currentView || "today";
   if (currentView === "replan") {
     currentView = "setup";
@@ -6215,6 +6216,32 @@ const _authHintEl = document.querySelector("#auth-hint");
 const _authTabBtns = Array.from(document.querySelectorAll(".auth-tab"));
 let _authMode = "login";
 
+const GUEST_MODE_KEY = 'sb-guest-v1';
+const GUEST_BANNER_KEY = 'sb-guest-banner-last';
+function isGuestMode() { return localStorage.getItem(GUEST_MODE_KEY) === '1'; }
+function enterGuestMode() {
+  localStorage.setItem(GUEST_MODE_KEY, '1');
+  localStorage.removeItem(GUEST_BANNER_KEY);
+  localStorage.removeItem(GUEST_MODE_KEY);
+      _authOverlay.hidden = true;
+  if (!_appInitialized) { _appInitialized = true; init(); }
+}
+function updateGuestBanner() {
+  const banner = document.getElementById('guest-banner');
+  if (!banner) return;
+  if (!isGuestMode()) { banner.hidden = true; return; }
+  const last = parseInt(localStorage.getItem(GUEST_BANNER_KEY) || '0');
+  banner.hidden = (Date.now() - last) < 23 * 60 * 60 * 1000;
+}
+function dismissGuestBanner() {
+  localStorage.setItem(GUEST_BANNER_KEY, String(Date.now()));
+  const b = document.getElementById('guest-banner'); if (b) b.hidden = true;
+}
+function showAuthFromBanner() {
+  dismissGuestBanner();
+  _authOverlay.hidden = false;
+}
+
 function _authShowError(msg) {
   _authErrorEl.textContent = msg;
   _authErrorEl.hidden = false;
@@ -6282,6 +6309,8 @@ _authTabBtns.forEach(btn => {
 });
 
 // フォーム送信
+document.getElementById('auth-guest-btn')?.addEventListener('click', enterGuestMode);
+
 _authForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   _authClearError();
@@ -6326,6 +6355,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
     if (!_appInitialized) {
       // ログイン時は必ずSupabaseを優先（force=true）
       await loadStateFromSupabase(session.user.id, { force: true });
+      localStorage.removeItem(GUEST_MODE_KEY);
       _authOverlay.hidden = true;
       window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       _appInitialized = true;
@@ -6336,6 +6366,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
     } else if (event === "SIGNED_IN") {
       // 再ログイン時も必ずSupabaseを優先（force=true）
       await loadStateFromSupabase(session.user.id, { force: true });
+      localStorage.removeItem(GUEST_MODE_KEY);
       _authOverlay.hidden = true;
       window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       render();
