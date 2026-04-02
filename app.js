@@ -632,7 +632,7 @@ function init() {
   // 3分ごとに他デバイスの変更を自動取得
   setInterval(() => {
     if (!state.activeSession) _resyncFromSupabase();
-  }, 3 * 60 * 1000);
+  }, 30 * 1000);
 }
 
 function updateVH() {
@@ -1454,6 +1454,17 @@ function handleInput(event) {
     saveState();
   }
 }
+
+function safeRender() {
+  const el = document.activeElement;
+  if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') && document.hasFocus()) {
+    clearTimeout(safeRender._t);
+    safeRender._t = setTimeout(render, 800);
+    return;
+  }
+  render();
+}
+safeRender._t = null;
 
 function render() {
   updateGuestBanner();
@@ -5428,7 +5439,7 @@ function startClock() {
 
   ui.clockTimer = window.setInterval(() => {
     todayLabel.textContent = formatHeaderDate(new Date());
-    if (state.meta.currentView === "today" && !ui.sessionOpen && !state.activeSession) {
+    if (state.meta.currentView === "today" && !ui.sessionOpen && !state.activeSession && !ui.finishDraft) {
       render();
     }
   }, 60000);
@@ -6135,7 +6146,7 @@ async function _resyncFromSupabase() {
     const prevTs = state.meta?.lastSavedAt || 0;
     await loadStateFromSupabase(user.id);
     if ((state.meta?.lastSavedAt || 0) !== prevTs) {
-      render(); // データが更新されたら再描画
+      safeRender(); // データが更新されたら再描画
     }
   } catch (err) {
     console.warn("Resync error:", err);
@@ -6159,7 +6170,7 @@ async function pushStateToSupabase() {
       // Supabaseの方が新しい（他デバイスで更新あり）→ ローカルに取り込む
       state = mergeState(buildSeedState(), existing.state);
       localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
-      render();
+      safeRender();
       return;
     }
     await sb.from("user_data").upsert(
@@ -6196,7 +6207,7 @@ function setupRealtimeSync(userId) {
         if (remoteTs > localTs) {
           state = mergeState(buildSeedState(), payload.new.state);
           localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
-          render();
+          safeRender();
         }
       }
     )
@@ -6222,8 +6233,7 @@ function isGuestMode() { return localStorage.getItem(GUEST_MODE_KEY) === '1'; }
 function enterGuestMode() {
   localStorage.setItem(GUEST_MODE_KEY, '1');
   localStorage.removeItem(GUEST_BANNER_KEY);
-  localStorage.removeItem(GUEST_MODE_KEY);
-      _authOverlay.hidden = true;
+  _authOverlay.setAttribute('hidden', '');
   if (!_appInitialized) { _appInitialized = true; init(); }
 }
 function updateGuestBanner() {
