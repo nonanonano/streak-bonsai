@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg: #f2e9d8;
   --surface: rgba(255, 253, 246, 0.92);
   --ink: #2c2820;
@@ -3556,6 +3556,7 @@ button {
   border-radius: var(--radius-md);
   border: 1.5px solid rgba(34, 32, 29, 0.1);
   background: rgba(255, 252, 246, 0.88);
+  color: var(--ink);
   text-align: center;
   font-weight: 700;
   cursor: pointer;
