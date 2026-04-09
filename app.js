@@ -1496,11 +1496,18 @@ function render() {
     garden: renderGardenView,
   };
 
-  try {
-    screenRoot.innerHTML = (renderMap[currentView] || renderMap.today)();
-  } catch (err) {
-    console.error("render error:", err);
-    screenRoot.innerHTML = `<div class="screen" style="padding:32px 24px;text-align:center;"><p style="font-size:1.1rem;margin-bottom:8px;">表示エラーが発生しました</p><p style="font-size:0.82rem;color:var(--muted)">${escapeHtml(String(err.message || err))}</p></div>`;
+  // Skip expensive screenRoot rebuild when the session sheet covers the
+  // screen and the underlying view hasn't changed — the backdrop blur
+  // hides it anyway, and rebuilding innerHTML causes a brief flash
+  // visible through the semi-transparent overlay.
+  const sheetCoversScreen = ui.sessionOpen && (state.activeSession || ui.finishDraft);
+  if (!sheetCoversScreen) {
+    try {
+      screenRoot.innerHTML = (renderMap[currentView] || renderMap.today)();
+    } catch (err) {
+      console.error("render error:", err);
+      screenRoot.innerHTML = `<div class="screen" style="padding:32px 24px;text-align:center;"><p style="font-size:1.1rem;margin-bottom:8px;">表示エラーが発生しました</p><p style="font-size:0.82rem;color:var(--muted)">${escapeHtml(String(err.message || err))}</p></div>`;
+    }
   }
   renderSessionSheet();
   startSessionTicker();
@@ -3899,15 +3906,72 @@ function renderWindowField(label, startKey, endKey, startValue, endValue) {
   `;
 }
 
-function renderSessionSheet() {
-  if (!ui.sessionOpen) {
-    sessionSheet.hidden = true;
-    sessionSheet.innerHTML = "";
-    return;
+// ── Session Sheet (flicker-free) ─────────────────────────
+// Track the current layout mode so we can skip full innerHTML rebuilds
+// when only data (not structure) has changed.
+let _sheetLayout = "closed"; // "closed" | "timer" | "finish" | "picker" | "abort"
+
+function _getSheetLayout() {
+  if (!ui.sessionOpen) return "closed";
+  if (ui.finishDraft) return "finish";
+  if (state.activeSession) {
+    return ui.showAbortConfirm ? "abort" : "timer";
+  }
+  return "picker";
+}
+
+function _getDisplayPlanKey() {
+  const livePlanKey = state.plans[ui.selectedSessionPlan] ? ui.selectedSessionPlan : (state.activeSession ? state.activeSession.planKey : "A");
+  return ui.finishDraft ? ui.finishDraft.outcome : livePlanKey;
+}
+
+// Lightweight in-place update — no innerHTML replacement, no animation replay
+function _patchSessionSheet() {
+  const displayPlanKey = _getDisplayPlanKey();
+
+  // Update plan button highlights
+  sessionSheet.querySelectorAll("[data-action='select-session-plan']").forEach(btn => {
+    btn.classList.toggle("is-active", btn.dataset.plan === displayPlanKey);
+  });
+
+  if (_sheetLayout === "timer") {
+    // Timer value is already updated by startSessionTicker's setInterval.
+    // Update it here too for immediate accuracy on render() calls.
+    const timerEl = sessionSheet.querySelector("#session-timer-value");
+    if (timerEl && state.activeSession) {
+      const remaining = getRemainingMs(state.activeSession.endsAt);
+      timerEl.textContent = remaining <= 0 ? "時間です" : (ui.focusPausedAt ? "⏸" : formatCountdown(remaining));
+    }
+    // Update departures display
+    const depEl = sessionSheet.querySelector("[data-departures]");
+    if (depEl && state.activeSession) {
+      const d = state.activeSession.departures || 0;
+      depEl.textContent = d > 0 ? `離脱 ${d}回` : "";
+      depEl.hidden = d <= 0;
+    }
   }
 
-  const livePlanKey = state.plans[ui.selectedSessionPlan] ? ui.selectedSessionPlan : (state.activeSession ? state.activeSession.planKey : "A");
-  const displayPlanKey = ui.finishDraft ? ui.finishDraft.outcome : livePlanKey;
+  if (_sheetLayout === "finish") {
+    // Update caption text (plan label / planned seconds) — don't touch inputs
+    const captionEl = sessionSheet.querySelector("[data-finish-caption]");
+    if (captionEl && ui.finishDraft) {
+      captionEl.innerHTML = `実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">⏱ タップして修正（例: 10 または 1:30）</span>`;
+    }
+    // Update elapsed display only if the input is NOT focused (avoid disrupting user editing)
+    const elapsedInput = sessionSheet.querySelector("#elapsed-input-field");
+    if (elapsedInput && ui.finishDraft && document.activeElement !== elapsedInput) {
+      const edited = ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed;
+      elapsedInput.value = formatElapsedForInput(ui.finishDraft.elapsedSeconds);
+      elapsedInput.classList.toggle("is-edited", edited);
+      elapsedInput.classList.remove("is-invalid");
+      const unitEl = elapsedInput.closest(".elapsed-timer-wrap")?.querySelector(".elapsed-timer-unit");
+      if (unitEl) unitEl.textContent = edited ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : "分:秒";
+    }
+  }
+}
+
+function _buildSessionSheetHTML() {
+  const displayPlanKey = _getDisplayPlanKey();
   const plan = state.plans[displayPlanKey];
   const remaining = state.activeSession ? getRemainingMs(state.activeSession.endsAt) : plan.minutes * 60 * 1000;
   const overtime = state.activeSession && remaining <= 0;
@@ -3917,8 +3981,7 @@ function renderSessionSheet() {
     )
     .join("");
 
-  sessionSheet.hidden = false;
-  sessionSheet.innerHTML = `
+  return `
     <div class="sheet__backdrop" data-action="close-session"></div>
     <section class="sheet__panel">
       <div class="sheet__grab"></div>
@@ -3952,7 +4015,7 @@ function renderSessionSheet() {
                   />
                   <span class="elapsed-timer-unit">${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : "分:秒"}</span>
                 </div>
-                <p class="sheet__caption">実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">⏱ タップして修正（例: 10 または 1:30）</span></p>
+                <p class="sheet__caption" data-finish-caption>実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">⏱ タップして修正（例: 10 または 1:30）</span></p>
               </div>
               <div class="panel stack">
                 <h3 class="panel__title">記録の仕上げ</h3>
@@ -3983,7 +4046,7 @@ function renderSessionSheet() {
               <div class="panel panel--cool">
                 ${state.setup.goal ? `<p style="font-size:0.8rem;font-weight:600;opacity:0.6;text-align:center;margin:0 0 2px;letter-spacing:0.02em">${escapeHtml(state.setup.goal)}</p>` : ""}
                 <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : (ui.focusPausedAt ? "⏸" : formatCountdown(remaining))}</p>
-                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession.departures}回</p>` : ""}
+                <p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0" data-departures ${!(state.activeSession?.departures > 0) ? "hidden" : ""}>${(state.activeSession?.departures > 0) ? `離脱 ${state.activeSession.departures}回` : ""}</p>
               </div>
             `
         }
@@ -4018,6 +4081,32 @@ function renderSessionSheet() {
       </div>
     </section>
   `;
+}
+
+function renderSessionSheet() {
+  const targetLayout = _getSheetLayout();
+
+  if (targetLayout === "closed") {
+    if (_sheetLayout !== "closed") {
+      sessionSheet.hidden = true;
+      sessionSheet.innerHTML = "";
+      _sheetLayout = "closed";
+    }
+    return;
+  }
+
+  // If the structural layout hasn't changed, do a lightweight in-place patch
+  // instead of destroying and recreating the entire DOM (which replays the
+  // slide-in animation and kills input focus).
+  if (_sheetLayout === targetLayout && sessionSheet.innerHTML !== "") {
+    _patchSessionSheet();
+    return;
+  }
+
+  // Layout changed — full rebuild required
+  _sheetLayout = targetLayout;
+  sessionSheet.hidden = false;
+  sessionSheet.innerHTML = _buildSessionSheetHTML();
 }
 
 function openFinishDraft(planKey) {
@@ -6081,6 +6170,8 @@ async function pushStateToSupabase() {
     const supabaseTs = existing?.state?.meta?.lastSavedAt || 0;
     const localTs = state.meta?.lastSavedAt || 0;
     if (supabaseTs > localTs) {
+      // セッション中は他デバイスのデータで上書きしない（タイマー破壊防止）
+      if (state.activeSession) return;
       // Supabaseの方が新しい（他デバイスで更新あり）→ ローカルに取り込む
       state = mergeState(buildSeedState(), existing.state);
       localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
