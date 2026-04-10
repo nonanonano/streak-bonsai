@@ -1459,7 +1459,7 @@ function safeRender() {
   const el = document.activeElement;
   if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') && document.hasFocus()) {
     clearTimeout(safeRender._t);
-    safeRender._t = setTimeout(render, 800);
+    safeRender._t = setTimeout(safeRender, 800);
     return;
   }
   render();
