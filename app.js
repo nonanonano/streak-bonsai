@@ -1457,7 +1457,7 @@ function handleInput(event) {
 
 function safeRender() {
   const el = document.activeElement;
-  if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') && document.hasFocus()) {
+  if ((el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) || safeRender._ime) {
     clearTimeout(safeRender._t);
     safeRender._t = setTimeout(safeRender, 800);
     return;
@@ -1465,6 +1465,9 @@ function safeRender() {
   render();
 }
 safeRender._t = null;
+safeRender._ime = false;
+document.addEventListener('compositionstart', () => { safeRender._ime = true; });
+document.addEventListener('compositionend', () => { safeRender._ime = false; });
 
 function render() {
   updateGuestBanner();
