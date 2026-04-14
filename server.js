@@ -17,7 +17,8 @@ const MIME_TYPES = {
 };
 
 function safeResolve(requestPath) {
-  const cleanPath = requestPath === '/' ? '/index.html' : requestPath;
+  const stripped = requestPath.split('?')[0];
+  const cleanPath = stripped === '/' ? '/index.html' : stripped;
   const resolved = path.normalize(path.join(ROOT, decodeURIComponent(cleanPath)));
   if (!resolved.startsWith(ROOT)) {
     return null;
@@ -43,6 +44,9 @@ const server = http.createServer((req, res) => {
 
     res.statusCode = 200;
     res.setHeader('Content-Type', MIME_TYPES[path.extname(target).toLowerCase()] || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.end(data);
   });
 });

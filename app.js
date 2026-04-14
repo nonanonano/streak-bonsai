@@ -4083,6 +4083,22 @@ function _buildSessionSheetHTML() {
   `;
 }
 
+// Track IME composition state so we can defer disruptive rebuilds while the
+// user is mid-composition (e.g., typing Japanese/Chinese/Korean).
+let _imeComposingInSheet = false;
+let _pendingSheetRender = false;
+document.addEventListener("compositionstart", (e) => {
+  if (sessionSheet && sessionSheet.contains(e.target)) _imeComposingInSheet = true;
+}, true);
+document.addEventListener("compositionend", (e) => {
+  _imeComposingInSheet = false;
+  // If a render was deferred during composition, flush it now.
+  if (_pendingSheetRender) {
+    _pendingSheetRender = false;
+    renderSessionSheet();
+  }
+}, true);
+
 function renderSessionSheet() {
   const targetLayout = _getSheetLayout();
 
@@ -4103,10 +4119,68 @@ function renderSessionSheet() {
     return;
   }
 
+  // Defer disruptive full rebuilds while the user is composing text with an
+  // IME. Destroying the textarea mid-composition drops characters and feels
+  // like an abrupt "screen switch". We'll flush the rebuild on compositionend.
+  if (_imeComposingInSheet) {
+    _pendingSheetRender = true;
+    return;
+  }
+
+  const sheetWasVisible = _sheetLayout !== "closed" && sessionSheet.innerHTML !== "";
+
+  // Preserve focus/selection/value of any currently-focused input/textarea
+  // inside the sheet so users don't lose their typing across a full rebuild.
+  const active = document.activeElement;
+  let preserved = null;
+  if (
+    active &&
+    sessionSheet.contains(active) &&
+    (active.tagName === "TEXTAREA" || active.tagName === "INPUT") &&
+    active.dataset &&
+    active.dataset.finishField
+  ) {
+    preserved = {
+      field: active.dataset.finishField,
+      value: active.value,
+      selStart: active.selectionStart,
+      selEnd: active.selectionEnd,
+    };
+    // Sync the latest typed value back into the draft so the rebuilt DOM
+    // reflects what the user last saw.
+    if (ui.finishDraft && preserved.field !== "elapsedInput") {
+      ui.finishDraft[preserved.field] = preserved.value;
+    }
+  }
+
   // Layout changed — full rebuild required
   _sheetLayout = targetLayout;
   sessionSheet.hidden = false;
   sessionSheet.innerHTML = _buildSessionSheetHTML();
+
+  // Suppress slide-in animation replay on rebuilds where the sheet was already
+  // visible (layout transitions like timer → finish). The slide-in should
+  // only play on the initial open of the sheet, not on every re-render.
+  if (sheetWasVisible) {
+    const panel = sessionSheet.querySelector(".sheet__panel");
+    if (panel) panel.style.animation = "none";
+  }
+
+  // Restore focus and selection to the field the user was editing.
+  if (preserved) {
+    const el = sessionSheet.querySelector(`[data-finish-field="${preserved.field}"]`);
+    if (el) {
+      if (el.value !== preserved.value) el.value = preserved.value;
+      try {
+        el.focus({ preventScroll: true });
+        const start = preserved.selStart ?? preserved.value.length;
+        const end = preserved.selEnd ?? preserved.value.length;
+        if (typeof el.setSelectionRange === "function") {
+          el.setSelectionRange(start, end);
+        }
+      } catch (_) { /* ignore */ }
+    }
+  }
 }
 
 function openFinishDraft(planKey) {
