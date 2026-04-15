@@ -4037,6 +4037,128 @@ function renderSessionSheet() {
   `;
 }
 
+// IME-safe wrapper around renderSessionSheet.
+// Problem: while user types in the reflection textarea or elapsed input inside
+// the session sheet, background rerenders (sync ticks, timer ticks, safeRender
+// debounce) cause sessionSheet.innerHTML to be fully replaced. This drops focus
+// and the mobile keyboard, and looks like a sudden "screen switch" — especially
+// bad mid-IME composition for Japanese input.
+//
+// Fix: (1) track IME composition anywhere inside the sheet and defer sheet
+// rebuilds until compositionend, (2) preserve the focused input's value,
+// focus, and selection range across unavoidable rebuilds, (3) suppress the
+// sheet-in slide animation on subsequent rebuilds so the user doesn't perceive
+// the sheet as reopening.
+(function () {
+  const _originalRenderSessionSheet = renderSessionSheet;
+  let _imeInSheet = false;
+  let _pendingSheetRender = false;
+  let _sheetAnimatedOnce = false;
+
+  document.addEventListener(
+    "compositionstart",
+    (e) => {
+      if (sessionSheet && e.target && sessionSheet.contains(e.target)) {
+        _imeInSheet = true;
+      }
+    },
+    true,
+  );
+  document.addEventListener(
+    "compositionend",
+    () => {
+      if (!_imeInSheet) return;
+      _imeInSheet = false;
+      if (_pendingSheetRender) {
+        _pendingSheetRender = false;
+        renderSessionSheet();
+      }
+    },
+    true,
+  );
+
+  renderSessionSheet = function () {
+    // If user is mid-IME composition inside the sheet, defer the rebuild.
+    if (_imeInSheet && ui.sessionOpen) {
+      _pendingSheetRender = true;
+      return;
+    }
+
+    // Reset animation flag when sheet is closed, so next open animates in.
+    if (!ui.sessionOpen) {
+      _sheetAnimatedOnce = false;
+      return _originalRenderSessionSheet.apply(this, arguments);
+    }
+
+    // Capture focus info before rebuild.
+    const active = document.activeElement;
+    let focusInfo = null;
+    if (
+      active &&
+      sessionSheet.contains(active) &&
+      (active.tagName === "TEXTAREA" || active.tagName === "INPUT")
+    ) {
+      focusInfo = {
+        finishField: active.dataset ? active.dataset.finishField : null,
+        setupField: active.dataset ? active.dataset.setupField : null,
+        id: active.id || null,
+        value: active.value,
+        start: active.selectionStart,
+        end: active.selectionEnd,
+      };
+    }
+
+    const result = _originalRenderSessionSheet.apply(this, arguments);
+
+    // Suppress sheet-in animation on rebuilds (only play on first open).
+    if (_sheetAnimatedOnce) {
+      const panel = sessionSheet.querySelector(".sheet__panel");
+      if (panel) panel.style.animation = "none";
+    } else {
+      _sheetAnimatedOnce = true;
+    }
+
+    // Restore focus/selection if we had one.
+    if (focusInfo) {
+      let target = null;
+      if (focusInfo.finishField) {
+        target = sessionSheet.querySelector(
+          '[data-finish-field="' + focusInfo.finishField + '"]',
+        );
+      }
+      if (!target && focusInfo.setupField) {
+        target = sessionSheet.querySelector(
+          '[data-setup-field="' + focusInfo.setupField + '"]',
+        );
+      }
+      if (!target && focusInfo.id) {
+        target = sessionSheet.querySelector("#" + focusInfo.id);
+      }
+      if (
+        target &&
+        (target.tagName === "TEXTAREA" || target.tagName === "INPUT")
+      ) {
+        // Prefer the freshly typed value over whatever came out of state,
+        // in case state hadn't yet been flushed when render fired.
+        if (target.value !== focusInfo.value) target.value = focusInfo.value;
+        try {
+          target.focus({ preventScroll: true });
+          if (
+            typeof focusInfo.start === "number" &&
+            typeof focusInfo.end === "number"
+          ) {
+            target.setSelectionRange(focusInfo.start, focusInfo.end);
+          }
+        } catch (_err) {
+          /* setSelectionRange not supported on this input type — ignore */
+        }
+      }
+    }
+
+    return result;
+  };
+})();
+
 function openFinishDraft(planKey) {
   ui.selectedSessionPlan = planKey;
   const rawElapsed = state.activeSession
