@@ -48,7 +48,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260708a Task編集";
+const APP_BUILD = "20260709a 象限色";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -3389,14 +3389,17 @@ function renderTaskQuadrantBoard(groups) {
         <span class="status-badge">${escapeHtml(`${assignedTasks.length}件 / ${totalMinutes}分`)}</span>
       </div>
       <div class="task-quadrant-grid">
-        ${TASK_QUADRANTS.map((quadrant) => renderTaskQuadrant(quadrant, groups[quadrant.key] || [])).join("")}
+        ${TASK_QUADRANTS.map((quadrant) => renderTaskQuadrant(quadrant, groups[quadrant.key] || [], totalMinutes)).join("")}
       </div>
     </section>
   `;
 }
 
-function renderTaskQuadrant(quadrant, tasks) {
+function renderTaskQuadrant(quadrant, tasks, boardTotalMinutes = 0) {
   const totalMinutes = tasks.reduce((sum, task) => sum + normalizeTaskMinutes(task.minutes), 0);
+  // A2Eは配分の本。目安に対して「今」何%割いているかを並記する
+  const share = boardTotalMinutes > 0 ? Math.round((totalMinutes / boardTotalMinutes) * 100) : null;
+  const shareLabel = share === null ? "" : ` ・ 今 ${share}%`;
 
   return `
     <section class="task-quadrant task-quadrant--${escapeHtml(quadrant.key)}" data-task-quadrant-zone="${escapeHtml(quadrant.key)}">
@@ -3412,7 +3415,7 @@ function renderTaskQuadrant(quadrant, tasks) {
         </div>
       </div>
       <div class="task-quadrant__meta">
-        <span>目安 ${escapeHtml(String(quadrant.target))}%</span>
+        <span>目安 ${escapeHtml(String(quadrant.target))}%${escapeHtml(shareLabel)}</span>
         <span>${escapeHtml(quadrant.note)}</span>
       </div>
       <div class="task-quadrant__list">
