@@ -3,25 +3,102 @@
 // =========================================================
 const SUPABASE_URL = "https://kyzyyciutnkhaxadwdlx.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_8BS-Guu8UUfb3sEHRfHGRg_vTvB0FyB";
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// supabase.js が読み込めなくてもアプリ本体は必ず起動させる（ローカルデータで動作）
+function createSupabaseStub() {
+  const offlineError = { message: "オフラインのため利用できません" };
+  const query = {
+    select() { return this; },
+    eq() { return this; },
+    single() { return Promise.resolve({ data: null, error: offlineError }); },
+    upsert() { return Promise.resolve({ data: null, error: offlineError }); },
+  };
+  return {
+    __stub: true,
+    auth: {
+      onAuthStateChange(callback) {
+        setTimeout(() => callback("INITIAL_SESSION", null), 0);
+        return { data: { subscription: { unsubscribe() {} } } };
+      },
+      async getUser() { return { data: { user: null } }; },
+      async signInWithPassword() { return { error: offlineError }; },
+      async signUp() { return { error: offlineError }; },
+      async resetPasswordForEmail() { return { error: offlineError }; },
+      async signOut() { return { error: null }; },
+    },
+    from() { return query; },
+    channel() { return { on() { return this; }, subscribe() { return this; } }; },
+    removeChannel() {},
+  };
+}
+
+const sb = (() => {
+  try {
+    return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+        persistSession: true,
+        storageKey: "streakbonsai-auth-v1",
+      },
+    });
+  } catch (err) {
+    console.warn("Supabase unavailable, running local-only:", err);
+    return createSupabaseStub();
+  }
+})();
+
+const APP_BUILD = "20260708a Task編集";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
+const TASK_DEFAULT_MINUTES = 5;
+const TASK_QUADRANT_DEFAULT = "inbox";
+const TASK_QUADRANTS = [
+  {
+    key: "urgentImportant",
+    title: "緊急×重要",
+    concept: "ビッグロック",
+    axis: "緊急度 高 / 重要度 高",
+    target: 30,
+    defaultMinutes: 30,
+    note: "今やる。時間は決める",
+  },
+  {
+    key: "notUrgentImportant",
+    title: "重要・非緊急",
+    concept: "未来投資",
+    axis: "緊急度 低 / 重要度 高",
+    target: 50,
+    defaultMinutes: 45,
+    note: "先に予定を押さえる",
+  },
+  {
+    key: "urgentNotImportant",
+    title: "緊急・低重要",
+    concept: "小石",
+    axis: "緊急度 高 / 重要度 低",
+    target: 20,
+    defaultMinutes: 10,
+    note: "任せる・軽くする",
+  },
+  {
+    key: "notUrgentNotImportant",
+    title: "低重要・非緊急",
+    concept: "砂・水",
+    axis: "緊急度 低 / 重要度 低",
+    target: 0,
+    defaultMinutes: 5,
+    note: "削る・保留する",
+  },
+];
+const TASK_QUADRANT_KEYS = TASK_QUADRANTS.map((quadrant) => quadrant.key);
 const PLAN_RANK = { C: 1, B: 2, A: 3 };
 const PLAN_META = {
-  A: { label: "Plan A", tag: "通常" },
-  B: { label: "Plan B", tag: "短縮" },
-  C: { label: "Plan C", tag: "救済" },
+  A: { label: "標準", tag: "通常" },
+  B: { label: "短め", tag: "短縮" },
+  C: { label: "最小", tag: "救済" },
 };
-const REASONS = [
-  "残業で開始が遅れた",
-  "タスクが重すぎた",
-  "開始前の準備が面倒",
-  "疲労",
-  "予定変更",
-  "忘れた",
-];
 const REPLAN_MODES = {
   lighten_today: "今日を軽くする",
   reset_week: "今週を立て直す",
@@ -36,12 +113,6 @@ const SETUP_SECTIONS = {
     title: "目標編集",
     copy: "登録済みの目標をここで編集します。",
   },
-  roadmap: {
-    label: "Roadmap",
-    hint: "節目を整える",
-    title: "Roadmap",
-    copy: "マイルストーンの追加と調整は設定で行います。",
-  },
   schedule: {
     label: "実施時間",
     hint: "いつ動くか",
@@ -49,10 +120,10 @@ const SETUP_SECTIONS = {
     copy: "曜日ごとに、取りかかる時間だけをここで整えます。",
   },
   plan: {
-    label: "プランの変更",
-    hint: "どこまで軽くするか",
-    title: "プラン",
-    copy: "通常 / 短縮 / 救済の3段階だけ調整します。",
+    label: "分数",
+    hint: "何分やるか",
+    title: "分数",
+    copy: "1回に集中する時間だけを決めます。",
   },
 };
 const ROADMAP_TARGETS = {
@@ -119,6 +190,39 @@ const BONSAI_LIBRARY = {
 };
 const BONSAI_STAGE_LABELS = ["鉢のみ","芽生え","幼木","成長期","形成期","樹形成","整い","老成","銘木","傑作"];
 
+// 目標ごとの識別色。テーマに馴染む深めの8色から、目標IDのハッシュで安定的に割り当てる。
+// 同じ花/盆栽を選んでいても目標ごとに色が変わるので、表示中の目標が一目で分かる。
+const GOAL_COLOR_PALETTE = [
+  "#c2562f", // テラコッタ
+  "#4e7a65", // 若葉
+  "#a67c1f", // 金茶
+  "#4c6e88", // 藍
+  "#8a4f6b", // 梅紫
+  "#2f7d78", // 青緑
+  "#a85a3c", // 赤土
+  "#667238", // 苔緑
+];
+
+function getGoalSignatureColor(goalOrId) {
+  const id = typeof goalOrId === "string" ? goalOrId : (goalOrId && goalOrId.id) || "";
+  if (!id) {
+    return GOAL_COLOR_PALETTE[0];
+  }
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return GOAL_COLOR_PALETTE[hash % GOAL_COLOR_PALETTE.length];
+}
+
+function hexToRgba(hex, alpha = 1) {
+  const h = String(hex).replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const screenRoot = document.querySelector("#screen-root");
 const screenFrame = document.querySelector(".screen-frame");
 const todayLabel = document.querySelector("#today-label");
@@ -138,8 +242,17 @@ let ui = {
   roadmapDraft: null,
   reviewLogDraft: null,
   reviewLogExpanded: false,
-  missPanelOpen: false,
-  missReasonDraft: REASONS[0],
+  taskDraft: { title: "", minutes: String(TASK_DEFAULT_MINUTES) },
+  taskShowShelved: false,
+  taskDragId: null,
+  taskDragBeforeId: null,
+  taskPointerDrag: null,
+  taskSuppressClickUntil: 0,
+  taskSubtaskDrafts: {},
+  taskEditRenderTimer: null,
+  selectedTaskId: null,
+  focusLockHelp: null,
+  pendingFocusStart: null,
   sessionOpen: false,
   selectedSessionPlan: "A",
   finishDraft: null,
@@ -147,7 +260,6 @@ let ui = {
   toastTimer: null,
   clockTimer: null,
   sessionTimer: null,
-  focusPausedAt: null,
 };
 
 // init() は Supabase auth 解決後に呼ばれます（ファイル末尾参照）
@@ -358,22 +470,62 @@ function getBonsaiHealth(logs, studyDays) {
   return scheduled > 0 ? Math.round((completed / scheduled) * 100) : 100;
 }
 
-// 直近7回の実施予定日を●○ドットで返す（説明不要の一目瞭然UI）
-function renderStreakDots(logs, studyDays) {
+function getRecentHabitSlots(logs, studyDays, limit = 7) {
   const days = normalizeStudyDays(studyDays);
   const today = new Date();
   const slots = [];
-  for (let i = 0; i < 14 && slots.length < 7; i++) {
+  for (let i = 0; i < 56 && slots.length < limit; i++) {
     const d = new Date(today); d.setDate(d.getDate() - i);
     const dayKey = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()];
     if (!days.includes(dayKey)) continue;
     const ds = toISODate(d);
     const log = (Array.isArray(logs) ? logs : []).find(l => l.date === ds);
     const done = Boolean(log && log.outcome !== "miss" && log.outcome !== "none");
-    slots.unshift({ done, isToday: i === 0 });
+    slots.unshift({ done, isToday: i === 0, dayKey, date: ds });
   }
-  // 7個未満なら左を薄いドットで埋める
-  while (slots.length < 7) slots.unshift({ done: false, isToday: false, filler: true });
+  while (slots.length < limit) slots.unshift({ done: false, isToday: false, filler: true });
+  return slots;
+}
+
+function weekdayShortLabel(key) {
+  return weekdayLabel(key).slice(0, 1);
+}
+
+function renderHabitHistory(logs, studyDays) {
+  const slots = getRecentHabitSlots(logs, studyDays);
+  const completed = slots.filter((slot) => slot.done).length;
+
+  return `
+    <div class="habit-history" aria-label="直近7回の実行状況。完は完了、未は未完了です。">
+      <div class="habit-history__head">
+        <span>直近7回</span>
+        <span>${completed}/7 完了</span>
+      </div>
+      <div class="habit-history__days">
+        ${slots.map((slot) => {
+          if (slot.filler) {
+            return `
+              <span class="habit-history__day is-empty" aria-hidden="true">
+                <span class="habit-history__weekday">-</span>
+                <span class="habit-history__state">-</span>
+              </span>
+            `;
+          }
+          const statusText = slot.done ? "完" : "未";
+          return `
+            <span class="habit-history__day ${slot.done ? "is-done" : "is-miss"} ${slot.isToday ? "is-today" : ""}" title="${escapeHtml(`${slot.date} ${weekdayLabel(slot.dayKey)} ${slot.done ? "完了" : "未完了"}`)}">
+              <span class="habit-history__weekday">${escapeHtml(weekdayShortLabel(slot.dayKey))}</span>
+              <span class="habit-history__state">${statusText}</span>
+            </span>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderStreakDots(logs, studyDays) {
+  const slots = getRecentHabitSlots(logs, studyDays);
   return `<span class="streak-dots">${slots.map(s =>
     `<span class="streak-dot${s.done ? " is-done" : ""}${s.isToday ? " is-today" : ""}${s.filler ? " is-filler" : ""}"></span>`
   ).join("")}</span>`;
@@ -381,6 +533,538 @@ function renderStreakDots(logs, studyDays) {
 
 function createGoalId() {
   return `goal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function createTaskId() {
+  return `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function createSubtaskId() {
+  return `subtask-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function normalizeTaskMinutes(value) {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes)) {
+    return TASK_DEFAULT_MINUTES;
+  }
+  return Math.max(1, Math.min(240, Math.round(minutes)));
+}
+
+function normalizeTaskQuadrant(value) {
+  if (value === TASK_QUADRANT_DEFAULT || TASK_QUADRANT_KEYS.includes(value)) {
+    return value;
+  }
+  return TASK_QUADRANT_DEFAULT;
+}
+
+function normalizeTaskSubtask(subtask = {}) {
+  const now = new Date().toISOString();
+  const title = String(subtask.title || "").trim();
+  const done = Boolean(subtask.done || subtask.completedAt);
+
+  return {
+    id: subtask.id || createSubtaskId(),
+    title: title || "小さなTask",
+    done,
+    createdAt: subtask.createdAt || now,
+    updatedAt: subtask.updatedAt || subtask.createdAt || now,
+    completedAt: done ? (subtask.completedAt || now) : null,
+  };
+}
+
+function normalizeTaskSubtasks(subtasks) {
+  return Array.isArray(subtasks)
+    ? subtasks.map(normalizeTaskSubtask).filter((subtask) => subtask.title)
+    : [];
+}
+
+function normalizeTask(task = {}) {
+  const now = new Date().toISOString();
+  const title = String(task.title || "").trim();
+  const status = ["active", "shelved", "done"].includes(task.status)
+    ? task.status
+    : "active";
+
+  return {
+    id: task.id || createTaskId(),
+    title: title || "無題のTask",
+    minutes: normalizeTaskMinutes(task.minutes),
+    status,
+    quadrant: normalizeTaskQuadrant(task.quadrant),
+    createdAt: task.createdAt || now,
+    updatedAt: task.updatedAt || task.createdAt || now,
+    completedAt: task.completedAt || null,
+    shelvedAt: task.shelvedAt || null,
+    lastStartedAt: task.lastStartedAt || null,
+    subtasks: normalizeTaskSubtasks(task.subtasks),
+  };
+}
+
+function normalizeTasks(tasks) {
+  return Array.isArray(tasks) ? tasks.map(normalizeTask) : [];
+}
+
+function getTaskQuadrantMeta(quadrantKey) {
+  return TASK_QUADRANTS.find((quadrant) => quadrant.key === quadrantKey) || null;
+}
+
+function groupActiveTasksByQuadrant(tasks) {
+  const groups = {
+    [TASK_QUADRANT_DEFAULT]: [],
+  };
+  TASK_QUADRANTS.forEach((quadrant) => {
+    groups[quadrant.key] = [];
+  });
+
+  tasks.forEach((task) => {
+    const key = normalizeTaskQuadrant(task.quadrant);
+    groups[key].push(task);
+  });
+
+  return groups;
+}
+
+function moveTaskToQuadrant(taskId, quadrantKey, beforeTaskId = null) {
+  const nextQuadrant = normalizeTaskQuadrant(quadrantKey);
+  const meta = getTaskQuadrantMeta(nextQuadrant);
+  let movedTask = null;
+  const nextTasks = normalizeTasks(state.tasks).filter((task) => {
+    if (task.id !== taskId) {
+      return true;
+    }
+    movedTask = normalizeTask({
+      ...task,
+      quadrant: nextQuadrant,
+      minutes: meta
+        && task.quadrant !== nextQuadrant
+        && task.minutes === TASK_DEFAULT_MINUTES
+        && meta.defaultMinutes !== TASK_DEFAULT_MINUTES
+          ? meta.defaultMinutes
+          : task.minutes,
+      updatedAt: new Date().toISOString(),
+    });
+    return false;
+  });
+
+  if (!movedTask) {
+    return null;
+  }
+
+  const beforeIndex = beforeTaskId
+    ? nextTasks.findIndex((task) => task.id === beforeTaskId)
+    : -1;
+  if (beforeIndex >= 0) {
+    nextTasks.splice(beforeIndex, 0, movedTask);
+  } else {
+    let insertIndex = nextTasks.length;
+    for (let index = nextTasks.length - 1; index >= 0; index -= 1) {
+      if (normalizeTaskQuadrant(nextTasks[index].quadrant) === nextQuadrant) {
+        insertIndex = index + 1;
+        break;
+      }
+    }
+    nextTasks.splice(insertIndex, 0, movedTask);
+  }
+
+  state.tasks = nextTasks;
+  return movedTask;
+}
+
+function assignTaskQuadrant(taskId, quadrantKey) {
+  return moveTaskToQuadrant(taskId, quadrantKey);
+}
+
+function updateTaskMinutes(taskId, minutes) {
+  return updateTask(taskId, () => ({
+    minutes: normalizeTaskMinutes(minutes),
+  }));
+}
+
+function getTaskQuadrantToastLabel(quadrantKey) {
+  if (quadrantKey === TASK_QUADRANT_DEFAULT) {
+    return "未整理";
+  }
+  const meta = getTaskQuadrantMeta(quadrantKey);
+  return meta ? meta.concept : "未整理";
+}
+
+function getTaskById(taskId) {
+  return (state.tasks || []).find((task) => task.id === taskId) || null;
+}
+
+function ensureTaskDraft() {
+  if (!ui.taskDraft) {
+    ui.taskDraft = { title: "", minutes: String(TASK_DEFAULT_MINUTES) };
+  }
+  if (!ui.taskDraft.minutes) {
+    ui.taskDraft.minutes = String(TASK_DEFAULT_MINUTES);
+  }
+  return ui.taskDraft;
+}
+
+function resetTaskDraft() {
+  ui.taskDraft = { title: "", minutes: String(TASK_DEFAULT_MINUTES) };
+}
+
+function ensureTaskSubtaskDrafts() {
+  if (!ui.taskSubtaskDrafts) {
+    ui.taskSubtaskDrafts = {};
+  }
+  return ui.taskSubtaskDrafts;
+}
+
+function getTaskSubtaskDraft(taskId) {
+  const drafts = ensureTaskSubtaskDrafts();
+  return drafts[taskId] || "";
+}
+
+function setTaskSubtaskDraft(taskId, value) {
+  const drafts = ensureTaskSubtaskDrafts();
+  drafts[taskId] = value;
+}
+
+function clearTaskSubtaskDraft(taskId) {
+  const drafts = ensureTaskSubtaskDrafts();
+  delete drafts[taskId];
+}
+
+function getTaskSubtaskProgress(task) {
+  const subtasks = normalizeTaskSubtasks(task.subtasks);
+  return {
+    total: subtasks.length,
+    done: subtasks.filter((subtask) => subtask.done).length,
+  };
+}
+
+function updateTaskTitle(taskId, title) {
+  const cleaned = String(title || "").trim();
+  return updateTask(taskId, () => ({
+    title: cleaned || "無題のTask",
+  }));
+}
+
+function addTaskSubtask(taskId, title) {
+  const cleaned = String(title || "").trim();
+  if (!cleaned) {
+    return null;
+  }
+  const now = new Date().toISOString();
+  return updateTask(taskId, (task) => ({
+    subtasks: [
+      ...normalizeTaskSubtasks(task.subtasks),
+      normalizeTaskSubtask({
+        id: createSubtaskId(),
+        title: cleaned,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    ],
+  }));
+}
+
+function updateTaskSubtask(taskId, subtaskId, updater) {
+  let found = false;
+  const task = updateTask(taskId, (currentTask) => ({
+    subtasks: normalizeTaskSubtasks(currentTask.subtasks).map((subtask) => {
+      if (subtask.id !== subtaskId) {
+        return subtask;
+      }
+      found = true;
+      return normalizeTaskSubtask({
+        ...subtask,
+        ...updater(subtask),
+        updatedAt: new Date().toISOString(),
+      });
+    }),
+  }));
+
+  return found ? task : null;
+}
+
+function removeTaskSubtask(taskId, subtaskId) {
+  let removed = false;
+  const task = updateTask(taskId, (currentTask) => ({
+    subtasks: normalizeTaskSubtasks(currentTask.subtasks).filter((subtask) => {
+      if (subtask.id === subtaskId) {
+        removed = true;
+        return false;
+      }
+      return true;
+    }),
+  }));
+
+  return removed ? task : null;
+}
+
+function scheduleTaskEditRender() {
+  window.clearTimeout(ui.taskEditRenderTimer);
+  ui.taskEditRenderTimer = window.setTimeout(() => {
+    const active = document.activeElement;
+    if (active?.closest?.(".task-selected-panel")) {
+      return;
+    }
+    render();
+  }, 80);
+}
+
+const DEVICE_APP_LOCK_TIMEOUT_MS = 5000;
+let deviceAppLockRequest = null;
+
+function getDeviceAppLockBridge() {
+  return window.webkit?.messageHandlers?.focusLock
+    || window.webkit?.messageHandlers?.guidedAccess
+    || null;
+}
+
+function requestDeviceAppLock(enabled) {
+  const handler = getDeviceAppLockBridge();
+  if (!handler || typeof handler.postMessage !== "function") {
+    return Promise.resolve({
+      supported: false,
+      enabled: Boolean(enabled),
+      success: !enabled,
+      isEnabled: false,
+    });
+  }
+
+  if (deviceAppLockRequest?.timer) {
+    window.clearTimeout(deviceAppLockRequest.timer);
+    deviceAppLockRequest.resolve({
+      supported: true,
+      enabled: deviceAppLockRequest.enabled,
+      success: false,
+      isEnabled: false,
+      cancelled: true,
+    });
+  }
+
+  const requestId = `lock-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => {
+      if (deviceAppLockRequest?.requestId === requestId) {
+        deviceAppLockRequest = null;
+      }
+      resolve({
+        supported: true,
+        enabled: Boolean(enabled),
+        success: false,
+        isEnabled: false,
+        timeout: true,
+      });
+    }, DEVICE_APP_LOCK_TIMEOUT_MS);
+
+    deviceAppLockRequest = {
+      requestId,
+      enabled: Boolean(enabled),
+      resolve,
+      timer,
+    };
+
+    try {
+      handler.postMessage({ enabled: Boolean(enabled), requestId });
+    } catch (_err) {
+      window.clearTimeout(timer);
+      deviceAppLockRequest = null;
+      resolve({
+        supported: true,
+        enabled: Boolean(enabled),
+        success: false,
+        isEnabled: false,
+      });
+    }
+  });
+}
+
+function syncDeviceAppLock() {
+  requestDeviceAppLock(Boolean(state.activeSession && !ui.finishDraft));
+}
+
+function buildFocusLockHelp(result = {}) {
+  const fallbackButton = result.usesHomeIndicator === false ? "ホームボタン" : "サイドボタン";
+  const shortcutButton = result.shortcutButton || fallbackButton;
+
+  return {
+    deviceModel: result.deviceModel || "このiPhone",
+    deviceIdentifier: result.deviceIdentifier || "",
+    shortcutButton,
+    shortcutInstruction: result.shortcutInstruction || `${shortcutButton}を3回クリック`,
+    isTimeout: Boolean(result.timeout),
+  };
+}
+
+function startPendingFocusSession(pending = ui.pendingFocusStart) {
+  if (!pending) {
+    return;
+  }
+
+  if (pending.type === "task") {
+    beginTaskSession(pending.taskId || "");
+    render();
+    return;
+  }
+
+  const planKey = pending.planKey || ui.selectedSessionPlan;
+  beginSession(planKey);
+  render();
+  showToast(`${state.plans?.[planKey]?.minutes || state.setup.normalMinutes || 30}分を開始しました。`);
+}
+
+function retryPendingFocusStart() {
+  const pending = ui.pendingFocusStart;
+  if (!pending) {
+    ui.focusLockHelp = null;
+    ui.sessionOpen = false;
+    render();
+    return;
+  }
+
+  ui.focusLockHelp = null;
+  requireDeviceAppLockBeforeStart(() => startPendingFocusSession(pending), pending);
+}
+
+async function requireDeviceAppLockBeforeStart(startCallback, pending = null) {
+  if (pending) {
+    ui.pendingFocusStart = pending;
+  }
+
+  if (!getDeviceAppLockBridge()) {
+    ui.focusLockHelp = null;
+    startCallback();
+    ui.pendingFocusStart = null;
+    return true;
+  }
+
+  showToast("iPhoneを固定しています...");
+  const result = await requestDeviceAppLock(true);
+  if (result.success && result.isEnabled) {
+    ui.focusLockHelp = null;
+    startCallback();
+    ui.pendingFocusStart = null;
+    return true;
+  }
+
+  ui.focusLockHelp = buildFocusLockHelp(result);
+  ui.sessionOpen = true;
+  ui.showAbortConfirm = false;
+  render();
+  showToast("iPhone固定の準備が必要です。案内を開きました。");
+  return false;
+}
+
+function handleGuidedAccessResult(event) {
+  const detail = event.detail || {};
+  if (deviceAppLockRequest && detail.requestId === deviceAppLockRequest.requestId) {
+    window.clearTimeout(deviceAppLockRequest.timer);
+    const pending = deviceAppLockRequest;
+    deviceAppLockRequest = null;
+    pending.resolve({
+      supported: true,
+      ...detail,
+      enabled: Boolean(detail.enabled),
+      success: Boolean(detail.success),
+      isEnabled: Boolean(detail.isEnabled),
+    });
+    return;
+  }
+
+  if (detail.enabled && detail.success === false && state.activeSession && !ui.finishDraft) {
+    showToast("iPhone固定に失敗しました。設定でアクセスガイドをオンにしてください。");
+  }
+}
+
+function updateTask(taskId, updater) {
+  let updatedTask = null;
+  state.tasks = normalizeTasks(state.tasks).map((task) => {
+    if (task.id !== taskId) {
+      return task;
+    }
+    updatedTask = normalizeTask({
+      ...task,
+      ...updater(task),
+      updatedAt: new Date().toISOString(),
+    });
+    return updatedTask;
+  });
+  return updatedTask;
+}
+
+function isTaskSession(session = state.activeSession) {
+  return session && session.type === "task";
+}
+
+function getFallbackPlanKey(preferredKey = ui.selectedSessionPlan) {
+  if (preferredKey && state.plans && state.plans[preferredKey]) {
+    return preferredKey;
+  }
+
+  const recommended = getRecommendedPlan(state);
+  if (recommended && state.plans && state.plans[recommended]) {
+    return recommended;
+  }
+
+  return Object.keys(state.plans || {}).find((key) => state.plans[key]) || "";
+}
+
+function clearActiveSessionRuntime() {
+  if (ui.sessionTimer) {
+    window.clearInterval(ui.sessionTimer);
+    ui.sessionTimer = null;
+  }
+  releaseWakeLock();
+  state.activeSession = null;
+  ui.sessionOpen = false;
+  ui.finishDraft = null;
+  ui.showAbortConfirm = false;
+  syncDeviceAppLock();
+}
+
+function reconcileActiveSession({ persist = false } = {}) {
+  const session = state.activeSession;
+  if (!session) {
+    return false;
+  }
+
+  if (isTaskSession(session)) {
+    const task = getTaskById(session.taskId);
+    if (task && task.status === "active") {
+      return false;
+    }
+
+    clearActiveSessionRuntime();
+    if (persist) {
+      saveState();
+    }
+    return true;
+  }
+
+  if (state.plans && state.plans[session.planKey]) {
+    return false;
+  }
+
+  const fallbackPlanKey = getFallbackPlanKey(session.planKey);
+  if (fallbackPlanKey && state.plans[fallbackPlanKey]) {
+    const now = Date.now();
+    const fallbackMinutes = Number(state.plans[fallbackPlanKey].minutes) || 1;
+    state.activeSession = {
+      ...session,
+      planKey: fallbackPlanKey,
+      startedAt: Number.isFinite(Number(session.startedAt)) ? Number(session.startedAt) : now,
+      endsAt: Number.isFinite(Number(session.endsAt)) ? Number(session.endsAt) : now + fallbackMinutes * 60 * 1000,
+    };
+    ui.selectedSessionPlan = fallbackPlanKey;
+    if (persist) {
+      saveState();
+    }
+    return false;
+  }
+
+  clearActiveSessionRuntime();
+  if (persist) {
+    saveState();
+  }
+  return true;
 }
 
 function mergePlanDefinition(basePlan, savedPlan) {
@@ -604,7 +1288,6 @@ function activateGoal(goalId) {
   state.meta.currentView = currentView;
   ui.setupDraft = currentView === "setup" ? expandSetup(state.setup) : null;
   ui.setupMode = "edit";
-  ui.missPanelOpen = false;
   ui.sessionOpen = false;
   ui.finishDraft = null;
   ui.reviewLogDraft = null;
@@ -625,14 +1308,16 @@ function init() {
     saveNavState();
   }
   syncSelectedSessionPlan(true);
+  probeTimerVideo();
   startClock();
   startSessionTicker();
   bindEvents();
   render();
-  // 3分ごとに他デバイスの変更を自動取得
+  syncDeviceAppLock();
+  // 3分ごとに他デバイスの変更を自動取得（画面非表示中とタイマー中は行わない）
   setInterval(() => {
-    if (!state.activeSession) _resyncFromSupabase();
-  }, 30 * 1000);
+    if (!document.hidden && !state.activeSession) _resyncFromSupabase();
+  }, 180 * 1000);
 }
 
 function updateVH() {
@@ -654,31 +1339,27 @@ function bindEvents() {
 
   document.addEventListener("click", handleClick);
   document.addEventListener("input", handleInput);
+  document.addEventListener("change", handleChange);
+  document.addEventListener("dragstart", handleTaskDragStart);
+  document.addEventListener("dragover", handleTaskDragOver);
+  document.addEventListener("dragleave", handleTaskDragLeave);
+  document.addEventListener("drop", handleTaskDrop);
+  document.addEventListener("dragend", handleTaskDragEnd);
+  document.addEventListener("pointerdown", handleTaskPointerDown);
+  document.addEventListener("pointermove", handleTaskPointerMove, { passive: false });
+  document.addEventListener("pointerup", handleTaskPointerEnd);
+  document.addEventListener("pointercancel", handleTaskPointerEnd);
   document.addEventListener("keydown", handleKeydown);
+  window.addEventListener("focus-lock-result", handleGuidedAccessResult);
+  window.addEventListener("guided-access-result", handleGuidedAccessResult);
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      // tab visibility pause disabled
-    } else {
-      if (state.activeSession && !ui.finishDraft) {
-        resumeFocusSession();
-        // 画面復帰時にウェイクロックを再取得（スリープ解除後も継続）
-        requestWakeLock();
-      }
-      // タブに戻ったとき他のデバイスの変更を取得
-      _resyncFromSupabase();
+    if (document.hidden) return;
+    if (state.activeSession && !ui.finishDraft) {
+      // 画面復帰時にウェイクロックを再取得（スリープ解除後も継続）
+      requestWakeLock();
     }
-  });
-
-  window.addEventListener("blur", () => {
-    setTimeout(() => {
-      if (!document.hidden) pauseFocusSession();
-    }, 200);
-  });
-
-  window.addEventListener("focus", () => {
-    if (!document.hidden && state.activeSession && !ui.finishDraft) {
-      resumeFocusSession();
-    }
+    // タブに戻ったとき他のデバイスの変更を取得
+    _resyncFromSupabase();
   });
 }
 
@@ -690,7 +1371,7 @@ function handleKeydown(event) {
     return;
   }
 
-  const tabViews = ["today", "roadmap", "review", "garden"];
+  const tabViews = ["today", "tasks", "review"];
   const viewIndex = Number(event.key) - 1;
   if (viewIndex >= 0 && viewIndex < tabViews.length) {
     if (state.activeSession) {
@@ -707,6 +1388,10 @@ function handleKeydown(event) {
   }
 
   if (event.key === "Escape") {
+    if (state.activeSession) {
+      keepSessionLocked("タイマー中は閉じられません。中断すると他の操作に戻れます。");
+      return;
+    }
     if (state.meta.currentView === "setup") {
       ui.setupDraft = null;
       ui.goalLibraryDraft = null;
@@ -715,13 +1400,41 @@ function handleKeydown(event) {
       state.meta.currentView = "today";
       render();
     } else if (ui.sessionOpen || state.activeSession) {
-      if (state.activeSession && !ui.finishDraft) {
-        pauseFocusSession();
-      }
       ui.sessionOpen = false;
       render();
     }
   }
+}
+
+const SESSION_LOCK_ACTIONS = new Set([
+  "close-session",
+  "select-session-plan",
+  "begin-session",
+  "complete-session",
+  "save-finish-log",
+  "cancel-finish",
+  "confirm-abort-session",
+  "cancel-abort-confirm",
+  "abort-session",
+]);
+
+function keepSessionLocked(message = "タイマー中は他の操作ができません。中断すると戻れます。") {
+  ui.sessionOpen = true;
+  render();
+  showToast(message);
+}
+
+function blockWhenSessionLocked(action) {
+  if (state.activeSession && reconcileActiveSession({ persist: true })) {
+    return false;
+  }
+
+  if (!state.activeSession || SESSION_LOCK_ACTIONS.has(action)) {
+    return false;
+  }
+
+  keepSessionLocked();
+  return true;
 }
 
 function renderWithTransition() {
@@ -736,26 +1449,51 @@ function renderWithTransition() {
 }
 
 function handleClick(event) {
+  if (ui.taskSuppressClickUntil && Date.now() < ui.taskSuppressClickUntil) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+
   const target = event.target.closest("[data-action]");
   if (!target) {
     return;
   }
 
   const { action } = target.dataset;
+  if (action === "select-task" && target.tagName !== "BUTTON") {
+    const nestedControl = event.target.closest("input, select, textarea, button");
+    if (nestedControl) {
+      return;
+    }
+  }
+  if (blockWhenSessionLocked(action)) {
+    return;
+  }
+
+  if (action === "dismiss-focus-lock-help") {
+    ui.focusLockHelp = null;
+    ui.pendingFocusStart = null;
+    ui.sessionOpen = false;
+    render();
+    return;
+  }
+
+  if (action === "retry-focus-lock") {
+    retryPendingFocusStart();
+    return;
+  }
 
   if (action === "navigate") {
     if (state.activeSession) {
-      ui.sessionOpen = true;
-      render();
-      showToast("セッション中は画面を切り替えられません");
+      keepSessionLocked("タイマー中は画面を切り替えられません。中断すると戻れます。");
       return;
     }
-    ui.missPanelOpen = false;
-    if (target.dataset.view !== "review") {
+      if (target.dataset.view !== "review") {
       ui.reviewLogDraft = null;
       ui.reviewLogExpanded = false;
     }
-    state.meta.currentView = target.dataset.view;
+    state.meta.currentView = target.dataset.view === "garden" ? "today" : target.dataset.view;
     saveNavState();
     render();
     if (screenFrame) screenFrame.scrollTop = 0;
@@ -764,9 +1502,7 @@ function handleClick(event) {
 
   if (action === "open-setup") {
     if (state.activeSession) {
-      ui.sessionOpen = true;
-      render();
-      showToast("セッション中は設定を開けません");
+      keepSessionLocked("タイマー中は設定を開けません。中断すると戻れます。");
       return;
     }
     ui.setupMode = "edit";
@@ -824,7 +1560,7 @@ function handleClick(event) {
     return;
   }
 
-  // アルバムへ移動（データ保持したまま非表示）
+  // データ保持したまま非表示へ移動
   if (action === "archive-goal") {
     const goalId = target.dataset.goalId;
     ensureGoalCollection();
@@ -841,7 +1577,7 @@ function handleClick(event) {
     ui.deleteConfirmGoalId = null;
     saveState();
     render();
-    showToast("アルバムに保存しました。");
+    showToast("目標を非表示にしました。");
     return;
   }
 
@@ -875,7 +1611,7 @@ function handleClick(event) {
     return;
   }
 
-  // アルバムから完全消去
+  // 非表示リストから完全消去
   if (action === "purge-archived-goal") {
     const goalId = target.dataset.goalId;
     ensureGoalCollection();
@@ -883,7 +1619,7 @@ function handleClick(event) {
     ui.deleteConfirmGoalId = null;
     saveState();
     render();
-    showToast("アルバムから削除しました。");
+    showToast("非表示の目標を削除しました。");
     return;
   }
 
@@ -966,13 +1702,6 @@ function handleClick(event) {
     return;
   }
 
-  if (action === "select-setup-flower") {
-    ensureSetupDraft();
-    ui.setupDraft.flowerType = normalizeFlowerType(target.dataset.flowerType, ui.setupDraft);
-    render();
-    return;
-  }
-
   if (action === "select-goal-library-type") {
     if (!ui.goalLibraryDraft) return;
     const t = target.dataset.goalType;
@@ -980,24 +1709,6 @@ function handleClick(event) {
       ui.goalLibraryDraft.goalType = t;
       render();
     }
-    return;
-  }
-
-  if (action === "select-goal-library-bonsai") {
-    if (!ui.goalLibraryDraft) return;
-    if (BONSAI_LIBRARY[target.dataset.bonsaiKey]) {
-      ui.goalLibraryDraft.bonsaiKey = target.dataset.bonsaiKey;
-      render();
-    }
-    return;
-  }
-
-  if (action === "select-goal-library-flower") {
-    if (!ui.goalLibraryDraft) {
-      return;
-    }
-    ui.goalLibraryDraft.flowerType = normalizeFlowerType(target.dataset.flowerType, ui.goalLibraryDraft);
-    render();
     return;
   }
 
@@ -1022,7 +1733,7 @@ function handleClick(event) {
     } else if (saveResult === "reset" && conflicts.length) {
       showToast(`設定を保存しました。実施時間は ${conflicts.map((item) => item.label).join(" / ")} と重なっています。`);
     } else if (saveResult === "reset") {
-      showToast("設定を保存してプランを作り直しました。");
+      showToast("設定を保存しました。");
     } else if (conflicts.length) {
       showToast(`設定を保存しました。実施時間は ${conflicts.map((item) => item.label).join(" / ")} と重なっています。`);
     } else {
@@ -1030,62 +1741,192 @@ function handleClick(event) {
     }
     return;
   }
-  if (action === "quick-start-session") {
-    const launchPlanKey = syncSelectedSessionPlan();
-    ui.selectedSessionPlan = launchPlanKey;
-    ui.sessionOpen = true;
+  if (action === "add-task") {
+    const draft = ensureTaskDraft();
+    const title = String(draft.title || "").trim();
+    if (!title) {
+      showToast("Task名を入れてください。");
+      return;
+    }
+    state.tasks = normalizeTasks(state.tasks);
+    state.tasks.unshift(normalizeTask({
+      id: createTaskId(),
+      title,
+      minutes: normalizeTaskMinutes(draft.minutes),
+      status: "active",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+    resetTaskDraft();
+    saveState();
     render();
-    showToast(`${PLAN_META[launchPlanKey].label}を選びました。開始ボタンで始められます。`);
+    showToast("Taskに追加しました。");
     return;
   }
 
-  if (action === "launch-session-plan") {
+  if (action === "start-task-session") {
+    const taskId = target.dataset.taskId || "";
+    const pending = { type: "task", taskId };
+    requireDeviceAppLockBeforeStart(() => {
+      startPendingFocusSession(pending);
+    }, pending);
+    return;
+  }
+
+  if (action === "select-task") {
+    ui.selectedTaskId = target.dataset.taskId || null;
+    render();
+    return;
+  }
+
+  if (action === "add-subtask") {
+    const taskId = target.dataset.taskId || "";
+    const title = getTaskSubtaskDraft(taskId).trim();
+    if (!title) {
+      showToast("小Task名を入れてください。");
+      return;
+    }
+    const task = addTaskSubtask(taskId, title);
+    if (task) {
+      clearTaskSubtaskDraft(taskId);
+      saveState();
+      render();
+      showToast("小Taskを追加しました。");
+    }
+    return;
+  }
+
+  if (action === "toggle-subtask") {
+    const taskId = target.dataset.taskId || "";
+    const subtaskId = target.dataset.subtaskId || "";
+    const task = updateTaskSubtask(taskId, subtaskId, (subtask) => {
+      const done = !subtask.done;
+      return {
+        done,
+        completedAt: done ? new Date().toISOString() : null,
+      };
+    });
+    if (task) {
+      saveState();
+      render();
+    }
+    return;
+  }
+
+  if (action === "delete-subtask") {
+    const taskId = target.dataset.taskId || "";
+    const subtaskId = target.dataset.subtaskId || "";
+    const task = removeTaskSubtask(taskId, subtaskId);
+    if (task) {
+      saveState();
+      render();
+      showToast("小Taskを削除しました。");
+    }
+    return;
+  }
+
+  if (action === "complete-task") {
+    const taskId = target.dataset.taskId || "";
+    const task = updateTask(taskId, () => ({
+      status: "done",
+      completedAt: new Date().toISOString(),
+    }));
+    if (task) {
+      if (ui.selectedTaskId === taskId) {
+        ui.selectedTaskId = null;
+      }
+      saveState();
+      render();
+      showToast("Taskを完了にしました。");
+    }
+    return;
+  }
+
+  if (action === "shelve-task") {
+    const taskId = target.dataset.taskId || "";
+    const task = updateTask(taskId, () => ({
+      status: "shelved",
+      shelvedAt: new Date().toISOString(),
+    }));
+    if (task) {
+      if (ui.selectedTaskId === taskId) {
+        ui.selectedTaskId = null;
+      }
+      saveState();
+      render();
+      showToast("Taskを棚上げしました。");
+    }
+    return;
+  }
+
+  if (action === "restore-task") {
+    const task = updateTask(target.dataset.taskId || "", () => ({
+      status: "active",
+      shelvedAt: null,
+    }));
+    if (task) {
+      saveState();
+      render();
+      showToast("Taskを戻しました。");
+    }
+    return;
+  }
+
+  if (action === "delete-task") {
+    const taskId = target.dataset.taskId || "";
+    const before = normalizeTasks(state.tasks).length;
+    state.tasks = normalizeTasks(state.tasks).filter((task) => task.id !== taskId);
+    if (state.tasks.length !== before) {
+      if (ui.selectedTaskId === taskId) {
+        ui.selectedTaskId = null;
+      }
+      saveState();
+      render();
+      showToast("Taskを削除しました。");
+    }
+    return;
+  }
+
+  if (action === "toggle-shelved-tasks") {
+    ui.taskShowShelved = !ui.taskShowShelved;
+    render();
+    return;
+  }
+
+  if (action === "start-goal-session") {
     const goalId = target.dataset.goalId || "";
     if (goalId && goalId !== state.meta.activeGoalId) {
       activateGoal(goalId);
     }
-
-    const planKey = target.dataset.plan;
-    if (!state.plans[planKey]) {
-      return;
-    }
-
+    const planKey = getLaunchPlan(state);
     ui.selectedSessionPlan = planKey;
-    ui.sessionOpen = true;
-    if (state.activeSession) {
-      if (state.activeSession.planKey !== planKey) {
-        openFinishDraft(planKey);
-      } else {
-        ui.finishDraft = null;
-      }
-    }
-    render();
-    return;
-  }
-
-  if (action === "open-session") {
-    const planKey = state.plans?.A ? "A" : getRecommendedPlan(state);
-    ui.selectedSessionPlan = planKey;
-    ui.sessionOpen = true;
-    if (state.activeSession) {
-      ui.selectedSessionPlan = state.activeSession.planKey;
-    }
-    render();
+    const pending = { type: "plan", planKey };
+    requireDeviceAppLockBeforeStart(() => {
+      startPendingFocusSession(pending);
+    }, pending);
     return;
   }
 
   if (action === "close-session") {
-    if (state.activeSession && !ui.finishDraft) {
-      pauseFocusSession();
+    if (state.activeSession) {
+      keepSessionLocked("タイマー中は閉じられません。中断すると他の操作に戻れます。");
+      return;
     }
     ui.sessionOpen = false;
+    ui.focusLockHelp = null;
+    ui.pendingFocusStart = null;
     render();
     return;
   }
 
   if (action === "select-session-plan") {
     const planKey = target.dataset.plan;
+    if (state.activeSession && !ui.finishDraft) {
+      keepSessionLocked("タイマー中は分数を変更できません。完了するか中断してください。");
+      return;
+    }
     if (ui.finishDraft) {
+      if (!state.plans[planKey]) return;
       ui.finishDraft.outcome = planKey;
       ui.finishDraft.plannedSeconds = state.plans[planKey].minutes * 60;
       render();
@@ -1106,28 +1947,22 @@ function handleClick(event) {
   }
 
   if (action === "begin-session") {
-    beginSession(ui.selectedSessionPlan);
-    render();
-    showToast(`${PLAN_META[ui.selectedSessionPlan].label}を開始しました。`);
+    const planKey = ui.selectedSessionPlan;
+    const pending = { type: "plan", planKey };
+    requireDeviceAppLockBeforeStart(() => {
+      startPendingFocusSession(pending);
+    }, pending);
     return;
   }
 
   if (action === "complete-session") {
+    if (isTaskSession()) {
+      completeTaskSession();
+      render();
+      showToast("Taskを完了にしました。");
+      return;
+    }
     openFinishDraft(state.activeSession ? state.activeSession.planKey : ui.selectedSessionPlan);
-    render();
-    return;
-  }
-
-  if (action === "downgrade-session") {
-    const rawElapsed = state.activeSession
-      ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
-      : 0;
-    const elapsedMinutes = Math.max(1, Math.round(rawElapsed / 60));
-    // Pick the heaviest plan whose minutes fit within elapsed time; fallback to lightest
-    const plans = Object.entries(state.plans).sort((a, b) => b[1].minutes - a[1].minutes);
-    const fit = plans.find(([, p]) => p.minutes <= elapsedMinutes);
-    const appropriatePlan = fit ? fit[0] : plans[plans.length - 1][0];
-    openFinishDraft(appropriatePlan);
     render();
     return;
   }
@@ -1141,6 +1976,7 @@ function handleClick(event) {
 
   if (action === "cancel-finish") {
     ui.finishDraft = null;
+    syncDeviceAppLock();
     startSessionTicker();
     render();
     return;
@@ -1163,110 +1999,15 @@ function handleClick(event) {
       window.clearInterval(ui.sessionTimer);
       ui.sessionTimer = null;
     }
-    hideFocusLostOverlay();
     releaseWakeLock();
     state.activeSession = null;
     ui.sessionOpen = false;
     ui.finishDraft = null;
-    ui.focusPausedAt = null;
     ui.showAbortConfirm = false;
+    syncDeviceAppLock();
     saveState();
     render();
-    showToast("セッションを取り消しました。");
-    return;
-  }
-
-  if (action === "lighten-today") {
-    state.today.recommendedPlan = nextPlanDown(getRecommendedPlan(state));
-    syncSelectedSessionPlan(true);
-    saveState();
-    render();
-    showToast(`今日は${PLAN_META[state.today.recommendedPlan].label}から始める設定にしました。`);
-    return;
-  }
-
-  if (action === "toggle-miss-panel") {
-    ui.missPanelOpen = !ui.missPanelOpen;
-    render();
-    return;
-  }
-
-  if (action === "select-miss-reason") {
-    ui.missReasonDraft = target.dataset.reason;
-    render();
-    return;
-  }
-
-  if (action === "confirm-miss") {
-    recordLog("miss", ui.missReasonDraft);
-    ui.missPanelOpen = false;
-    render();
-    showToast("未実施として記録しました。明日の復帰を主役にします。");
-    return;
-  }
-
-  if (action === "habit-checkin") {
-    const goalId = target.dataset.goalId;
-    const todayStr = toISODate(new Date());
-    // Find the goal to check for existing log
-    const targetGoal = (state.goals || []).find(g => g.id === goalId);
-    if (!targetGoal) return;
-    const logsToCheck = goalId === state.meta.activeGoalId ? state.logs : (targetGoal.logs || []);
-    const existingLog = logsToCheck.find(l => l.date === todayStr && l.outcome !== "miss");
-    if (existingLog) return;
-    // Activate goal if needed so state.logs points to this goal's logs
-    if (goalId !== state.meta.activeGoalId) {
-      activateGoal(goalId);
-    }
-    const missionTitle = state.today ? state.today.missionTitle : targetGoal.setup.goal;
-    const nextEntry = {
-      logId: createLogId(),
-      date: todayStr,
-      outcome: "A",
-      reason: null,
-      missionTitle,
-      recordedAt: new Date().toISOString(),
-      elapsedSeconds: 0,
-      plannedSeconds: 0,
-      progressText: "",
-      reflection: "",
-      milestoneId: "",
-      milestoneLabel: "",
-      milestoneTarget: null,
-      milestoneStatus: "",
-    };
-    state.logs.push(nextEntry);
-    state.logs.sort((a, b) => new Date(a.recordedAt) - new Date(b.recordedAt));
-    syncTodayLastLogFields();
-    saveState();
-    render();
-    showToast("今日のチェックインを記録しました！");
-    return;
-  }
-
-  if (action === "habit-undo-checkin") {
-    const goalId = target.dataset.goalId;
-    const todayStr = toISODate(new Date());
-    if (goalId !== state.meta.activeGoalId) {
-      activateGoal(goalId);
-    }
-    const before = state.logs.length;
-    state.logs = state.logs.filter(l => !(l.date === todayStr && l.outcome !== "miss"));
-    if (state.logs.length < before) {
-      saveState();
-      render();
-      showToast("チェックインを取り消しました。");
-    }
-    return;
-  }
-
-  if (action === "select-setup-bonsai") {
-    ensureSetupDraft();
-    const key = target.dataset.bonsaiKey;
-    if (BONSAI_LIBRARY[key]) {
-      ui.setupDraft.bonsaiKey = key;
-    }
-    render();
+    showToast("タイマーを中断しました。");
     return;
   }
 
@@ -1313,20 +2054,6 @@ function handleClick(event) {
     deleteRoadmapItem(target.dataset.roadmapId || "");
     render();
     showToast("マイルストーンを削除しました。");
-    return;
-  }
-
-    if (action === "manual-log") {
-    recordLog(target.dataset.outcome, null);
-    render();
-    showToast("手動で記録しました。");
-    return;
-  }
-
-  if (action === "undo-log-date") {
-    const removed = removeLatestLogByDate(target.dataset.date || toISODate(new Date()));
-    render();
-    showToast(removed ? `取り消しました: ${buildLogSummary(removed)}` : "取り消せる記録がありません。");
     return;
   }
 
@@ -1405,6 +2132,37 @@ function handleInput(event) {
     }
   }
 
+  if (target.matches("[data-task-draft-field]")) {
+    const draft = ensureTaskDraft();
+    draft[target.dataset.taskDraftField] = target.value;
+    return;
+  }
+
+  if (target.matches("[data-subtask-draft-field]")) {
+    setTaskSubtaskDraft(target.dataset.taskId || "", target.value);
+    return;
+  }
+
+  if (target.matches("[data-task-title-field]")) {
+    const task = updateTaskTitle(target.dataset.taskTitleField || "", target.value);
+    if (task) {
+      saveState();
+    }
+    return;
+  }
+
+  if (target.matches("[data-subtask-title-field]")) {
+    const task = updateTaskSubtask(
+      target.dataset.taskId || "",
+      target.dataset.subtaskTitleField || "",
+      () => ({ title: target.value })
+    );
+    if (task) {
+      saveState();
+    }
+    return;
+  }
+
   if (target.matches("[data-finish-field]")) {
     if (!ui.finishDraft) {
       return;
@@ -1455,6 +2213,354 @@ function handleInput(event) {
   }
 }
 
+function handleChange(event) {
+  const target = event.target;
+
+  if (target.matches("[data-task-title-field]")) {
+    const task = updateTaskTitle(target.dataset.taskTitleField || "", target.value);
+    if (task) {
+      saveState();
+      scheduleTaskEditRender();
+    }
+    return;
+  }
+
+  if (target.matches("[data-subtask-title-field]")) {
+    const task = updateTaskSubtask(
+      target.dataset.taskId || "",
+      target.dataset.subtaskTitleField || "",
+      () => ({ title: target.value })
+    );
+    if (task) {
+      saveState();
+      scheduleTaskEditRender();
+    }
+    return;
+  }
+
+  if (target.matches("[data-task-minutes-field]")) {
+    const task = updateTaskMinutes(target.dataset.taskMinutesField || "", target.value);
+    if (task) {
+      saveState();
+      render();
+    }
+    return;
+  }
+
+  if (target.matches("[data-task-quadrant-select]")) {
+    const nextQuadrant = normalizeTaskQuadrant(target.value);
+    const taskId = target.dataset.taskQuadrantSelect || "";
+    const task = assignTaskQuadrant(taskId, nextQuadrant);
+    if (task) {
+      ui.selectedTaskId = nextQuadrant === TASK_QUADRANT_DEFAULT ? null : taskId;
+      saveState();
+      render();
+      showToast(`${getTaskQuadrantToastLabel(nextQuadrant)}に移しました。`);
+    }
+  }
+}
+
+function getTaskDragSource(target) {
+  return target?.closest?.("[data-task-draggable='true'][data-task-id]") || null;
+}
+
+function getTaskPointerDragCard(target) {
+  const handle = target?.closest?.("[data-task-drag-handle]");
+  return handle ? handle.closest("[data-task-draggable='true'][data-task-id]") : null;
+}
+
+function getTaskDropZone(target) {
+  return target?.closest?.("[data-task-quadrant-zone]") || null;
+}
+
+function getTaskDropItem(target) {
+  return target?.closest?.("[data-task-drop-item='true'][data-task-id]") || null;
+}
+
+function clearTaskDropMarkers() {
+  document.querySelectorAll(".is-drop-before, .is-drop-after").forEach((el) => {
+    el.classList.remove("is-drop-before", "is-drop-after");
+  });
+}
+
+function clearTaskDragState() {
+  document.querySelectorAll(".is-drag-over, .is-dragging, .is-drop-before, .is-drop-after").forEach((el) => {
+    el.classList.remove("is-drag-over", "is-dragging", "is-drop-before", "is-drop-after");
+  });
+  ui.taskDragBeforeId = null;
+  removeTaskDragPreview();
+  document.body.classList.remove("is-task-pointer-dragging");
+}
+
+function getTaskDragTitle(source) {
+  return source?.querySelector?.(".task-board-item__title, .task-card__title")?.textContent?.trim()
+    || "Task";
+}
+
+function createTaskDragPreview(source, event) {
+  removeTaskDragPreview();
+  const rect = source.getBoundingClientRect();
+  const preview = document.createElement("div");
+  const title = getTaskDragTitle(source);
+  const width = Math.min(Math.max(rect.width, 148), 260);
+  preview.className = "task-drag-preview";
+  preview.style.width = `${width}px`;
+  preview.innerHTML = `
+    <span class="task-drag-preview__grip" aria-hidden="true"></span>
+    <span class="task-drag-preview__title">${escapeHtml(title)}</span>
+  `;
+  document.body.appendChild(preview);
+
+  const drag = ui.taskPointerDrag;
+  if (drag) {
+    drag.previewEl = preview;
+    drag.offsetX = Math.min(Math.max(event.clientX - rect.left, 18), width - 18);
+    drag.offsetY = Math.min(Math.max(event.clientY - rect.top, 12), rect.height - 8);
+    updateTaskDragPreview(event.clientX, event.clientY);
+  }
+}
+
+function updateTaskDragPreview(clientX, clientY) {
+  const drag = ui.taskPointerDrag;
+  if (!drag?.previewEl) {
+    return;
+  }
+
+  const x = Math.round(clientX - drag.offsetX);
+  const y = Math.round(clientY - drag.offsetY);
+  drag.previewEl.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(-1deg)`;
+}
+
+function removeTaskDragPreview() {
+  const preview = ui.taskPointerDrag?.previewEl || document.querySelector(".task-drag-preview");
+  preview?.remove();
+}
+
+function updateTaskDropIntent(target, clientY) {
+  const zone = getTaskDropZone(target);
+  document.querySelectorAll(".is-drag-over").forEach((el) => {
+    if (el !== zone) {
+      el.classList.remove("is-drag-over");
+    }
+  });
+  clearTaskDropMarkers();
+  ui.taskDragBeforeId = null;
+
+  if (!zone) {
+    return null;
+  }
+
+  zone.classList.add("is-drag-over");
+  const item = getTaskDropItem(target);
+  if (!item || item.dataset.taskId === ui.taskDragId || !zone.contains(item)) {
+    return zone;
+  }
+
+  const rect = item.getBoundingClientRect();
+  const shouldInsertBefore = clientY < rect.top + rect.height / 2;
+  if (shouldInsertBefore) {
+    ui.taskDragBeforeId = item.dataset.taskId || null;
+    item.classList.add("is-drop-before");
+    return zone;
+  }
+
+  const items = Array.from(zone.querySelectorAll("[data-task-drop-item='true'][data-task-id]"))
+    .filter((el) => el.dataset.taskId !== ui.taskDragId);
+  const itemIndex = items.indexOf(item);
+  ui.taskDragBeforeId = items[itemIndex + 1]?.dataset.taskId || null;
+  item.classList.add("is-drop-after");
+  return zone;
+}
+
+function handleTaskDragStart(event) {
+  if (state.activeSession) {
+    return;
+  }
+  const source = getTaskDragSource(event.target);
+  if (!source) {
+    return;
+  }
+
+  ui.taskDragId = source.dataset.taskId || "";
+  ui.taskDragBeforeId = null;
+  source.classList.add("is-dragging");
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", ui.taskDragId);
+  }
+}
+
+function handleTaskDragOver(event) {
+  if (state.activeSession || !ui.taskDragId) {
+    return;
+  }
+  const zone = updateTaskDropIntent(event.target, event.clientY);
+  if (!zone) {
+    return;
+  }
+
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "move";
+  }
+}
+
+function handleTaskDragLeave(event) {
+  const zone = getTaskDropZone(event.target);
+  if (!zone || zone.contains(event.relatedTarget)) {
+    return;
+  }
+  zone.classList.remove("is-drag-over");
+}
+
+function handleTaskDrop(event) {
+  const zone = getTaskDropZone(event.target);
+  if (state.activeSession || !zone) {
+    return;
+  }
+
+  event.preventDefault();
+  const taskId = event.dataTransfer?.getData("text/plain") || ui.taskDragId || "";
+  const nextQuadrant = normalizeTaskQuadrant(zone.dataset.taskQuadrantZone || TASK_QUADRANT_DEFAULT);
+  const task = moveTaskToQuadrant(taskId, nextQuadrant, ui.taskDragBeforeId);
+  ui.taskDragId = null;
+  clearTaskDragState();
+  if (task) {
+    ui.selectedTaskId = nextQuadrant === TASK_QUADRANT_DEFAULT ? null : taskId;
+    saveState();
+    render();
+    showToast(`${getTaskQuadrantToastLabel(nextQuadrant)}に移しました。`);
+  }
+}
+
+function handleTaskDragEnd() {
+  ui.taskDragId = null;
+  clearTaskDragState();
+}
+
+function handleTaskPointerDown(event) {
+  if (state.activeSession || !event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) {
+    return;
+  }
+  const card = getTaskPointerDragCard(event.target);
+  if (!card) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  ui.taskDragId = card.dataset.taskId || "";
+  ui.taskDragBeforeId = null;
+  ui.taskPointerDrag = {
+    taskId: ui.taskDragId,
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    active: true,
+    hasMoved: false,
+    overQuadrant: null,
+    beforeTaskId: null,
+    sourceEl: card,
+    previewEl: null,
+    offsetX: 18,
+    offsetY: 16,
+  };
+  card.setPointerCapture?.(event.pointerId);
+  card.classList.add("is-dragging");
+  document.body.classList.add("is-task-pointer-dragging");
+  createTaskDragPreview(card, event);
+}
+
+function setPointerDragZone(clientX, clientY) {
+  const drag = ui.taskPointerDrag;
+  if (!drag) {
+    return null;
+  }
+  const zone = updateTaskDropIntent(document.elementFromPoint(clientX, clientY), clientY);
+  if (!zone) {
+    drag.overQuadrant = null;
+    drag.beforeTaskId = null;
+    return null;
+  }
+  drag.overQuadrant = normalizeTaskQuadrant(zone.dataset.taskQuadrantZone || TASK_QUADRANT_DEFAULT);
+  drag.beforeTaskId = ui.taskDragBeforeId;
+  return zone;
+}
+
+function autoScrollTaskDrag(clientY) {
+  const frame = screenFrame || document.querySelector(".screen-frame");
+  if (!frame) {
+    return;
+  }
+  const rect = frame.getBoundingClientRect();
+  const edge = 86;
+  const maxStep = 18;
+  let step = 0;
+  if (clientY > rect.bottom - edge) {
+    step = maxStep;
+  } else if (clientY < rect.top + edge) {
+    step = -maxStep;
+  }
+  if (step) {
+    frame.scrollBy({ top: step, behavior: "auto" });
+  }
+}
+
+function handleTaskPointerMove(event) {
+  const drag = ui.taskPointerDrag;
+  if (!drag || drag.pointerId !== event.pointerId || state.activeSession) {
+    return;
+  }
+
+  const deltaX = event.clientX - drag.startX;
+  const deltaY = event.clientY - drag.startY;
+  if (Math.hypot(deltaX, deltaY) >= 3) {
+    drag.hasMoved = true;
+  }
+  if (!drag.hasMoved) {
+    updateTaskDragPreview(event.clientX, event.clientY);
+    event.preventDefault();
+    return;
+  }
+
+  event.preventDefault();
+  updateTaskDragPreview(event.clientX, event.clientY);
+  autoScrollTaskDrag(event.clientY);
+  setPointerDragZone(event.clientX, event.clientY);
+}
+
+function handleTaskPointerEnd(event) {
+  const drag = ui.taskPointerDrag;
+  if (!drag || drag.pointerId !== event.pointerId) {
+    return;
+  }
+
+  const nextQuadrant = drag.active && drag.hasMoved
+    ? drag.overQuadrant || setPointerDragZone(event.clientX, event.clientY)?.dataset.taskQuadrantZone
+    : null;
+  const beforeTaskId = drag.beforeTaskId || ui.taskDragBeforeId || null;
+  drag.sourceEl?.releasePointerCapture?.(event.pointerId);
+  ui.taskPointerDrag = null;
+  ui.taskDragId = null;
+  ui.taskSuppressClickUntil = Date.now() + 350;
+  clearTaskDragState();
+
+  if (!drag.active || !drag.hasMoved || state.activeSession || !nextQuadrant) {
+    event.preventDefault();
+    return;
+  }
+
+  event.preventDefault();
+  const normalizedQuadrant = normalizeTaskQuadrant(nextQuadrant);
+  const task = moveTaskToQuadrant(drag.taskId, normalizedQuadrant, beforeTaskId);
+  if (task) {
+    ui.selectedTaskId = normalizedQuadrant === TASK_QUADRANT_DEFAULT ? null : drag.taskId;
+    saveState();
+    render();
+    showToast(`${getTaskQuadrantToastLabel(normalizedQuadrant)}に移しました。`);
+  }
+}
+
 function safeRender() {
   const el = document.activeElement;
   if ((el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) || safeRender._ime) {
@@ -1470,8 +2576,17 @@ document.addEventListener('compositionstart', () => { safeRender._ime = true; })
 document.addEventListener('compositionend', () => { safeRender._ime = false; });
 
 function render() {
+  window.clearTimeout(ui.taskEditRenderTimer);
   updateGuestBanner();
+  reconcileActiveSession();
+  if (state.activeSession) {
+    ui.sessionOpen = true;
+  }
   let currentView = state.meta.currentView || "today";
+  if (currentView === "garden" || currentView === "roadmap") {
+    currentView = "today";
+    state.meta.currentView = "today";
+  }
   if (currentView === "replan") {
     currentView = "setup";
     state.meta.currentView = "setup";
@@ -1507,9 +2622,8 @@ function render() {
   const renderMap = {
     setup: renderSetupView,
     today: renderTodayView,
-    roadmap: renderRoadmapView,
+    tasks: renderTasksView,
     review: renderReviewView,
-    garden: renderGardenView,
   };
 
   try {
@@ -1693,7 +2807,6 @@ function renderEditableScheduleRow(item, draft) {
               <div class="weekday-choice-row goal-window-row__days">
                 ${WEEKDAY_KEYS.map((weekdayKey) => renderWeekdayChip(weekdayKey, draft.studyDays)).join("")}
               </div>
-              <p class="goal-window-row__current">現在: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
             </div>
             <div class="goal-window-row__save">
               <button type="button" class="action-button action-button--primary" data-action="save-setup">この内容で保存</button>
@@ -1714,20 +2827,19 @@ function renderPrimaryWindowRoster(draft) {
     ? (isNewGoal
       ? "同じ実施時間の目標があります。追加後に調整できます。"
       : `この実施時間は ${conflicts.map((item) => item.label).join(" / ")} と重なっています。`)
-    : "いまの実施時間は同じ実施曜日の目標と重なっていません。";
+    : "";
 
   if (!isNewGoal) {
     const rows = getEditableScheduleRows(draft);
     return `
       <div class="stack setup-schedule-roster">
         <div class="setup-section-intro">
-          <h3 class="section-title">実施時間一覧</h3>
-          <p class="section-copy">この一覧から編集したい目標を開いて、そのまま実施時間と曜日を編集できます。</p>
+          <h3 class="section-title">時間</h3>
         </div>
         <div class="goal-window-list goal-window-list--editable">
           ${rows.map((item) => renderEditableScheduleRow(item, draft)).join("")}
         </div>
-        <p class="setup-warning ${warningClass}">${escapeHtml(warningText)}</p>
+        ${warningText ? `<p class="setup-warning ${warningClass}">${escapeHtml(warningText)}</p>` : ""}
       </div>
     `;
   }
@@ -1735,8 +2847,7 @@ function renderPrimaryWindowRoster(draft) {
   return `
     <div class="stack setup-schedule-roster">
       <div class="setup-section-intro">
-        <h3 class="section-title">ほかの目標の実施時間</h3>
-        <p class="section-copy">同じ実施時間を避けると、1日に抱える入口の多さが見えます。</p>
+        <h3 class="section-title">時間の重なり</h3>
       </div>
       ${roster.length
         ? `
@@ -1757,7 +2868,7 @@ function renderPrimaryWindowRoster(draft) {
           </div>
         `
         : `<p class="section-copy">まだ他の目標はありません。</p>`}
-      <p class="setup-warning ${warningClass}">${escapeHtml(warningText)}</p>
+      ${warningText ? `<p class="setup-warning ${warningClass}">${escapeHtml(warningText)}</p>` : ""}
     </div>
   `;
 }
@@ -1776,25 +2887,11 @@ function renderSetupSectionBody(section, draft) {
         ${renderPrimaryWindowRoster(draft)}
         <div class="field">
           <span class="field__label">曜日</span>
-          <p class="section-copy">Today には、今日の曜日に合う目標だけ表示します。</p>
           <div class="weekday-choice-row">
             ${WEEKDAY_KEYS.map((weekdayKey) => renderWeekdayChip(weekdayKey, draft.studyDays)).join("")}
           </div>
-          <p class="section-copy">現在: ${escapeHtml(formatStudyDays(draft.studyDays))}</p>
         </div>
         ${renderWindowField("実施時間", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
-      </div>
-    `;
-  }
-
-  if (section === "roadmap") {
-    return `
-      <div class="stack">
-        <div class="setup-section-intro">
-          <h3 class="section-title">マイルストーン</h3>
-          <p class="section-copy">Roadmap 画面は表示だけにして、編集はここでまとめます。</p>
-        </div>
-        ${renderRoadmapMilestoneList(buildEditableRoadmapPreview(), { editable: true })}
       </div>
     `;
   }
@@ -1802,9 +2899,7 @@ function renderSetupSectionBody(section, draft) {
   if (section === "plan") {
     return `
       <div class="plan-list">
-        ${renderEditablePlanCard("A", "normalMinutes", draft.normalMinutes, "いつもの標準プラン")}
-        ${renderEditablePlanCard("B", "shortMinutes", draft.shortMinutes, "少し軽くする短縮プラン")}
-        ${renderEditablePlanCard("C", "minimumMinutes", draft.minimumMinutes, "最低限だけ進める救済プラン")}
+        ${renderEditablePlanCard("A", "normalMinutes", draft.normalMinutes, "何分やるか")}
       </div>
     `;
   }
@@ -1820,7 +2915,6 @@ function renderSetupSectionBody(section, draft) {
   const isHabitDraft = draft.goalType === "habit";
   return `
     <div class="stack">
-      <p class="section-copy">保存すると、今の Today は変えずに新しい目標だけ追加します。</p>
       <div class="field">
         <span class="field__label">種類</span>
         <div class="goal-type-toggle">
@@ -1829,7 +2923,7 @@ function renderSetupSectionBody(section, draft) {
             <span class="goal-type-btn__label">目標達成</span>
           </button>
           <button type="button" class="goal-type-btn ${isHabitDraft ? "is-active" : ""}" data-action="select-goal-type" data-goal-type="habit">
-            <span class="goal-type-btn__icon">🌿</span>
+            <span class="goal-type-btn__icon">↻</span>
             <span class="goal-type-btn__label">習慣</span>
           </button>
         </div>
@@ -1840,14 +2934,11 @@ function renderSetupSectionBody(section, draft) {
       </label>
       ${!isHabitDraft ? `
         <div class="field">
-          <span class="field__label">期限（空欄で期限なし）</span>
+          <span class="field__label">期限</span>
           <input class="field__control" data-setup-field="deadline" type="date" value="${escapeHtml(draft.deadline)}" />
         </div>
-        ${renderFlowerPicker(draft.flowerType, "select-setup-flower")}
-        <p class="section-copy">下の設定メニューから Roadmap / 実施時間 / プランもこのまま決められます。</p>
       ` : `
-        ${renderBonsaiPicker(draft.bonsaiKey)}
-        <p class="section-copy">習慣タイプは Roadmap が不要です。毎日のチェックインで盆栽が育ちます。</p>
+        <p class="section-copy">毎日のチェックインだけ記録します。</p>
       `}
     </div>
   `;
@@ -1855,6 +2946,11 @@ function renderSetupSectionBody(section, draft) {
 
 function getLaunchPlan(currentState) {
   return currentState.plans?.A ? "A" : Object.keys(currentState.plans || {})[0] || "A";
+}
+
+function getGoalDurationMinutes(goal) {
+  const rawMinutes = Number(goal?.plans?.A?.minutes ?? goal?.setup?.normalMinutes ?? 30);
+  return Number.isFinite(rawMinutes) ? clamp(Math.round(rawMinutes), 1, 240) : 30;
 }
 
 function syncSelectedSessionPlan(forceRecommended = false) {
@@ -1893,13 +2989,6 @@ function renderSetupSectionIcon(sectionKey) {
         <circle cx="11" cy="17.5" r="2"></circle>
       </svg>
     `,
-    roadmap: `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M5 18V6M5 7.5h9l2 2H19v8.5H8l-3 2"></path>
-        <circle cx="5" cy="6" r="1.6"></circle>
-        <circle cx="19" cy="18" r="1.6"></circle>
-      </svg>
-    `,
     add: `
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <circle cx="12" cy="12" r="8"></circle>
@@ -1932,7 +3021,6 @@ function renderSetupMenuItem(config) {
         ${renderSetupSectionIcon(config.iconKey)}
         <span class="setup-tab__body">
           <span class="setup-tab__label">${escapeHtml(config.label)}</span>
-          <span class="setup-tab__hint">${escapeHtml(config.hint)}</span>
         </span>
       </span>
     </button>
@@ -1942,15 +3030,12 @@ function renderSetupMenuItem(config) {
 function renderGoalLibrary() {
   const goals = listGoalsByPrimaryWindow();
   const editingGoalId = ui.goalLibraryDraft ? ui.goalLibraryDraft.goalId : "";
-  const intro = ui.setupMode === "new_goal"
-    ? "保存すると一覧に追加されます。Today は今の目標のままです。"
-    : "登録済みの目標をここで編集します。表示する目標は設定メニュー下の選択タブで切り替えます。";
 
   return `
     <div class="stack">
-      <div class="setup-section-intro goal-library__intro">
-        <h3 class="section-title">登録済みの目標</h3>
-        <p class="section-copy">${escapeHtml(intro)}</p>
+      <div class="setup-section-intro goal-library__intro goal-library__intro--inline">
+        <h3 class="section-title">目標</h3>
+        <button type="button" class="soft-button setup-inline-add" data-action="start-new-goal" data-section="goal">追加</button>
       </div>
       <div class="goal-library">
         ${goals.map((goal) => {
@@ -1958,16 +3043,14 @@ function renderGoalLibrary() {
           const isEditing = editingGoalId === goal.id;
           const deadlineText = normalizeOptionalDate(isEditing ? ui.goalLibraryDraft?.deadline : goal.setup.deadline);
           const isHabitGoal = goal.setup && goal.setup.goalType === "habit";
-          const flower = isHabitGoal ? null : getGoalFlowerState(goal);
-          const bonsaiMeta = isHabitGoal ? getBonsaiTypeMeta(goal.setup.bonsaiKey) : null;
           const meta = isHabitGoal
-            ? `習慣 / ${bonsaiMeta.label}`
-            : `${formatDeadlineBadge(deadlineText)} / 植物 ${flower.label}`;
+            ? "習慣"
+            : formatDeadlineBadge(deadlineText);
           return `
             <article class="goal-library-card ${isActive ? "is-active" : ""}">
               <div class="goal-library-card__head">
                 <strong>${escapeHtml(isEditing ? ui.goalLibraryDraft.goal : goal.setup.goal)}</strong>
-                <span class="status-badge ${isActive ? "status-badge--done" : ""}">${isActive ? "表示中" : "保存済み"}</span>
+                ${isActive ? `<span class="status-badge status-badge--done">表示中</span>` : ""}
               </div>
               ${isEditing
                 ? `
@@ -1980,7 +3063,7 @@ function renderGoalLibrary() {
                           <span class="goal-type-btn__label">目標達成</span>
                         </button>
                         <button type="button" class="goal-type-btn ${ui.goalLibraryDraft.goalType === "habit" ? "is-active" : ""}" data-action="select-goal-library-type" data-goal-type="habit">
-                          <span class="goal-type-btn__icon">🌿</span>
+                          <span class="goal-type-btn__icon">↻</span>
                           <span class="goal-type-btn__label">習慣</span>
                         </button>
                       </div>
@@ -1990,12 +3073,11 @@ function renderGoalLibrary() {
                       <input class="field__control" data-goal-library-field="goal" type="text" value="${escapeHtml(ui.goalLibraryDraft.goal)}" />
                     </label>
                     ${ui.goalLibraryDraft.goalType === "habit"
-                      ? renderBonsaiPicker(ui.goalLibraryDraft.bonsaiKey, "select-goal-library-bonsai")
+                      ? `<p class="section-copy">習慣タイプは日々のチェックインで継続状況を記録します。</p>`
                       : `<label class="field">
-                          <span class="field__label">期限（空欄で期限なし）</span>
+                          <span class="field__label">期限</span>
                           <input class="field__control" data-goal-library-field="deadline" type="date" value="${escapeHtml(ui.goalLibraryDraft.deadline)}" />
-                        </label>
-                        ${renderFlowerPicker(ui.goalLibraryDraft.flowerType, "select-goal-library-flower", { compact: true })}`}
+                        </label>`}
                     <div class="goal-library-card__actions">
                       <button type="button" class="soft-button goal-library-card__action" data-action="save-goal-library-edit">保存</button>
                       <button type="button" class="soft-button goal-library-card__action" data-action="cancel-goal-library-edit">閉じる</button>
@@ -2012,17 +3094,16 @@ function renderGoalLibrary() {
                   `
                   : `
                     <p class="goal-library-card__meta">${escapeHtml(meta)}</p>
-                    ${isActive ? `<p class="goal-library-card__note">${escapeHtml(isGoalScheduledForDate(goal) ? "この目標は今日の Today に出ます。" : "今日は表示対象外です。")}</p>` : ""}
                     <div class="goal-library-card__actions">
                       <button type="button" class="soft-button goal-library-card__action" data-action="start-goal-library-edit" data-goal-id="${goal.id}">編集</button>
-                      <button type="button" class="soft-button goal-library-card__action" data-action="archive-goal" data-goal-id="${goal.id}">アルバムへ</button>
-                      <button type="button" class="soft-button goal-library-card__action goal-library-card__action--danger" data-action="confirm-delete-goal" data-goal-id="${goal.id}">完全消去</button>
+                      <button type="button" class="soft-button goal-library-card__action" data-action="archive-goal" data-goal-id="${goal.id}">非表示</button>
                     </div>
                   `}
             </article>
           `;
         }).join("")}
       </div>
+      ${renderAlbumSection()}
     </div>
   `;
 }
@@ -2032,43 +3113,24 @@ function renderTodayGoalCard(goal, index) {
   if (isHabit) {
     return renderTodayHabitCard(goal, index);
   }
-  const flower = getGoalFlowerState(goal);
   const missionState = getGoalMissionStateForDate(goal);
   const isActiveGoal = goal.id === state.meta.activeGoalId;
-  const selectedPlanKey = isActiveGoal
-    ? (goal.activeSession ? goal.activeSession.planKey : "A")
-    : "";
+  const durationMinutes = getGoalDurationMinutes(goal);
   const cardClass = `${index === 0 ? "" : " focus-launch--stacked"} ${isActiveGoal ? "is-active-goal" : "is-inactive-goal"} ${missionState.isClosed ? "is-complete-goal" : "is-pending-goal"}`;
+  const statusLabel = missionState.isClosed ? "完了" : "今日";
 
   return `
     <section class="focus-launch focus-launch--minimal${cardClass}" data-action="select-goal" data-goal-id="${goal.id}" role="button" tabindex="0" style="view-transition-name: goal-card-${goal.id}">
-      <div class="focus-launch__halo" aria-hidden="true"></div>
-      <div class="focus-launch__goal-meta">
-        <div class="focus-launch__status-row">
-          <span class="status-badge ${escapeHtml(missionState.badgeClass || "")}">${escapeHtml(missionState.isClosed ? "実施済み" : missionState.badge)}</span>
-        </div>
-        <div class="focus-launch__goal-timing">
-          <span class="focus-launch__goal-deadline">${escapeHtml(formatDeadlineBadge(goal.setup.deadline))}</span>
-          <span class="focus-launch__goal-slot">実施時間 ${escapeHtml(goal.setup.primaryWindow)}</span>
-        </div>
+      <div class="focus-launch__simple-meta">
+        <span>${escapeHtml(statusLabel)}</span>
+        <span>${escapeHtml(goal.setup.primaryWindow || "")}</span>
       </div>
       <div class="focus-launch__title-row">
         <h1 class="focus-launch__goal focus-launch__goal--solo">${escapeHtml(goal.setup.goal)}</h1>
-        <div class="focus-launch__flower-panel">
-          ${renderFlowerArtwork(flower.key, flower.stageIndex, { size: "card" })}
-        </div>
       </div>
-      <div class="choice-row focus-plan-row focus-plan-row--minimal">
-        ${Object.keys(goal.plans)
-          .map(
-            (planKey) => `
-              <button type="button" class="pill-button focus-plan-button ${selectedPlanKey === planKey ? "is-active" : ""}" data-action="launch-session-plan" data-goal-id="${goal.id}" data-plan="${planKey}">
-                <span class="focus-plan-button__label">${PLAN_META[planKey].label}</span>
-                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}分</span>
-              </button>
-            `,
-          )
-          .join("")}
+      <div class="focus-start-row">
+        <span class="focus-duration-pill">${escapeHtml(`${durationMinutes}分`)}</span>
+        <button type="button" class="action-button action-button--primary focus-start-button" data-action="start-goal-session" data-goal-id="${goal.id}">開始</button>
       </div>
     </section>
   `;
@@ -2078,49 +3140,25 @@ function renderTodayHabitCard(goal, index) {
   const today = toISODate(new Date());
   const todayLog = (goal.logs || []).find(l => l.date === today && l.outcome !== "miss");
   const isDone = Boolean(todayLog);
-  const growth = getBonsaiGrowth(goal.logs || []);
-  const health = getBonsaiHealth(goal.logs || [], goal.setup.studyDays);
-  const bonsaiKey = goal.setup.bonsaiKey || "pine";
-  const bonsaiMeta = getBonsaiTypeMeta(bonsaiKey);
   const isActiveGoal = goal.id === state.meta.activeGoalId;
-  const selectedPlanKey = isActiveGoal
-    ? (goal.activeSession ? goal.activeSession.planKey : "A")
-    : "";
+  const durationMinutes = getGoalDurationMinutes(goal);
   const cardClass = `${index === 0 ? "" : " focus-launch--stacked"} ${isActiveGoal ? "is-active-goal" : "is-inactive-goal"} ${isDone ? "is-complete-goal" : "is-pending-goal"}`;
 
   return `
     <section class="focus-launch focus-launch--minimal focus-launch--habit${cardClass}" style="view-transition-name: goal-card-${goal.id}">
-      <div class="focus-launch__halo" aria-hidden="true"></div>
-      <div class="focus-launch__goal-meta">
-        <div class="focus-launch__status-row">
-          <span class="status-badge ${isDone ? "status-badge--done" : "status-badge--accent"}">${isDone ? "完了済み" : "未完了"}</span>
-          <span class="status-badge">習慣</span>
-        </div>
-        <div class="focus-launch__goal-timing">
-          <span class="focus-launch__goal-slot">${escapeHtml(bonsaiMeta.label)} / ${escapeHtml(growth.stageLabel)}</span>
-          ${(() => { const w = goal.setup.primaryWindow || (goal.setup.primaryStart && goal.setup.primaryEnd ? `${goal.setup.primaryStart}-${goal.setup.primaryEnd}` : ""); return w ? `<span class="focus-launch__goal-slot">実施時間 ${escapeHtml(w)}</span>` : ""; })()}
-        </div>
+      <div class="focus-launch__simple-meta">
+        <span>${isDone ? "完了" : "習慣"}</span>
+        <span>${escapeHtml(goal.setup.primaryWindow || "")}</span>
       </div>
       <div class="focus-launch__title-row">
         <h1 class="focus-launch__goal focus-launch__goal--solo">${escapeHtml(goal.setup.goal)}</h1>
-        <div class="focus-launch__flower-panel">
-          ${renderBonsaiArtwork(bonsaiKey, growth.stageIndex, health, { size: "card" })}
-        </div>
       </div>
-      <div class="choice-row focus-plan-row focus-plan-row--minimal">
-        ${Object.keys(goal.plans)
-          .map(
-            (planKey) => `
-              <button type="button" class="pill-button focus-plan-button ${selectedPlanKey === planKey ? "is-active" : ""}" data-action="launch-session-plan" data-goal-id="${goal.id}" data-plan="${planKey}">
-                <span class="focus-plan-button__label">${PLAN_META[planKey].label}</span>
-                <span class="focus-plan-button__meta">${PLAN_META[planKey].tag} / ${goal.plans[planKey].minutes}分</span>
-              </button>
-            `,
-          )
-          .join("")}
+      <div class="focus-start-row">
+        <span class="focus-duration-pill">${escapeHtml(`${durationMinutes}分`)}</span>
+        <button type="button" class="action-button action-button--primary focus-start-button" data-action="start-goal-session" data-goal-id="${goal.id}">開始</button>
       </div>
       <div class="bonsai-health-row">
-        ${renderStreakDots(goal.logs || [], goal.setup.studyDays)}
+        ${renderHabitHistory(goal.logs || [], goal.setup.studyDays)}
       </div>
     </section>
   `;
@@ -2128,28 +3166,33 @@ function renderTodayHabitCard(goal, index) {
 
 function renderActiveGoalContext(options = {}) {
   const goals = options.sortByPrimaryWindow ? listGoalsByPrimaryWindow() : listGoals();
+  const currentColor = getGoalSignatureColor(state.meta.activeGoalId);
 
   return `
     <details class="goal-selector">
       <summary>
-        <span class="hero__context goal-selector__current">対象目標: ${escapeHtml(state.setup.goal)}</span>
+        <span class="hero__context goal-selector__current" style="color:${currentColor}">
+          <span class="goal-selector__dot" style="background:${currentColor}"></span>対象目標: ${escapeHtml(state.setup.goal)}
+        </span>
         <span class="goal-selector__button">選択</span>
       </summary>
       <div class="goal-selector__body">
         ${goals.map((goal) => {
           const isActive = goal.id === state.meta.activeGoalId;
-          const isHabit = goal.setup?.goalType === "habit";
-          const typeClass = isHabit ? "goal-selector__option--habit" : "goal-selector__option--goal";
+          const dotColor = getGoalSignatureColor(goal.id);
+          const optionStyle = `border-left-color:${dotColor};background:${isActive ? hexToRgba(dotColor, 0.16) : "rgba(255,251,245,0.86)"}`;
           return `
             <button
               type="button"
-              class="goal-selector__option ${typeClass} ${isActive ? "is-active" : ""}"
+              class="goal-selector__option ${isActive ? "is-active" : ""}"
+              style="${optionStyle}"
               data-action="activate-goal"
               data-goal-id="${goal.id}"
               ${isActive ? "disabled" : ""}
             >
+              <span class="goal-selector__dot" style="background:${dotColor}"></span>
               <span class="goal-selector__option-title">${escapeHtml(goal.setup.goal)}</span>
-              <span class="goal-selector__option-state">${isActive ? "表示中" : "選ぶ"}</span>
+              <span class="goal-selector__option-state"${isActive ? ` style="color:${dotColor}"` : ""}>${isActive ? "表示中" : "選ぶ"}</span>
             </button>
           `;
         }).join("")}
@@ -2162,58 +3205,30 @@ function renderSetupView() {
   ensureSetupDraft();
   const draft = ui.setupDraft;
   const isNewGoal = ui.setupMode === "new_goal";
-  const activeSectionKey = SETUP_SECTIONS[ui.setupSection] ? ui.setupSection : "goal";
-  const activeSection = SETUP_SECTIONS[activeSectionKey];
-  const saveLabel = state.meta.demoMode || isNewGoal ? "この内容で始める" : "変更を保存する";
-  const sectionTitle = activeSectionKey === "goal" ? (isNewGoal ? "目標追加" : "目標編集") : activeSection.title;
-  const newGoalSectionCopy = {
-    roadmap: "追加する目標のマイルストーンをここで決めます。",
-    schedule: "追加する目標の実施曜日と実施時間をここで決めます。",
-    plan: "追加する目標の Plan A / B / C をここで決めます。",
-  };
-  const sectionCopy = activeSectionKey === "goal"
-    ? (isNewGoal ? "今の Today は変えずに、新しい目標を追加します。" : activeSection.copy)
-    : (isNewGoal ? newGoalSectionCopy[activeSectionKey] || activeSection.copy : activeSection.copy);
-  const showSaveAction = !(activeSectionKey === "goal" && !isNewGoal);
-  const isHabitMode = isNewGoal ? draft.goalType === "habit" : state.setup.goalType === "habit";
+  const activeSectionKey = ui.setupSection === "roadmap" ? "goal" : (SETUP_SECTIONS[ui.setupSection] ? ui.setupSection : "goal");
+  ui.setupSection = activeSectionKey;
+  const showGoalSelector = !isNewGoal && activeSectionKey === "plan" && listGoals().length > 1;
+  const saveLabel = isNewGoal ? "追加する" : "保存する";
+  const showSaveAction = isNewGoal || activeSectionKey === "plan";
   const setupMenu = [
     renderSetupMenuItem({
-      action: "start-new-goal",
-      section: "goal",
-      label: "目標追加",
-      hint: "別の目標を増やす",
-      iconKey: "add",
-      active: isNewGoal && activeSectionKey === "goal",
-    }),
-    renderSetupMenuItem({
-      action: "edit-current-goal",
-      section: "goal",
-      label: "目標編集",
-      hint: "登録済みを直す",
-      iconKey: "goal",
-      active: !isNewGoal && activeSectionKey === "goal",
-    }),
-    !isHabitMode && renderSetupMenuItem({
       action: "select-setup-section",
-      section: "roadmap",
-      label: "Roadmap",
-      hint: "節目を整える",
-      iconKey: "roadmap",
-      active: activeSectionKey === "roadmap",
+      section: "goal",
+      label: "目標",
+      iconKey: "goal",
+      active: activeSectionKey === "goal",
     }),
     renderSetupMenuItem({
       action: "select-setup-section",
       section: "schedule",
-      label: "実施時間",
-      hint: "いつやるか",
+      label: "時間",
       iconKey: "schedule",
       active: activeSectionKey === "schedule",
     }),
     renderSetupMenuItem({
       action: "select-setup-section",
       section: "plan",
-      label: "プラン",
-      hint: "A / B / C の幅",
+      label: "分数",
       iconKey: "plan",
       active: activeSectionKey === "plan",
     }),
@@ -2222,35 +3237,34 @@ function renderSetupView() {
   return `
     <section class="screen screen--setup">
       <section class="setup-layout setup-layout--menu">
-        <aside class="setup-nav setup-nav--menu">
-          <div class="setup-nav__lead">
-            <p class="setup-nav__eyebrow">Settings</p>
-            <strong>変えたいものを選ぶ</strong>
-          </div>
+        <aside class="setup-nav setup-nav--menu setup-nav--simple">
           <div class="setup-nav__list">${setupMenu}</div>
-          <div class="setup-nav__data-actions">
-            <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">エクスポート</button>
-            <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">インポート</button>
-            <button type="button" class="ghost-button setup-nav__data-btn" data-action="sign-out">ログアウト</button>
-          </div>
+          <details class="setup-data-menu">
+            <summary>データ</summary>
+            <div class="setup-nav__data-actions">
+              <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">書き出し</button>
+              <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">読み込み</button>
+              <button type="button" class="ghost-button setup-nav__data-btn" data-action="sign-out">ログアウト</button>
+              <p class="setup-build-label">build ${APP_BUILD}</p>
+            </div>
+          </details>
         </aside>
 
-        ${activeSectionKey === "schedule"
-          ? ""
-          : `
+        ${showGoalSelector
+          ? `
             <div class="setup-layout__selector">
               ${renderActiveGoalContext({ sortByPrimaryWindow: true })}
             </div>
-          `}
+          `
+          : ""}
 
-        <section class="panel panel--warm stack setup-stage">
-          <div class="setup-stage__header">
-            ${renderSetupSectionIcon(activeSectionKey)}
-            <div class="setup-stage__copy">
-              ${isNewGoal ? '<span class="status-badge status-badge--accent">追加中</span>' : ""}
-              <h2 class="panel__title">${escapeHtml(sectionTitle)}</h2>
-            </div>
-          </div>
+        <section class="panel panel--warm stack setup-stage setup-stage--simple">
+          ${isNewGoal
+            ? `<div class="setup-stage__simple-head">
+                <h2 class="section-title">目標追加</h2>
+                <button type="button" class="soft-button" data-action="edit-current-goal" data-section="goal">戻る</button>
+              </div>`
+            : ""}
           ${renderSetupSectionBody(activeSectionKey, draft)}
         </section>
       </section>
@@ -2267,21 +3281,313 @@ function renderSetupView() {
 function renderTodayView() {
   const goals = listGoalsForToday();
   const todayKey = weekdayKeyFromDate(new Date());
+  // スケジュール上は今日の対象だが、すべて実施済みで一覧から消えている状態
+  const allDoneToday = !goals.length && listGoals().some((goal) => isGoalScheduledForDate(goal));
 
   return `
     <section class="screen screen--today screen--today-minimal">
       <div class="focus-goal-list">
         ${goals.length
           ? goals.map((goal, index) => renderTodayGoalCard(goal, index)).join("")
-          : `
-            <section class="panel panel--warm stack">
-              <span class="status-badge">今日は${escapeHtml(weekdayLabel(todayKey))}</span>
-              <h2 class="section-title">今日は表示する目標がありません</h2>
-              <p class="section-copy">実施曜日が ${escapeHtml(weekdayLabel(todayKey))} の目標だけを Today に表示しています。設定の実施時間から曜日を変更できます。</p>
-            </section>
-          `}
+          : allDoneToday
+            ? `
+              <section class="panel panel--warm stack empty-state">
+                <span class="status-badge status-badge--accent">完了</span>
+                <h2 class="section-title">今日の分はおわり</h2>
+                <p class="section-copy">おつかれさま。つづきはまた明日。</p>
+              </section>
+            `
+            : `
+              <section class="panel panel--warm stack empty-state">
+                <span class="status-badge">${escapeHtml(weekdayLabel(todayKey))}</span>
+                <h2 class="section-title">今日はなし</h2>
+                <button type="button" class="soft-button" data-action="open-setup" data-section="schedule">曜日を変える</button>
+              </section>
+            `}
       </div>
     </section>
+  `;
+}
+
+function renderTasksView() {
+  const draft = ensureTaskDraft();
+  const tasks = normalizeTasks(state.tasks);
+  const activeTasks = tasks.filter((task) => task.status === "active");
+  const activeGroups = groupActiveTasksByQuadrant(activeTasks);
+  const shelvedTasks = tasks.filter((task) => task.status === "shelved");
+  const doneTasks = tasks.filter((task) => task.status === "done").slice(0, 5);
+
+  return `
+    <section class="screen screen--tasks">
+      <section class="panel task-composer task-composer--simple">
+        <div class="task-add-row task-add-row--simple">
+          <input class="field__control task-title-input" data-task-draft-field="title" type="text" value="${escapeHtml(draft.title || "")}" placeholder="あとでやること" />
+          <label class="task-minute-inline">
+            <input class="field__control" data-task-draft-field="minutes" type="number" min="1" max="240" inputmode="numeric" value="${escapeHtml(String(draft.minutes || TASK_DEFAULT_MINUTES))}" aria-label="予定分数" />
+            <span>分</span>
+          </label>
+          <button type="button" class="action-button action-button--primary task-add-button" data-action="add-task" aria-label="Taskを追加">＋</button>
+        </div>
+      </section>
+
+      ${renderTaskQuadrantBoard(activeGroups)}
+      ${renderSelectedTaskPanel(activeTasks)}
+      ${renderTaskInbox(activeGroups[TASK_QUADRANT_DEFAULT])}
+
+      <section class="task-list-section">
+        <button type="button" class="task-shelf-toggle" data-action="toggle-shelved-tasks">
+          <span>保留中</span>
+          <span>${escapeHtml(`${shelvedTasks.length}件`)}</span>
+        </button>
+        ${ui.taskShowShelved
+          ? `<div class="task-list task-list--shelved">
+              ${shelvedTasks.length
+                ? shelvedTasks.map(renderShelvedTaskCard).join("")
+                : `<section class="panel panel--warm task-empty"><p>棚上げ中のTaskはありません。</p></section>`}
+            </div>`
+          : ""}
+      </section>
+
+      ${doneTasks.length
+        ? `<details class="task-history">
+            <summary>完了済み ${escapeHtml(`${doneTasks.length}件`)}</summary>
+            <div class="task-list task-list--done">
+              ${doneTasks.map(renderDoneTaskCard).join("")}
+            </div>
+          </details>`
+        : ""}
+    </section>
+  `;
+}
+
+function renderTaskInbox(tasks) {
+  return `
+    <section class="task-list-section task-inbox" data-task-quadrant-zone="${TASK_QUADRANT_DEFAULT}">
+      <div class="task-list-section__head">
+        <h3 class="section-title section-title--small">未整理</h3>
+        <span class="status-badge">${escapeHtml(`${tasks.length}件`)}</span>
+      </div>
+      <div class="task-list task-list--inbox">
+        ${tasks.length
+          ? tasks.map((task) => renderActiveTaskCard(task)).join("")
+          : `<div class="task-drop-empty">Taskは空です。</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderTaskQuadrantBoard(groups) {
+  const assignedTasks = TASK_QUADRANTS.flatMap((quadrant) => groups[quadrant.key] || []);
+  const totalMinutes = assignedTasks.reduce((sum, task) => sum + normalizeTaskMinutes(task.minutes), 0);
+
+  return `
+    <section class="task-quadrant-board">
+      <div class="task-board-head">
+        <div>
+          <h3 class="section-title section-title--small">優先順位</h3>
+        </div>
+        <span class="status-badge">${escapeHtml(`${assignedTasks.length}件 / ${totalMinutes}分`)}</span>
+      </div>
+      <div class="task-quadrant-grid">
+        ${TASK_QUADRANTS.map((quadrant) => renderTaskQuadrant(quadrant, groups[quadrant.key] || [])).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderTaskQuadrant(quadrant, tasks) {
+  const totalMinutes = tasks.reduce((sum, task) => sum + normalizeTaskMinutes(task.minutes), 0);
+
+  return `
+    <section class="task-quadrant task-quadrant--${escapeHtml(quadrant.key)}" data-task-quadrant-zone="${escapeHtml(quadrant.key)}">
+      <div class="task-quadrant__head">
+        <div class="task-quadrant__label">
+          <span class="task-quadrant__axis">${escapeHtml(quadrant.axis)}</span>
+          <h4>${escapeHtml(quadrant.title)}</h4>
+          <p>${escapeHtml(quadrant.concept)}</p>
+        </div>
+        <div class="task-quadrant__time">
+          <strong>${escapeHtml(String(totalMinutes))}</strong>
+          <span>分</span>
+        </div>
+      </div>
+      <div class="task-quadrant__meta">
+        <span>目安 ${escapeHtml(String(quadrant.target))}%</span>
+        <span>${escapeHtml(quadrant.note)}</span>
+      </div>
+      <div class="task-quadrant__list">
+        ${tasks.length
+          ? tasks.map(renderTaskBoardItem).join("")
+          : `<div class="task-drop-empty">空</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderTaskDragGrip() {
+  return `<span class="task-drag-grip" data-task-drag-handle aria-hidden="true"></span>`;
+}
+
+function renderTaskBoardItem(task) {
+  const isSelected = ui.selectedTaskId === task.id;
+  const progress = getTaskSubtaskProgress(task);
+  const progressBadge = progress.total
+    ? `<span class="task-board-item__breakdown">${escapeHtml(`${progress.done}/${progress.total}`)}</span>`
+    : "";
+  return `
+    <button
+      type="button"
+      class="task-board-item${isSelected ? " is-selected" : ""}"
+      data-action="select-task"
+      data-task-id="${escapeHtml(task.id)}"
+      data-task-draggable="true"
+      data-task-drop-item="true"
+    >
+      ${renderTaskDragGrip()}
+      <span class="task-board-item__title">${escapeHtml(task.title)}</span>
+      ${progressBadge}
+    </button>
+  `;
+}
+
+function renderSelectedTaskPanel(tasks) {
+  const selectedTask = tasks.find((task) => task.id === ui.selectedTaskId);
+  if (!selectedTask) {
+    return "";
+  }
+
+  return `
+    <section class="task-selected-panel">
+      <div class="task-selected-panel__main">
+        <label class="task-edit-title-wrap">
+          <span>Task</span>
+          <input class="task-edit-title" data-task-title-field="${escapeHtml(selectedTask.id)}" type="text" value="${escapeHtml(selectedTask.title)}" aria-label="Task名" />
+        </label>
+        <div class="task-card__meta">
+          <label class="task-card__minutes">
+            <input class="task-card__minutes-input" data-task-minutes-field="${escapeHtml(selectedTask.id)}" type="number" min="1" max="240" inputmode="numeric" value="${escapeHtml(String(selectedTask.minutes))}" aria-label="予定分数" />
+            <span>分</span>
+          </label>
+          <select class="task-card__quadrant-select" data-task-quadrant-select="${escapeHtml(selectedTask.id)}" aria-label="分類">
+            ${renderTaskQuadrantOptions(selectedTask.quadrant)}
+          </select>
+        </div>
+      </div>
+      ${renderTaskBreakdown(selectedTask)}
+      <div class="task-card__actions">
+        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-task-session" data-task-id="${escapeHtml(selectedTask.id)}">開始</button>
+        <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(selectedTask.id)}">完了</button>
+        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(selectedTask.id)}">保留</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderTaskBreakdown(task) {
+  const subtasks = normalizeTaskSubtasks(task.subtasks);
+  const progress = getTaskSubtaskProgress(task);
+  const draft = getTaskSubtaskDraft(task.id);
+
+  return `
+    <div class="task-breakdown">
+      <div class="task-breakdown__head">
+        <span>小Task</span>
+        <span>${escapeHtml(`${progress.done}/${progress.total}`)}</span>
+      </div>
+      <div class="task-subtask-list">
+        ${subtasks.length
+          ? subtasks.map((subtask) => renderTaskSubtask(task, subtask)).join("")
+          : `<div class="task-subtask-empty">まだ分解なし</div>`}
+      </div>
+      <div class="task-subtask-add">
+        <input class="task-subtask-add__input" data-subtask-draft-field data-task-id="${escapeHtml(task.id)}" type="text" value="${escapeHtml(draft)}" placeholder="小さく分ける" aria-label="小Taskを追加" />
+        <button type="button" class="task-subtask-add__button" data-action="add-subtask" data-task-id="${escapeHtml(task.id)}" aria-label="小Taskを追加">＋</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderTaskSubtask(task, subtask) {
+  return `
+    <div class="task-subtask${subtask.done ? " is-done" : ""}">
+      <button type="button" class="task-subtask__toggle" data-action="toggle-subtask" data-task-id="${escapeHtml(task.id)}" data-subtask-id="${escapeHtml(subtask.id)}" aria-label="${subtask.done ? "未完了に戻す" : "完了にする"}">${subtask.done ? "✓" : ""}</button>
+      <input class="task-subtask__title" data-subtask-title-field="${escapeHtml(subtask.id)}" data-task-id="${escapeHtml(task.id)}" type="text" value="${escapeHtml(subtask.title)}" aria-label="小Task名" />
+      <button type="button" class="task-subtask__delete" data-action="delete-subtask" data-task-id="${escapeHtml(task.id)}" data-subtask-id="${escapeHtml(subtask.id)}" aria-label="小Taskを削除">×</button>
+    </div>
+  `;
+}
+
+function renderTaskQuadrantOptions(selectedQuadrant) {
+  const normalized = normalizeTaskQuadrant(selectedQuadrant);
+  const options = [
+    { key: TASK_QUADRANT_DEFAULT, label: "未整理" },
+    ...TASK_QUADRANTS.map((quadrant) => ({ key: quadrant.key, label: quadrant.concept })),
+  ];
+
+  return options.map((option) => `
+    <option value="${escapeHtml(option.key)}"${normalized === option.key ? " selected" : ""}>${escapeHtml(option.label)}</option>
+  `).join("");
+}
+
+function renderActiveTaskCard(task) {
+  const progress = getTaskSubtaskProgress(task);
+  const progressBadge = progress.total
+    ? `<span class="task-card__breakdown">${escapeHtml(`${progress.done}/${progress.total}`)}</span>`
+    : "";
+  const isSelected = ui.selectedTaskId === task.id;
+  return `
+    <article class="task-card task-card--active${isSelected ? " is-selected" : ""}" data-action="select-task" data-task-id="${escapeHtml(task.id)}" data-task-draggable="true" data-task-drop-item="true">
+      <div class="task-card__main">
+        <div class="task-card__title-row">
+          ${renderTaskDragGrip()}
+          <strong class="task-card__title">${escapeHtml(task.title)}</strong>
+          ${progressBadge}
+        </div>
+        <div class="task-card__meta">
+          <label class="task-card__minutes">
+            <input class="task-card__minutes-input" data-task-minutes-field="${escapeHtml(task.id)}" type="number" min="1" max="240" inputmode="numeric" value="${escapeHtml(String(task.minutes))}" aria-label="予定分数" />
+            <span>分</span>
+          </label>
+          <select class="task-card__quadrant-select" data-task-quadrant-select="${escapeHtml(task.id)}" aria-label="分類">
+            ${renderTaskQuadrantOptions(task.quadrant)}
+          </select>
+        </div>
+      </div>
+      <div class="task-card__actions">
+        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-task-session" data-task-id="${escapeHtml(task.id)}">開始</button>
+        <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(task.id)}">完了</button>
+        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(task.id)}">保留</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderShelvedTaskCard(task) {
+  return `
+    <article class="task-card task-card--shelved">
+      <div class="task-card__main">
+        <strong>${escapeHtml(task.title)}</strong>
+        <span>${escapeHtml(`${task.minutes}分`)}</span>
+      </div>
+      <div class="task-card__actions">
+        <button type="button" class="soft-button" data-action="restore-task" data-task-id="${escapeHtml(task.id)}">戻す</button>
+        <button type="button" class="soft-button soft-button--danger" data-action="delete-task" data-task-id="${escapeHtml(task.id)}">削除</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderDoneTaskCard(task) {
+  return `
+    <article class="task-card task-card--done">
+      <div class="task-card__main">
+        <strong>${escapeHtml(task.title)}</strong>
+        <span>${escapeHtml(`${task.minutes}分`)}</span>
+      </div>
+      <div class="task-card__actions">
+        <button type="button" class="soft-button soft-button--danger" data-action="delete-task" data-task-id="${escapeHtml(task.id)}">削除</button>
+      </div>
+    </article>
   `;
 }
 
@@ -2355,34 +3661,6 @@ function getGoalLogByDate(goalRecord, date) {
 function getGoalMissionStateForDate(goalRecord, date = new Date()) {
   const dateKey = typeof date === "string" ? date : toISODate(date);
   return getTodayMissionState(goalRecord, getGoalLogByDate(goalRecord, dateKey));
-}
-
-function computeCatchUpRecommendation(currentState) {
-  const activeDays = Math.min(7, Math.max(1, diffInDays(new Date(), new Date(currentState.programStartDate)) + 1));
-  const normalSeconds = Math.max(600, (Number(currentState.setup.normalMinutes) || 30) * 60);
-  const actualSeconds = getTrailingEntries(activeDays).reduce((sum, entry) => (
-    isExecutionOutcome(entry.outcome) ? sum + getLoggedSeconds(entry) : sum
-  ), 0);
-  const targetSeconds = normalSeconds * activeDays;
-  const shortfallSeconds = Math.max(0, targetSeconds - actualSeconds);
-
-  if (shortfallSeconds < Math.max(currentState.plans.C.minutes * 60, 60)) {
-    return null;
-  }
-
-  const candidatePlan = shortfallSeconds >= normalSeconds * 0.9
-    ? "A"
-    : shortfallSeconds >= currentState.plans.B.minutes * 60
-      ? "B"
-      : "C";
-  const windowCap = inferWindowState(currentState).planCap || "A";
-  const planKey = downgradePlan(candidatePlan, windowCap);
-
-  return {
-    planKey,
-    shortfallSeconds,
-    shortfallLabel: formatLoggedDuration(shortfallSeconds),
-  };
 }
 
 function renderRoadmapMilestoneCard(milestone, index, options = {}) {
@@ -2499,7 +3777,7 @@ function renderRoadmapCurrentStatus(roadmap) {
         </div>
         <div class="roadmap-focus-card__value-block">
           <strong class="roadmap-focus-card__value">${overallProgress}%</strong>
-          <span class="roadmap-focus-card__value-label">全体進捗</span>
+          <span class="roadmap-focus-card__value-label">到達度</span>
         </div>
       </div>
 
@@ -2538,7 +3816,7 @@ function renderRoadmapView() {
         </div>
         ${renderRoadmapCurrentStatus(roadmap)}
         <div>
-          <h2 class="section-title">全体のロードマップ</h2>
+          <h2 class="section-title">到達点</h2>
         </div>
         ${renderRoadmapMilestoneList(roadmap)}
       </section>
@@ -2670,31 +3948,12 @@ function renderReviewView() {
     isExecutionOutcome(entry.outcome) ? sum + getLoggedSeconds(entry) : sum
   ), 0);
   const weekLog = getTrailingEntries(7);
-  const activeGoal = getActiveGoalRecord();
 
   return `
-    <section class="screen">
-      <div class="hero">
-        <div class="hero__sticky">
-          <div class="hero__accent"></div>
-          ${renderActiveGoalContext()}
-        </div>
-      </div>
+    <section class="screen screen--review">
+      ${listGoals().length > 1 ? `<div class="review-goal-switch">${renderActiveGoalContext()}</div>` : ""}
 
-      <section class="panel stack">
-        <div class="metric-grid">
-          ${renderMetricCard("7日実行率", metrics.executionRate)}
-          ${renderMetricCard("トータル勉強時間", formatLoggedDuration(totalStudySeconds), "")}
-        </div>
-      </section>
-
-      ${activeGoal ? renderReviewPotCard(activeGoal) : ""}
-
-      <section class="panel stack">
-        <div class="log-grid">
-          ${renderReviewLogGrid(weekLog)}
-        </div>
-      </section>
+      ${renderReviewOverview(weekLog, metrics, totalStudySeconds)}
 
       ${renderReviewLogEditPanel()}
     </section>
@@ -2704,6 +3963,47 @@ function renderReviewView() {
 function getActiveGoalRecord() {
   const goals = listGoals();
   return goals.find((goal) => goal.id === state.meta.activeGoalId) || goals[0] || null;
+}
+
+function renderReviewOverview(entries, metrics, totalStudySeconds) {
+  const summaries = entries.map((entry) => {
+    const seconds = getLogsByDate(entry.date).reduce((sum, log) => (
+      isExecutionOutcome(log.outcome) ? sum + getLoggedSeconds(log) : sum
+    ), 0);
+    return { ...entry, seconds };
+  });
+  const executedDays = summaries.filter((entry) => entry.hasExecution).length;
+  const weekSeconds = summaries.reduce((sum, entry) => sum + entry.seconds, 0);
+  const maxSeconds = Math.max(1, ...summaries.map((entry) => entry.seconds));
+
+  return `
+    <section class="panel review-overview">
+      <div class="review-overview__summary">
+        <span>7日間</span>
+        <strong>${escapeHtml(`${executedDays}/${summaries.length}`)}</strong>
+        <small>${escapeHtml(`${metrics.executionRate}% / ${formatLoggedDuration(weekSeconds)}`)}</small>
+      </div>
+      <div class="review-bars" aria-label="直近7日間の実行グラフ">
+        ${summaries.map((entry) => {
+          const statusClass = entry.hasExecution
+            ? "is-done"
+            : (entry.outcome === "miss" ? "is-miss" : "is-empty");
+          const barHeight = entry.hasExecution
+            ? Math.max(14, Math.round((entry.seconds / maxSeconds) * 100))
+            : (entry.outcome === "miss" ? 10 : 4);
+          return `
+            <div class="review-day ${statusClass}">
+              <div class="review-day__bar"><span style="height:${barHeight}%"></span></div>
+              <small>${escapeHtml(shortWeekday(entry.date))}</small>
+            </div>
+          `;
+        }).join("")}
+      </div>
+      <div class="review-overview__foot">
+        <span>累計 ${escapeHtml(formatLoggedDuration(totalStudySeconds))}</span>
+      </div>
+    </section>
+  `;
 }
 
 function isGoalAchieved(goalRecord) {
@@ -2736,61 +4036,39 @@ function renderReviewLogGrid(entries) {
 
 function renderReviewPotCard(goal) {
   const isHabit = goal.setup && goal.setup.goalType === "habit";
-  const flower = isHabit ? null : getGoalFlowerState(goal);
-  const bonsaiGrowth = isHabit ? getBonsaiGrowth(goal.logs || []) : null;
-  const bonsaiHealth = isHabit ? getBonsaiHealth(goal.logs || [], goal.setup.studyDays) : null;
-  const bonsaiMeta = isHabit ? getBonsaiTypeMeta(goal.setup.bonsaiKey) : null;
-  const roadmap = isHabit ? { learningProgress: 0 } : computeRoadmap(goal);
   const todayLog = getGoalLogByDate(goal, toISODate(new Date()));
   const missionState = getGoalMissionStateForDate(goal);
+  const executionLogs = (goal.logs || []).filter((entry) => isExecutionOutcome(entry.outcome));
+  const executedDays = new Set(executionLogs.map((entry) => entry.date)).size;
+  const latestLog = executionLogs.slice(-1)[0] || null;
   const statusCopy = isHabit
-    ? `${bonsaiMeta.label} / ${bonsaiGrowth.stageLabel}`
+    ? (todayLog ? buildLogSummary(todayLog) : "今日のチェックインはまだです。")
     : (missionState.isClosed && todayLog
       ? buildLogSummary(todayLog)
-      : `${flower.label} / ${flower.stageLabel}`);
+      : missionState.badge);
 
   return `
-    <section class="panel panel--garden stack">
-      <div class="review-pot-card">
-        <div class="review-pot-card__copy">
-          <div class="status-strip">
-            <span class="status-badge status-badge--done">選択中</span>
-            ${isHabit
-              ? `<span class="status-badge">習慣</span>`
-              : `<span class="status-badge ${isGoalAchieved(goal) ? "status-badge--done" : "status-badge--accent"}">${isGoalAchieved(goal) ? "達成済み" : "育成中"}</span>`}
-          </div>
-          <div class="stack stack--tight">
-            <h2 class="section-title">${escapeHtml(goal.setup.goal)}</h2>
-            <p class="section-copy">${escapeHtml(statusCopy)}</p>
-            ${todayLog && isExecutionOutcome(todayLog.outcome)
-              ? `<div class="review-pot-card__actions">
-                  <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(todayLog.logId)}">この記録を修正</button>
-                </div>`
-              : ""}
-          </div>
+    <section class="panel review-pot-card review-pot-card--compact">
+      <div class="review-pot-card__copy">
+        <span class="status-badge">${isHabit ? "習慣" : (isGoalAchieved(goal) ? "達成済み" : "進行中")}</span>
+        <h2 class="section-title">${escapeHtml(goal.setup.goal)}</h2>
+        <p class="section-copy">${escapeHtml(statusCopy)}</p>
+        ${todayLog && isExecutionOutcome(todayLog.outcome)
+          ? `<button type="button" class="ghost-button review-pot-card__edit" data-action="open-review-log-editor" data-log-id="${escapeHtml(todayLog.logId)}">今日を修正</button>`
+          : ""}
+      </div>
+      <div class="review-pot-card__facts">
+        <div class="review-pot-card__fact">
+          <span>実行</span>
+          <strong>${escapeHtml(`${executedDays}日`)}</strong>
         </div>
-        <div class="review-pot-card__scene" aria-hidden="true">
-          <div class="review-pot-card__glow"></div>
-          <div class="review-pot-card__flower">
-            ${isHabit
-              ? renderBonsaiArtwork(goal.setup.bonsaiKey, bonsaiGrowth.stageIndex, bonsaiHealth, { size: "review-pot" })
-              : renderFlowerArtwork(flower.key, flower.stageIndex, { size: "review-pot", showSoil: false })}
-          </div>
-          <div class="review-pot-card__pot"></div>
+        <div class="review-pot-card__fact">
+          <span>直近</span>
+          <strong>${escapeHtml(latestLog ? formatReviewLogDate(latestLog.date) : "未記録")}</strong>
         </div>
-        <div class="review-pot-card__facts">
-          <div class="review-pot-card__fact">
-            <span>${isHabit ? "成長段階" : "咲き方"}</span>
-            <strong>${escapeHtml(isHabit ? bonsaiGrowth.stageLabel : flower.stageLabel)}</strong>
-          </div>
-          <div class="review-pot-card__fact">
-            <span>${isHabit ? "継続日数" : "育成日数"}</span>
-            <strong>${escapeHtml(`${isHabit ? bonsaiGrowth.executedDays : flower.executedDays}日`)}</strong>
-          </div>
-          <div class="review-pot-card__fact">
-            <span>${isHabit ? "直近7回" : "全体進捗"}</span>
-            <strong>${isHabit ? renderStreakDots(goal.logs || [], goal.setup.studyDays) : escapeHtml(`${roadmap.learningProgress}%`)}</strong>
-          </div>
+        <div class="review-pot-card__fact">
+          <span>7回</span>
+          <strong>${renderStreakDots(goal.logs || [], goal.setup.studyDays)}</strong>
         </div>
       </div>
     </section>
@@ -2865,6 +4143,10 @@ function renderReviewLogEditor(entry) {
 
 function renderReviewLogCard(entry) {
   const isEditing = ui.reviewLogDraft && ui.reviewLogDraft.logId === entry.logId;
+  const loggedSeconds = getLoggedSeconds(entry);
+  const meta = isExecutionOutcome(entry.outcome)
+    ? `実行 ${formatLoggedDuration(loggedSeconds)}`
+    : outcomeLabel(entry.outcome);
   const detailParts = [
     entry.milestoneLabel ? `節目 ${entry.milestoneLabel}` : "",
     entry.progressText ? `到達 ${entry.progressText}` : "",
@@ -2876,7 +4158,7 @@ function renderReviewLogCard(entry) {
       <div class="review-log-card__head">
         <div>
           <strong class="review-log-card__title">${escapeHtml(formatReviewLogDate(entry.date))}</strong>
-          <p class="review-log-card__meta">${escapeHtml(`${outcomeLabel(entry.outcome)} / 実行 ${formatLoggedDuration(getLoggedSeconds(entry))}`)}</p>
+          <p class="review-log-card__meta">${escapeHtml(meta)}</p>
         </div>
         <button type="button" class="ghost-button" data-action="open-review-log-editor" data-log-id="${escapeHtml(entry.logId)}">修正</button>
       </div>
@@ -2916,25 +4198,16 @@ function renderAlbumSection() {
   const goals = listArchivedGoals();
   if (!goals.length) return "";
   const cards = goals.map(goal => {
-    const isHabit = goal.setup && goal.setup.goalType === "habit";
     const isConfirm = ui.deleteConfirmGoalId === goal.id;
-    let artwork = "";
-    let subtitle = "";
-    if (isHabit) {
-      const growth = getBonsaiGrowth(goal.logs || []);
-      const health = getBonsaiHealth(goal.logs || [], goal.setup.studyDays);
-      artwork = renderBonsaiArtwork(goal.setup.bonsaiKey || "pine", growth.stageIndex, health, { size: "card" });
-      subtitle = `${getBonsaiTypeMeta(goal.setup.bonsaiKey).label} / ${growth.stageIndex}段階 / ${growth.executedDays}日間`;
-    } else {
-      const growth = getFlowerGrowth(goal.logs || []);
-      const flower = getGoalFlowerState(goal);
-      artwork = renderFlowerArtwork(flower.key, growth.stageIndex, { size: "card" });
-      subtitle = `${flower.label} / ${growth.stageLabel} / ${growth.executedDays}日間`;
-    }
+    const isHabit = goal.setup && goal.setup.goalType === "habit";
+    const executionLogs = (goal.logs || []).filter((entry) => isExecutionOutcome(entry.outcome));
+    const executedDays = new Set(executionLogs.map((entry) => entry.date)).size;
+    const subtitle = isHabit
+      ? `習慣 / 実行 ${executedDays}日`
+      : `${formatDeadlineBadge(goal.setup.deadline)} / 実行 ${executedDays}日`;
     const archivedDate = goal.archivedAt ? goal.archivedAt.replace(/-/g, ".") : "";
     return `
       <div class="album-card">
-        <div class="album-card__art">${artwork}</div>
         <div class="album-card__body">
           <p class="album-card__name">${escapeHtml(goal.setup.goal)}</p>
           <p class="album-card__sub">${escapeHtml(subtitle)}</p>
@@ -2955,8 +4228,8 @@ function renderAlbumSection() {
   return `
     <section class="panel stack garden-album">
       <div>
-        <h2 class="section-title">アルバム</h2>
-        <p class="section-copy">アルバムへ移動した目標です。記録はここで見返せます。</p>
+        <h2 class="section-title">非表示の目標</h2>
+        <p class="section-copy">Today から外した目標です。記録はここで見返せます。</p>
       </div>
       <div class="album-list">${cards}</div>
     </section>
@@ -3142,7 +4415,7 @@ function renderReplanView() {
       ${isRetargetMode ? `
         <section class="panel stack">
           <div>
-            <h2 class="panel__title">目標とRoadmapを更新</h2>
+          <h2 class="panel__title">目標と次の一歩を更新</h2>
           </div>
           <label class="field">
             <span class="field__label">目標</span>
@@ -3214,10 +4487,7 @@ function renderEditablePlanCard(planKey, fieldName, value, hint) {
   return `
     <article class="plan-card plan-card--editable">
       <div class="plan-card__head">
-        <div>
-          <div class="plan-card__label">${PLAN_META[planKey].label} (${PLAN_META[planKey].tag})</div>
-          <div class="plan-card__meta">${escapeHtml(hint)}</div>
-        </div>
+        <div class="plan-card__label">${escapeHtml(hint)}</div>
       </div>
       <label class="plan-card__editor">
         <input class="field__control" data-setup-field="${fieldName}" type="number" min="${min}" max="${max}" value="${escapeHtml(String(value))}" />
@@ -3235,47 +4505,6 @@ function renderMetricCard(label, value, unit = "%") {
       </div>
       <p class="metric-card__value">${escapeHtml(String(value))}${unit ? `<span class="metric-card__unit">${escapeHtml(unit)}</span>` : ""}</p>
     </article>
-  `;
-}
-
-function renderBonsaiPicker(selectedKey, actionName = "select-setup-bonsai") {
-  const currentKey = BONSAI_LIBRARY[selectedKey] ? selectedKey : "pine";
-  return `
-    <div class="field">
-      <span class="field__label">育てる盆栽</span>
-      <p class="section-copy">盆栽の種類を選びます。日々のチェックインで育っていきます。</p>
-      <div class="bonsai-picker">
-        ${Object.entries(BONSAI_LIBRARY).map(([key, bonsai]) => `
-          <button type="button" class="bonsai-picker-item ${currentKey === key ? "is-active" : ""}" data-action="${actionName}" data-bonsai-key="${key}" aria-pressed="${currentKey === key ? "true" : "false"}">
-            ${renderBonsaiArtwork(key, 5, 100, { size: "picker" })}
-            <span class="bonsai-picker-item__label">${escapeHtml(bonsai.label)}</span>
-            <span class="bonsai-picker-item__trait">${escapeHtml(bonsai.trait)}</span>
-          </button>
-        `).join("")}
-      </div>
-    </div>
-  `;
-}
-
-function renderFlowerPicker(selectedType, actionName, options = {}) {
-  const currentType = normalizeFlowerType(selectedType);
-
-  return `
-    <div class="field">
-      <span class="field__label">育てる植物</span>
-      <p class="section-copy">目標の種類に合った植物を選びます。咲く木として成長します。</p>
-      <div class="flower-choice-grid">
-        ${Object.entries(FLOWER_LIBRARY)
-          .map(([key, flower]) => `
-            <button type="button" class="flower-choice ${currentType === key ? "is-active" : ""}" data-action="${actionName}" data-flower-type="${key}" aria-pressed="${currentType === key ? "true" : "false"}">
-              ${renderFlowerArtwork(key, 8, { size: "picker" })}
-              <span class="flower-choice__label">${escapeHtml(flower.label)}</span>
-              <span class="flower-choice__trait">${escapeHtml(flower.trait)}</span>
-            </button>
-          `)
-          .join("")}
-      </div>
-    </div>
   `;
 }
 
@@ -3915,41 +5144,384 @@ function renderWindowField(label, startKey, endKey, startValue, endValue) {
   `;
 }
 
+function renderFocusLockHelpPanel() {
+  const help = ui.focusLockHelp || buildFocusLockHelp();
+  const deviceLabel = help.deviceIdentifier
+    ? `${help.deviceModel} (${help.deviceIdentifier})`
+    : help.deviceModel;
+
+  return `
+    <div class="sheet__backdrop" data-action="dismiss-focus-lock-help"></div>
+    <section class="sheet__panel" role="dialog" aria-modal="true" aria-label="iPhone固定の設定">
+      <div class="sheet__grab"></div>
+      <div class="stack focus-lock-help">
+        <div class="focus-lock-help__head">
+          <span class="status-badge status-badge--accent">初回だけ</span>
+          <h2 class="section-title">iPhone固定をオンにする</h2>
+          <p class="section-copy">${escapeHtml(deviceLabel)} では、${escapeHtml(help.shortcutInstruction)}でアクセスガイドを開始します。</p>
+        </div>
+
+        <div class="focus-lock-device">
+          <span>この端末の操作</span>
+          <strong>${escapeHtml(help.shortcutInstruction)}</strong>
+        </div>
+
+        <ol class="focus-lock-steps">
+          <li>
+            <strong>設定を開く</strong>
+            <span>iPhoneの「設定」→「アクセシビリティ」→「アクセスガイド」を開きます。</span>
+          </li>
+          <li>
+            <strong>アクセスガイドをオン</strong>
+            <span>初回だけ、パスコード設定やFace ID設定も済ませておくと楽です。</span>
+          </li>
+          <li>
+            <strong>砂時計に戻る</strong>
+            <span>この画面で ${escapeHtml(help.shortcutInstruction)}。案内が出たら「開始」を押します。</span>
+          </li>
+          <li>
+            <strong>もう一度開始する</strong>
+            <span>下のボタンで再試行します。固定できた場合だけタイマーが始まります。</span>
+          </li>
+        </ol>
+
+        <p class="focus-lock-note">集中タイマー中に外へ出たいときも、${escapeHtml(help.shortcutInstruction)}してアクセスガイドを解除します。</p>
+
+        <div class="sheet__actions">
+          <button type="button" class="action-button action-button--primary" data-action="retry-focus-lock">設定後にもう一度開始</button>
+          <button type="button" class="soft-button" data-action="dismiss-focus-lock-help">あとで</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function getSessionDurationMs(session = state.activeSession) {
+  if (!session) {
+    return 60 * 1000;
+  }
+
+  const minutes = isTaskSession(session)
+    ? normalizeTaskMinutes(session.minutes)
+    : Number(state.plans?.[session.planKey]?.minutes || 0);
+  if (minutes > 0) {
+    return minutes * 60 * 1000;
+  }
+
+  const span = Number(session.endsAt) - Number(session.startedAt);
+  return Number.isFinite(span) && span > 0 ? span : 60 * 1000;
+}
+
+function getSessionProgressRatio(session = state.activeSession, remainingMs = null) {
+  if (!session) {
+    return 0;
+  }
+
+  const duration = getSessionDurationMs(session);
+  const remaining = remainingMs === null ? getRemainingMs(session.endsAt) : Number(remainingMs);
+  return clamp((duration - Math.max(0, remaining)) / duration, 0, 1);
+}
+
+// =========================================================
+// タイマー映像 — 水時計（既定） / 動画（timer.mp4 を置くと自動使用）
+// =========================================================
+
+// 動画モード: アプリと同じ場所に timer.mp4 を置くと、毎秒「進行度に対応する
+// 再生位置」へシークする。どの分数のセッションでも終了時にちょうど再生し終わる。
+let _timerVideoState = "unknown"; // unknown | available | missing
+
+function probeTimerVideo() {
+  if (_timerVideoState !== "unknown") return;
+  const probe = document.createElement("video");
+  probe.muted = true;
+  probe.preload = "metadata";
+  probe.addEventListener("loadedmetadata", () => {
+    _timerVideoState = "available";
+    if (ui.sessionOpen) render();
+  }, { once: true });
+  probe.addEventListener("error", () => {
+    _timerVideoState = "missing";
+  }, { once: true });
+  probe.src = "./timer.mp4";
+}
+
+// 砂時計のジオメトリ。1秒ごとに再計算し、CSS transitionでなめらかに繋ぐ。
+// 上の砂は中央がすり鉢状にくぼみながら減り、下は安息角のついた山として積もる。
+function buildSandClockGeometry(progressRatio = 0) {
+  const progress = clamp(Number(progressRatio) || 0, 0, 1);
+  const remaining = 1 - progress;
+  const n = (value) => Number(value).toFixed(1);
+
+  // 上室: 表面全体が中心へゆるやかに傾く漏斗状
+  const surfaceY = 150 - 92 * Math.sqrt(Math.max(0, remaining));
+  const dipY = Math.min(surfaceY + 2 + 9 * progress, 149);
+  const topD = [
+    `M 60 ${n(surfaceY)}`,
+    `Q 102 ${n(dipY)} 110 ${n(dipY)}`,
+    `Q 118 ${n(dipY)} 160 ${n(surfaceY)}`,
+    "L 160 152 L 60 152 Z",
+  ].join(" ");
+
+  // 下室: 安息角のついた砂の山
+  const pileHeight = 90 * Math.sqrt(Math.max(0, progress));
+  const apexY = 245 - pileHeight;
+  const baseHalf = Math.min(50, 10 + pileHeight * 0.85);
+  const slopeY = apexY + pileHeight * 0.24;
+  const pileD = [
+    `M ${n(110 - baseHalf)} 247`,
+    `Q ${n(110 - baseHalf * 0.5)} ${n(slopeY)} 110 ${n(apexY)}`,
+    `Q ${n(110 + baseHalf * 0.5)} ${n(slopeY)} ${n(110 + baseHalf)} 247`,
+    "Z",
+  ].join(" ");
+
+  const streamD = `M 110 151.5 L 110 ${n(Math.max(156, apexY - 2))}`;
+
+  return {
+    topD,
+    pileD,
+    streamD,
+    topOpacity: remaining <= 0.003 ? "0" : "1",
+    // 灯: 上のほむらは残りに応じて弱まり、下は積もるほど灯る
+    haloTopOpacity: 0.25 + 0.75 * remaining,
+    haloTopCy: 95 + 30 * progress,
+    haloBottomOpacity: 0.12 + 0.8 * progress,
+    haloBottomRy: 24 + 30 * progress,
+  };
+}
+
+// 案「灯」: 暗い画面の中で砂だけが行灯のように光る。
+// ガラスは光の輪郭だけ。すべてCSSアニメーション + 毎秒1回のパス更新。
+function renderFocusSandClock(progressRatio = 0) {
+  const progress = clamp(Number(progressRatio) || 0, 0, 1);
+  const g = buildSandClockGeometry(progress);
+  const flowing = Boolean(state.activeSession) && !ui.finishDraft && progress < 0.995;
+
+  return `
+    <figure
+      class="focus-visual focus-sand${progress >= 0.995 ? " is-complete" : ""}${flowing ? "" : " is-idle"}"
+      aria-label="集中の進み具合 ${Math.round(progress * 100)}%"
+    >
+      <svg class="focus-visual__svg" viewBox="0 0 220 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <clipPath id="sandTopClip">
+            <path d="M 77.5 55 C 77.5 100 104 130 108.6 150 L 111.4 150 C 116 130 142.5 100 142.5 55 Z" />
+          </clipPath>
+          <clipPath id="sandBottomClip">
+            <path d="M 108.6 150 C 104 170 77.5 200 77.5 245 L 142.5 245 C 142.5 200 116 170 111.4 150 Z" />
+          </clipPath>
+          <linearGradient id="hgSandLumen" gradientUnits="userSpaceOnUse" x1="110" y1="50" x2="110" y2="250">
+            <stop offset="0" stop-color="#ffe9a8" />
+            <stop offset="1" stop-color="#d29e3e" />
+          </linearGradient>
+          <linearGradient id="hgStreamLumen" gradientUnits="userSpaceOnUse" x1="110" y1="150" x2="110" y2="250">
+            <stop offset="0" stop-color="#ffefb5" />
+            <stop offset="1" stop-color="#dfa94e" />
+          </linearGradient>
+          <radialGradient id="hgHalo" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stop-color="rgba(255, 212, 116, 0.5)" />
+            <stop offset="0.6" stop-color="rgba(255, 200, 100, 0.16)" />
+            <stop offset="1" stop-color="rgba(255, 200, 100, 0)" />
+          </radialGradient>
+        </defs>
+
+        <ellipse class="focus-sand__shadow" cx="110" cy="254" rx="36" ry="3.5" fill="rgba(44,40,32,0.07)" />
+
+        <ellipse class="focus-sand__halo focus-sand__halo--top" fill="url(#hgHalo)" cx="110" cy="${g.haloTopCy.toFixed(1)}" rx="72" ry="60" style="opacity:${g.haloTopOpacity.toFixed(3)}" />
+        <ellipse class="focus-sand__halo focus-sand__halo--bottom" fill="url(#hgHalo)" cx="110" cy="225" rx="80" ry="${g.haloBottomRy.toFixed(1)}" style="opacity:${g.haloBottomOpacity.toFixed(3)}" />
+
+        <g clip-path="url(#sandTopClip)">
+          <path class="focus-sand__mass" fill="url(#hgSandLumen)" d="${g.topD}" opacity="${g.topOpacity}" />
+        </g>
+        <g clip-path="url(#sandBottomClip)">
+          <path class="focus-sand__mass focus-sand__mass--pile" fill="url(#hgSandLumen)" d="${g.pileD}" />
+        </g>
+
+        <path class="focus-sand__stream focus-sand__stream--glow" fill="none" stroke="rgba(255,222,140,0.22)" stroke-width="5.5" stroke-linecap="round" d="${g.streamD}" />
+        <path class="focus-sand__stream focus-sand__stream--core" fill="none" stroke="url(#hgStreamLumen)" stroke-width="1.7" stroke-linecap="round" d="${g.streamD}" />
+        <path class="focus-sand__stream focus-sand__stream--spark" fill="none" stroke="#fff3c8" stroke-width="0.9" stroke-linecap="round" stroke-dasharray="1.2 5.2" d="${g.streamD}" />
+
+        <g class="focus-sand__glass">
+          <path class="focus-sand__lip" fill="none" stroke="rgba(44,40,32,0.5)" stroke-width="2.2" stroke-linecap="round" d="M 74 52 H 146" />
+          <path class="focus-sand__lip" fill="none" stroke="rgba(44,40,32,0.5)" stroke-width="2.2" stroke-linecap="round" d="M 74 248 H 146" />
+          <path class="focus-sand__wall" fill="none" stroke="rgba(44,40,32,0.32)" stroke-width="1.6" stroke-linecap="round" d="M 74 52 C 74 100 102 132 106.5 150 C 102 168 74 200 74 248" />
+          <path class="focus-sand__wall" fill="none" stroke="rgba(44,40,32,0.32)" stroke-width="1.6" stroke-linecap="round" d="M 146 52 C 146 100 118 132 113.5 150 C 118 168 146 200 146 248" />
+          <path class="focus-sand__shine" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="2.4" stroke-linecap="round" d="M 80 62 C 79 92 94 116 101 132" />
+        </g>
+
+        <circle class="focus-sand__mote" fill="#ffe9ad" cx="63" cy="120" r="1" style="--dx:5px; --dy:-9px; animation-duration:7s" />
+        <circle class="focus-sand__mote" fill="#ffe9ad" cx="160" cy="180" r="0.8" style="--dx:-6px; --dy:-7px; animation-duration:9s; opacity:0.28" />
+        <circle class="focus-sand__mote" fill="#ffe9ad" cx="145" cy="70" r="0.7" style="--dx:4px; --dy:6px; animation-duration:8s; opacity:0.25" />
+      </svg>
+    </figure>
+  `;
+}
+
+function renderFocusTimerVideo(progressRatio = 0) {
+  const progress = clamp(Number(progressRatio) || 0, 0, 1);
+  return `
+    <figure class="focus-visual focus-visual--video" aria-label="集中の進み具合 ${Math.round(progress * 100)}%">
+      <video class="focus-visual__video" src="./timer.mp4" muted playsinline preload="auto"></video>
+    </figure>
+  `;
+}
+
+function renderFocusTimerVisual(progressRatio = 0) {
+  return _timerVideoState === "available"
+    ? renderFocusTimerVideo(progressRatio)
+    : renderFocusSandClock(progressRatio);
+}
+
+function updateFocusTimerVisual(remainingMs = null) {
+  if (!state.activeSession) {
+    return;
+  }
+
+  const progress = getSessionProgressRatio(state.activeSession, remainingMs);
+  const label = `集中の進み具合 ${Math.round(progress * 100)}%`;
+
+  const video = sessionSheet.querySelector(".focus-visual__video");
+  if (video) {
+    if (Number.isFinite(video.duration) && video.duration > 0 && video.readyState >= 1) {
+      const target = Math.min(Math.max(0, progress * video.duration), Math.max(0, video.duration - 0.05));
+      if (Math.abs((video.currentTime || 0) - target) > 0.02) {
+        try {
+          video.currentTime = target;
+        } catch (_err) {
+          /* メタデータ未読込などでシークできない時は次のtickで再試行 */
+        }
+      }
+    }
+    const figure = video.closest(".focus-visual");
+    if (figure) figure.setAttribute("aria-label", label);
+    return;
+  }
+
+  const sand = sessionSheet.querySelector(".focus-sand");
+  if (!sand) {
+    return;
+  }
+  const g = buildSandClockGeometry(progress);
+  const topMass = sand.querySelector(".focus-sand__mass:not(.focus-sand__mass--pile)");
+  const pileMass = sand.querySelector(".focus-sand__mass--pile");
+  const haloTop = sand.querySelector(".focus-sand__halo--top");
+  const haloBottom = sand.querySelector(".focus-sand__halo--bottom");
+  if (topMass) {
+    topMass.setAttribute("d", g.topD);
+    topMass.style.opacity = g.topOpacity;
+  }
+  if (pileMass) {
+    pileMass.setAttribute("d", g.pileD);
+  }
+  if (haloTop) {
+    haloTop.setAttribute("cy", g.haloTopCy.toFixed(1));
+    haloTop.style.opacity = g.haloTopOpacity.toFixed(3);
+  }
+  if (haloBottom) {
+    haloBottom.setAttribute("ry", g.haloBottomRy.toFixed(1));
+    haloBottom.style.opacity = g.haloBottomOpacity.toFixed(3);
+  }
+  sand.querySelectorAll(".focus-sand__stream").forEach((stream) => {
+    stream.setAttribute("d", g.streamD);
+  });
+  sand.setAttribute("aria-label", label);
+  sand.classList.toggle("is-complete", progress >= 0.995);
+  sand.classList.toggle("is-idle", !(state.activeSession && !ui.finishDraft && progress < 0.995));
+}
+
+
 function renderSessionSheet() {
   if (!ui.sessionOpen) {
     sessionSheet.hidden = true;
     sessionSheet.innerHTML = "";
+    sessionSheet.className = "sheet";
     return;
   }
 
-  const livePlanKey = state.plans[ui.selectedSessionPlan] ? ui.selectedSessionPlan : (state.activeSession ? state.activeSession.planKey : "A");
-  const displayPlanKey = ui.finishDraft ? ui.finishDraft.outcome : livePlanKey;
-  const plan = state.plans[displayPlanKey];
+  const isLockedSession = Boolean(state.activeSession);
+  const isRunningLockedSession = Boolean(state.activeSession && !ui.finishDraft);
+  const taskSession = isTaskSession();
+  const sessionTitle = taskSession ? (state.activeSession?.taskTitle || "Task") : state.setup.goal;
+  const livePlanKey = taskSession ? "" : (state.plans[ui.selectedSessionPlan] ? ui.selectedSessionPlan : (state.activeSession ? state.activeSession.planKey : "A"));
+  let displayPlanKey = ui.finishDraft ? ui.finishDraft.outcome : livePlanKey;
+  let plan = taskSession
+    ? { minutes: normalizeTaskMinutes(state.activeSession.minutes) }
+    : state.plans[displayPlanKey];
+  if (!plan && state.activeSession && !taskSession) {
+    const fallbackPlanKey = getFallbackPlanKey(state.activeSession.planKey);
+    if (fallbackPlanKey && state.plans[fallbackPlanKey]) {
+      state.activeSession.planKey = fallbackPlanKey;
+      ui.selectedSessionPlan = fallbackPlanKey;
+      displayPlanKey = fallbackPlanKey;
+      plan = state.plans[fallbackPlanKey];
+    }
+  }
+  if (!plan) {
+    sessionSheet.hidden = true;
+    sessionSheet.innerHTML = "";
+    if (state.activeSession) {
+      sessionSheet.hidden = false;
+      sessionSheet.className = "sheet sheet--locked";
+      sessionSheet.innerHTML = `
+        <div class="sheet__backdrop" data-action="close-session"></div>
+        <section class="sheet__panel" role="dialog" aria-modal="true" aria-label="タイマー復旧">
+          <div class="sheet__grab"></div>
+          <div class="stack">
+            <div class="sheet__lock-note">
+              <span class="status-badge status-badge--accent">確認が必要</span>
+              <p>前のタイマー情報が残っています。次へ進むには、このセッションを中断してください。</p>
+            </div>
+            <div class="sheet__actions">
+              <button type="button" class="soft-button soft-button--danger" data-action="confirm-abort-session">中断する</button>
+            </div>
+          </div>
+        </section>
+      `;
+      return;
+    }
+    ui.sessionOpen = false;
+    return;
+  }
   const remaining = state.activeSession ? getRemainingMs(state.activeSession.endsAt) : plan.minutes * 60 * 1000;
   const overtime = state.activeSession && remaining <= 0;
-  const milestoneOptions = normalizeRoadmapItems(state.roadmap, state.setup)
-    .map(
-      (item) => `<option value="${escapeHtml(item.id)}" ${ui.finishDraft && ui.finishDraft.milestoneId === item.id ? "selected" : ""}>${escapeHtml(item.label)} / 目安 ${item.target}%</option>`,
-    )
-    .join("");
+  const sessionProgress = state.activeSession ? getSessionProgressRatio(state.activeSession, remaining) : 0;
+  const isLaunchSheet = !state.activeSession && !ui.finishDraft;
 
   sessionSheet.hidden = false;
+  sessionSheet.className = `sheet${isLockedSession ? " sheet--locked" : ""}${isLaunchSheet ? " sheet--launch" : ""}${isRunningLockedSession ? " sheet--running" : ""}`;
+  if (ui.focusLockHelp && !state.activeSession && !ui.finishDraft) {
+    sessionSheet.innerHTML = renderFocusLockHelpPanel();
+    return;
+  }
+
   sessionSheet.innerHTML = `
     <div class="sheet__backdrop" data-action="close-session"></div>
-    <section class="sheet__panel">
+    <section class="sheet__panel" role="dialog" aria-modal="${isLockedSession ? "true" : "false"}" aria-label="${isLockedSession ? (taskSession ? "Taskタイマー" : "集中タイマー") : "セッション"}">
       <div class="sheet__grab"></div>
       <div class="stack">
-        <div class="choice-row">
-          ${Object.keys(state.plans)
-            .map(
-              (key) => `
-                <button type="button" class="pill-button ${displayPlanKey === key ? "is-active" : ""}" data-action="select-session-plan" data-plan="${key}">
-                  ${PLAN_META[key].label}<br /><span class="muted">${state.plans[key].minutes}分</span>
-                </button>
-              `,
-            )
-            .join("")}
-        </div>
+        ${isRunningLockedSession ? `
+          <div class="sheet__lock-note">
+            <span class="status-badge status-badge--accent">集中モード</span>
+            <p>タイマー中は他の操作をロックしています。戻るには中断してください。</p>
+          </div>
+        ` : ""}
+        ${taskSession && ui.finishDraft
+          ? `
+            <div class="task-session-chip">
+              <span class="status-badge">Task</span>
+              <strong>${escapeHtml(sessionTitle || "Task")}</strong>
+              <span>${escapeHtml(`${plan.minutes}分`)}</span>
+            </div>
+          `
+          : ""}
+
+        ${isLaunchSheet
+          ? `
+            <div class="sheet__actions sheet__actions--launch-primary">
+              <button type="button" class="action-button action-button--primary" data-action="begin-session">開始</button>
+              <button type="button" class="soft-button" data-action="close-session">あとで</button>
+            </div>
+          `
+          : ""}
 
         ${
           ui.finishDraft
@@ -3968,27 +5540,10 @@ function renderSessionSheet() {
                   />
                   <span class="elapsed-timer-unit">${ui.finishDraft.elapsedSeconds !== ui.finishDraft._originalElapsed ? formatLoggedDuration(ui.finishDraft.elapsedSeconds) : "分:秒"}</span>
                 </div>
-                <p class="sheet__caption">実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)} / ${PLAN_META[ui.finishDraft.outcome].label}<br><span style="opacity:0.6;font-size:0.78em">⏱ タップして修正（例: 10 または 1:30）</span></p>
+                <p class="sheet__caption">実行時間 / 予定 ${formatLoggedDuration(ui.finishDraft.plannedSeconds)}<br><span style="opacity:0.6;font-size:0.78em">⏱ タップして修正（例: 10 または 1:30）</span></p>
               </div>
               <div class="panel stack">
                 <h3 class="panel__title">記録の仕上げ</h3>
-                ${state.setup.goalType !== "habit" ? `
-                <div class="field-grid field-grid--two">
-                  <label class="field">
-                    <span class="field__label">進んだマイルストーン</span>
-                    <select class="field__control" data-finish-field="milestoneId">
-                      <option value="">今回は更新しない</option>
-                      ${milestoneOptions}
-                    </select>
-                  </label>
-                  <label class="field">
-                    <span class="field__label">その節目の扱い</span>
-                    <select class="field__control" data-finish-field="milestoneStatus">
-                      <option value="working" ${ui.finishDraft.milestoneStatus === "working" ? "selected" : ""}>まだ途中</option>
-                      <option value="complete" ${ui.finishDraft.milestoneStatus === "complete" ? "selected" : ""}>ここまで完了</option>
-                    </select>
-                  </label>
-                </div>` : ""}
                 <label class="field">
                   <span class="field__label">ひとこと</span>
                   <textarea data-finish-field="reflection" placeholder="任意。気づきがあれば一言だけ">${escapeHtml(ui.finishDraft.reflection)}</textarea>
@@ -3996,42 +5551,54 @@ function renderSessionSheet() {
               </div>
             `
             : `
-              <div class="panel panel--cool">
-                ${state.setup.goal ? `<p style="font-size:0.8rem;font-weight:600;opacity:0.6;text-align:center;margin:0 0 2px;letter-spacing:0.02em">${escapeHtml(state.setup.goal)}</p>` : ""}
-                <p class="sheet__timer" id="session-timer-value">${overtime ? "時間です" : (ui.focusPausedAt ? "⏸" : formatCountdown(remaining))}</p>
-                <button onclick="openTimerPiP()" style="margin-top:6px;padding:4px 14px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:12px;color:rgba(255,255,255,0.85);font-size:0.73rem;cursor:pointer;" title="小窓タイマー">&#x1FA9F; PiP</button>
-                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession.departures}回</p>` : ""}
+              <div class="panel panel--cool session-focus-panel${state.activeSession ? "" : " session-focus-panel--launch"}">
+                ${sessionTitle ? `
+                  <div class="session-current-work">
+                    <span class="session-current-work__label">${taskSession ? "Task" : "今やること"}</span>
+                    <strong class="session-current-work__title">${escapeHtml(sessionTitle)}</strong>
+                    <span class="session-current-work__meta">${escapeHtml(`${plan.minutes}分`)}</span>
+                  </div>
+                ` : ""}
+                ${renderFocusTimerVisual(sessionProgress)}
+                <div class="sheet__time-readout" aria-live="polite">
+                  <small id="session-timer-label">${overtime ? "予定時間になりました" : "残り時間"}</small>
+                  <span id="session-timer-value">${overtime ? "00:00" : formatCountdown(remaining)}</span>
+                </div>
+                ${(state.activeSession?.departures > 0) ? `<p style="font-size:0.78rem;opacity:0.55;text-align:center;margin:4px 0 0">離脱 ${state.activeSession?.departures}回</p>` : ""}
               </div>
             `
         }
 
-        <div class="sheet__actions">
-          ${
-            ui.finishDraft
-              ? `
-                <button type="button" class="action-button action-button--primary" data-action="save-finish-log">記録して閉じる</button>
-                <button type="button" class="soft-button" data-action="cancel-finish">タイマーに戻る</button>
-              `
-              : state.activeSession
-                ? ui.showAbortConfirm
-                  ? `
-                    <div class="abort-confirm">
-                      <p class="abort-confirm__message">記録は保存されませんが、<br>よろしいですか？</p>
-                      <button type="button" class="action-button action-button--danger" data-action="abort-session">キャンセルする</button>
-                      <button type="button" class="soft-button" data-action="cancel-abort-confirm">戻る</button>
-                    </div>
+        ${isLaunchSheet ? "" : `
+          <div class="sheet__actions">
+            ${
+              ui.finishDraft
+                ? `
+                  <button type="button" class="action-button action-button--primary" data-action="save-finish-log">記録して閉じる</button>
+                  <button type="button" class="soft-button" data-action="cancel-finish">タイマーに戻る</button>
+                `
+                : state.activeSession
+                  ? ui.showAbortConfirm
+                    ? `
+                      <div class="abort-confirm">
+                        <p class="abort-confirm__message">タイマーを中断すると、<br>この記録は保存されません。</p>
+                        <button type="button" class="action-button action-button--danger" data-action="abort-session">中断する</button>
+                        <button type="button" class="soft-button" data-action="cancel-abort-confirm">戻る</button>
+                      </div>
+                    `
+                    : taskSession
+                      ? `
+                    <button type="button" class="action-button action-button--primary" data-action="complete-session">完了</button>
+                    <button type="button" class="soft-button soft-button--danger" data-action="confirm-abort-session">中断</button>
                   `
-                  : `
-                  <button type="button" class="action-button action-button--primary" data-action="complete-session">完了を記録する</button>
-                  <button type="button" class="action-button" data-action="downgrade-session">もっと軽くして着地する</button>
-                  <button type="button" class="soft-button soft-button--danger" data-action="confirm-abort-session">キャンセル</button>
-                `
-                : `
-                  <button type="button" class="action-button action-button--primary" data-action="begin-session">このプランで始める</button>
-                  <button type="button" class="soft-button" data-action="close-session">あとで</button>
-                `
-          }
-        </div>
+                    : `
+                    <button type="button" class="action-button action-button--primary" data-action="complete-session">完了</button>
+                    <button type="button" class="soft-button soft-button--danger" data-action="confirm-abort-session">中断</button>
+                  `
+                  : ""
+            }
+          </div>
+        `}
       </div>
     </section>
   `;
@@ -4165,7 +5732,6 @@ function openFinishDraft(planKey) {
     ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
     : state.plans[planKey].minutes * 60;
   const elapsedSeconds = Math.max(1, rawElapsed);
-  const roadmap = computeRoadmap(state);
 
   ui.finishDraft = {
     outcome: planKey,
@@ -4182,6 +5748,7 @@ function openFinishDraft(planKey) {
     window.clearInterval(ui.sessionTimer);
     ui.sessionTimer = null;
   }
+  syncDeviceAppLock();
 }
 
 function saveFinishDraft() {
@@ -4194,68 +5761,21 @@ function saveFinishDraft() {
   ui.sessionOpen = false;
   state.activeSession = null;
   releaseWakeLock();
+  syncDeviceAppLock();
   saveState();
-}
-
-function pauseFocusSession() {
-  return; // focus pause disabled
-  if (!state.activeSession || ui.finishDraft || ui.focusPausedAt) return;
-  ui.focusPausedAt = Date.now();
-  state.activeSession.departures = (state.activeSession.departures || 0) + 1;
-  if (ui.sessionTimer) {
-    window.clearInterval(ui.sessionTimer);
-    ui.sessionTimer = null;
-  }
-  showFocusLostOverlay();
-  saveState();
-  render();
-}
-
-function resumeFocusSession() {
-  if (!state.activeSession || ui.finishDraft || !ui.focusPausedAt) return;
-  const pauseDuration = Date.now() - ui.focusPausedAt;
-  state.activeSession.endsAt += pauseDuration;
-  ui.focusPausedAt = null;
-  hideFocusLostOverlay();
-  const d = state.activeSession.departures || 0;
-  showToast(`作業再開！ 離脱: ${d}回`);
-  startSessionTicker();
-  saveState();
-  render();
-}
-
-function showFocusLostOverlay() {
-  let overlay = document.getElementById("focus-lost-overlay");
-  if (!overlay) {
-    overlay = document.createElement("div");
-    overlay.id = "focus-lost-overlay";
-    overlay.style.cssText = [
-      "position:fixed", "inset:0", "z-index:9998",
-      "background:rgba(20,16,10,0.82)", "backdrop-filter:blur(4px)",
-      "display:flex", "flex-direction:column", "align-items:center",
-      "justify-content:center", "color:#fff", "text-align:center", "gap:14px",
-    ].join(";");
-    overlay.innerHTML = `
-      <div style="font-size:2.8rem">⏸</div>
-      <p style="font-size:1.1rem;font-weight:700;margin:0">タイマーを一時停止しました</p>
-      <p style="font-size:0.88rem;opacity:0.75;margin:0">このタブに戻ると再開します</p>
-    `;
-    document.body.appendChild(overlay);
-  }
-  overlay.hidden = false;
-}
-
-function hideFocusLostOverlay() {
-  const overlay = document.getElementById("focus-lost-overlay");
-  if (overlay) overlay.hidden = true;
 }
 
 function beginSession(planKey) {
+  const plan = state.plans[planKey];
+  if (!plan) {
+    showToast("プランが見つかりません。設定を確認してください。");
+    return;
+  }
   const now = Date.now();
   state.activeSession = {
     planKey,
     startedAt: now,
-    endsAt: now + state.plans[planKey].minutes * 60 * 1000,
+    endsAt: now + plan.minutes * 60 * 1000,
     departures: 0,
   };
   ui.selectedSessionPlan = planKey;
@@ -4263,14 +5783,67 @@ function beginSession(planKey) {
   ui.sessionOpen = true;
   requestNotificationPermission();
   requestWakeLock();
+  syncDeviceAppLock();
   saveState();
   startSessionTicker();
 }
+
+function beginTaskSession(taskId) {
+  const task = getTaskById(taskId);
+  if (!task || task.status !== "active") {
+    showToast("開始できるTaskが見つかりません。");
+    return;
+  }
+
+  const minutes = normalizeTaskMinutes(task.minutes);
+  const now = Date.now();
+  state.activeSession = {
+    type: "task",
+    taskId: task.id,
+    taskTitle: task.title,
+    minutes,
+    startedAt: now,
+    endsAt: now + minutes * 60 * 1000,
+    departures: 0,
+  };
+  updateTask(task.id, () => ({ lastStartedAt: new Date(now).toISOString() }));
+  ui.sessionOpen = true;
+  ui.finishDraft = null;
+  ui.showAbortConfirm = false;
+  requestNotificationPermission();
+  requestWakeLock();
+  syncDeviceAppLock();
+  saveState();
+  startSessionTicker();
+  showToast(`${minutes}分Taskを開始しました。`);
+}
+
+function completeTaskSession() {
+  const session = state.activeSession;
+  if (!isTaskSession(session)) {
+    return;
+  }
+
+  updateTask(session.taskId, () => ({
+    status: "done",
+    completedAt: new Date().toISOString(),
+  }));
+  state.activeSession = null;
+  ui.sessionOpen = false;
+  ui.finishDraft = null;
+  ui.showAbortConfirm = false;
+  releaseWakeLock();
+  syncDeviceAppLock();
+  saveState();
+  startSessionTicker();
+}
+
 function completeSession(planKey) {
   recordLog(planKey, null);
   state.activeSession = null;
   ui.sessionOpen = false;
   releaseWakeLock();
+  syncDeviceAppLock();
   saveState();
   startSessionTicker();
 }
@@ -4485,7 +6058,7 @@ function generateReviewSuggestions(metrics, currentState) {
   const suggestions = [];
 
   if (reasons.some((reason) => reason.includes("残業"))) {
-    suggestions.push("火曜は最初からPlan Bにする");
+    suggestions.push("火曜は分数を少し短くする");
   }
 
   if (metrics.rescueRate >= 20 || currentState.planTuning.rescuePrimaryDays.length > 0) {
@@ -4527,13 +6100,13 @@ function generateReplanPreview(mode, text, currentState) {
       `今日のミッションを「${currentState.today.missionTitle}」 -> 「${retargeted.today.missionTitle}」に更新`,
       `今週の到達点を「${weekItem ? weekItem.label : "今週の到達点"}」 -> 「${nextWeek ? nextWeek.label : "今週の到達点"}」に更新`,
       `次の一歩を「${nextItem ? nextItem.label : "次の一歩"}」 -> 「${nextRoadmapStep ? nextRoadmapStep.label : "次の一歩"}」に更新`,
-      "残りのRoadmapは目標と現在地から自動で作り直します。",
+      "残りの計画は目標と現在地から自動で作り直します。",
     ];
   }
 
   if (mode === "lighten_today") {
     return [
-      `今日の開始プランを ${PLAN_META[todayPlan].label} -> ${PLAN_META[nextPlan].label} に変更`,
+      `今日の分数を ${currentState.plans[todayPlan].minutes}分 -> ${currentState.plans[nextPlan].minutes}分 に変更`,
       `今日のミッションを「${currentState.today.missionTitle}」 -> 「${shortenMission(currentState.today.missionTitle)}」に短縮`,
       heavyReason ? `今日は主枠を追わず、予備枠 ${currentState.setup.backupWindow} を優先表示` : `救済の定義を「${currentState.plans.C.description}」のまま固定`,
     ];
@@ -4541,7 +6114,7 @@ function generateReplanPreview(mode, text, currentState) {
 
   if (mode === "reset_week") {
     return [
-      `${weekdayLabel("Tue")}の開始プランを Plan A -> Plan B に変更`,
+      `${weekdayLabel("Tue")}の分数を少し短くする`,
       `${weekdayLabel("Fri")}は救済枠 ${currentState.setup.rescueWindow} を主枠扱いにする`,
       `今週の到達点を「${weekItem ? weekItem.label : "今週の到達点"}」 -> 「今週: ${lighterWeeklyFocus(weekItem ? weekItem.label : "今週: 前半")}」に修正`,
     ];
@@ -4556,7 +6129,7 @@ function generateReplanPreview(mode, text, currentState) {
   }
 
   return [
-    heavyReason ? `残業が続く前提で、${weekdayLabel("Tue")}と${weekdayLabel("Thu")}を最初からPlan Bに変更` : "詰まりが出やすい曜日をPlan B始まりに変更",
+    heavyReason ? `残業が続く前提で、${weekdayLabel("Tue")}と${weekdayLabel("Thu")}の分数を短くする` : "詰まりが出やすい曜日の分数を短くする",
     fatigueReason ? `通常学習時間を ${currentState.setup.normalMinutes}分 -> ${Math.max(10, currentState.setup.normalMinutes - 5)}分 に調整` : "開始ハードルを下げるため、最小単位を守ったまま主枠の負荷だけ下げる",
     prepReason ? `開始前2分のウォームアップ「${warmupExample(currentState.setup.minimumExample)}」を追加` : "今日のミッションの前に2分のウォームアップを追加",
   ];
@@ -4741,6 +6314,7 @@ function buildSeedState() {
     logs: goalRecord.logs,
     activeSession: goalRecord.activeSession,
     goals: [goalRecord],
+    tasks: [],
   };
 }
 
@@ -5181,7 +6755,7 @@ function composeMissionNote(roadmap) {
   const items = Array.isArray(roadmap) ? roadmap : [];
   const weekly = getWeekRoadmapItem(items);
   const nextStep = getNextRoadmapItem(items);
-  return `${weekly ? weekly.label : "今週の到達点"}から逆算した1本です。${nextStep ? nextStep.label : "次の一歩はRoadmapで追加できます。"}`;
+  return `${weekly ? weekly.label : "今週の到達点"}から逆算した1本です。${nextStep ? nextStep.label : "次の一歩は設定から更新できます。"}`;
 }
 
 function stripRoadmapPrefix(value, prefix) {
@@ -5248,8 +6822,7 @@ function commitSetupDraft() {
     ui.roadmapDraft = null;
     ui.setupMode = "edit";
     ui.setupSection = "goal";
-    ui.missPanelOpen = false;
-    saveState();
+      saveState();
     return "created";
   }
 
@@ -5280,7 +6853,6 @@ function commitSetupDraft() {
   ui.setupDraft = expandSetup(state.setup);
   ui.roadmapDraft = null;
   ui.setupMode = "edit";
-  ui.missPanelOpen = false;
   syncSelectedSessionPlan(true);
   saveState();
   return isFreshStart ? "reset" : "updated";
@@ -5498,6 +7070,7 @@ function mergeState(base, saved) {
     replan: { ...base.replan, ...(saved.replan || {}) },
     logs: Array.isArray(saved.logs) ? normalizeLogs(saved.logs) : base.logs,
     goals: Array.isArray(saved.goals) ? saved.goals : [],
+    tasks: normalizeTasks(saved.tasks || base.tasks),
   };
 }
 
@@ -5583,9 +7156,9 @@ function openTimerPiP() {
   window.documentPictureInPicture.requestWindow({ width: 220, height: 130 }).then(function(pipWin) {
     _pipWindow = pipWin;
     var s = pipWin.document.createElement('style');
-    s.textContent = '*{margin:0;padding:0;box-sizing:border-box}body{background:linear-gradient(150deg,rgba(248,253,255,0.96) 0%,rgba(235,246,246,0.92) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;color:#2c2820;gap:4px;padding:12px}#pip-goal{font-size:0.68rem;color:rgba(44,40,32,0.55);text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}#pip-timer{font-size:2.8rem;font-weight:800;letter-spacing:-0.05em;line-height:1;color:#2c2820}';
+    s.textContent = '*{margin:0;padding:0;box-sizing:border-box}body{background:#f5f6f2;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;color:#1f2a25;gap:5px;padding:12px}#pip-goal{font-size:0.68rem;color:#6f7871;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;font-weight:700}#pip-hourglass{width:38px;height:50px}#pip-hourglass path{fill:none;stroke:#1f2a25;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}#pip-hourglass .sand{fill:#b8994d;stroke:none}#pip-hourglass .stream{stroke:#b8994d;stroke-width:1.35;opacity:.76;animation:flow 1.3s ease-in-out infinite}#pip-hourglass .grain{fill:#b8994d;stroke:none;opacity:0;animation:grain 1.35s linear infinite}#pip-timer{font-size:1.25rem;font-weight:900;letter-spacing:0;line-height:1;color:#1f2a25}@keyframes flow{0%,100%{opacity:.58}45%{opacity:.88}}@keyframes grain{0%{opacity:0;transform:translateY(0)}18%{opacity:.32}82%{opacity:.24}100%{opacity:0;transform:translateY(20px)}}';
     pipWin.document.head.appendChild(s);
-    pipWin.document.body.innerHTML = '<div id="pip-goal"></div><div id="pip-timer">--:--</div>';
+    pipWin.document.body.innerHTML = '<div id="pip-goal"></div><svg id="pip-hourglass" viewBox="0 0 64 84" aria-hidden="true"><path d="M20 8H44M20 76H44M24 8C24 26 29 32 32 42C29 52 24 58 24 76M40 8C40 26 35 32 32 42C35 52 40 58 40 76"/><path class="sand" d="M25 22c4 2 10 2 14 0l-4 14h-6l-4-14Z"/><path class="stream" d="M32 38V58"/><circle class="grain" cx="32" cy="38" r="1.4"/><path class="sand" d="M25 66c3-8 11-8 14 0H25Z"/></svg><div id="pip-timer">--:--</div>';
     updatePiP();
     // PiP window is always visible so its setInterval is never throttled
     pipWin.setInterval(function() { updatePiP(); }, 500);
@@ -5609,7 +7182,7 @@ function updatePiP() {
       }
     }
     var goalEl = pipDoc.getElementById('pip-goal');
-    if (goalEl && state && state.setup) goalEl.textContent = state.setup.goal || '';
+    if (goalEl && state) goalEl.textContent = isTaskSession() ? (state.activeSession.taskTitle || 'Task') : (state.setup?.goal || '');
   } catch(e) { console.warn('PiP update error:', e); _pipWindow = null; }
 }
 
@@ -5618,8 +7191,6 @@ function closePiP() {
 }
 
 function startSessionTicker() {
-  // Don't tick while focus-paused
-  if (ui.focusPausedAt) return;
   // Already running correctly — don't reset the interval
   if (ui.sessionTimer && state.activeSession && !ui.finishDraft) {
     return;
@@ -5634,14 +7205,25 @@ function startSessionTicker() {
     return;
   }
 
-  const updateTimerValue = () => {
+  const updateTimerReadout = (remaining) => {
     const timerValue = sessionSheet.querySelector("#session-timer-value");
     if (!timerValue) {
-      return;
+      return false;
     }
 
+    const timerLabel = sessionSheet.querySelector("#session-timer-label");
+    const isOvertime = remaining <= 0;
+    timerValue.textContent = isOvertime ? "00:00" : formatCountdown(remaining);
+    if (timerLabel) {
+      timerLabel.textContent = isOvertime ? "予定時間になりました" : "残り時間";
+    }
+    updateFocusTimerVisual(remaining);
+    return true;
+  };
+
+  const updateTimerValue = () => {
     const remaining = getRemainingMs(state.activeSession.endsAt);
-    timerValue.textContent = remaining <= 0 ? "時間です" : formatCountdown(remaining);
+    updateTimerReadout(remaining);
   };
 
   updateTimerValue();
@@ -5655,17 +7237,15 @@ function startSessionTicker() {
     }
 
     const remaining = getRemainingMs(state.activeSession.endsAt);
-    const timerValue = sessionSheet.querySelector("#session-timer-value");
-    if (timerValue) {
-      timerValue.textContent = remaining <= 0 ? "時間です" : formatCountdown(remaining);
-    }
+    updateTimerReadout(remaining);
 
     if (remaining <= 0) {
       window.clearInterval(ui.sessionTimer);
       ui.sessionTimer = null;
+      triggerTimerHaptic();
       playTempleBell();
       sendTimerEndNotification();
-      showToast("予定時間です。完了か軽量着地を選べます。");
+      showToast(isTaskSession() ? "予定時間です。Taskを完了にできます。" : "予定時間です。完了か軽量着地を選べます。");
     }
   }, 1000);
 }
@@ -5958,9 +7538,9 @@ function shortenGoal(goal, limit = 16) {
 }
 
 function outcomeLabel(outcome) {
-  if (outcome === "A") return "Plan Aで完了";
-  if (outcome === "B") return "Plan Bで短縮";
-  if (outcome === "C") return "Plan Cで救済";
+  if (outcome === "A") return "完了";
+  if (outcome === "B") return "短く完了";
+  if (outcome === "C") return "最小で完了";
   if (outcome === "miss") return "未実施";
   return "未記録";
 }
@@ -6151,13 +7731,30 @@ function sendTimerEndNotification() {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const goal = (state && state.setup && state.setup.goal) || '集中セッション';
   try {
-    new Notification('⏰ StreakBonsai', {
+    new Notification('砂時計', {
       body: goal + '\n予定時間です！',
       icon: '/icon-192.png',
       tag: 'session-end',
       renotify: true
     });
   } catch(e) {}
+}
+
+// タイマー終了時のバイブ通知。
+// iOS: WKWebView は navigator.vibrate 非対応のため、ネイティブ側に橋渡しする。
+// Web / Android: Vibration API をそのまま使う。
+function triggerTimerHaptic() {
+  try {
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.haptic) {
+      window.webkit.messageHandlers.haptic.postMessage({ pattern: "alarm" });
+      return;
+    }
+  } catch (e) {}
+  try {
+    if (navigator.vibrate) {
+      navigator.vibrate([400, 160, 400, 160, 600]);
+    }
+  } catch (e) {}
 }
 
 // ── 音声（お寺の鐘） ──────────────────────────────────────
@@ -6349,17 +7946,36 @@ const _authSubmitEl = document.querySelector("#auth-submit");
 const _authErrorEl = document.querySelector("#auth-error");
 const _authLoadingEl = document.querySelector("#auth-loading");
 const _authHintEl = document.querySelector("#auth-hint");
+const _authStatusEl = document.querySelector("#auth-status");
 const _authTabBtns = Array.from(document.querySelectorAll(".auth-tab"));
 let _authMode = "login";
 
 const GUEST_MODE_KEY = 'sb-guest-v1';
 const GUEST_BANNER_KEY = 'sb-guest-banner-last';
 function isGuestMode() { return localStorage.getItem(GUEST_MODE_KEY) === '1'; }
+function showAuthReady() {
+  if (!_authOverlay) return;
+  _authOverlay.dataset.authState = "ready";
+  _authOverlay.hidden = false;
+}
+function hideAuthOverlay() {
+  if (!_authOverlay) return;
+  _authOverlay.hidden = true;
+}
+function startGuestApp() {
+  _supabaseLoadedSuccessfully = false;
+  hideAuthOverlay();
+  if (!_appInitialized) {
+    _appInitialized = true;
+    init();
+  } else {
+    render();
+  }
+}
 function enterGuestMode() {
   localStorage.setItem(GUEST_MODE_KEY, '1');
   localStorage.removeItem(GUEST_BANNER_KEY);
-  _authOverlay.setAttribute('hidden', '');
-  if (!_appInitialized) { _appInitialized = true; init(); }
+  startGuestApp();
 }
 function updateGuestBanner() {
   const banner = document.getElementById('guest-banner');
@@ -6374,7 +7990,7 @@ function dismissGuestBanner() {
 }
 function showAuthFromBanner() {
   dismissGuestBanner();
-  _authOverlay.hidden = false;
+  showAuthReady();
 }
 
 function _authShowError(msg) {
@@ -6491,7 +8107,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
       // ログイン時は必ずSupabaseを優先（force=true）
       await loadStateFromSupabase(session.user.id, { force: true });
       localStorage.removeItem(GUEST_MODE_KEY);
-      _authOverlay.hidden = true;
+      hideAuthOverlay();
       window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       _appInitialized = true;
       init();
@@ -6502,7 +8118,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
       // 再ログイン時も必ずSupabaseを優先（force=true）
       await loadStateFromSupabase(session.user.id, { force: true });
       localStorage.removeItem(GUEST_MODE_KEY);
-      _authOverlay.hidden = true;
+      hideAuthOverlay();
       window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
       render();
       setupRealtimeSync(session.user.id);
@@ -6510,9 +8126,14 @@ sb.auth.onAuthStateChange(async (event, session) => {
       setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100);
     }
   } else {
+    if (isGuestMode() || sb.__stub) {
+      if (_realtimeChannel) { sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
+      startGuestApp();
+      return;
+    }
     _appInitialized = false;
     if (_realtimeChannel) { sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
-    _authOverlay.removeAttribute("hidden");
+    showAuthReady();
   }
 });
 
@@ -6521,49 +8142,9 @@ sb.auth.onAuthStateChange(async (event, session) => {
 async function signOut() {
   clearTimeout(_syncTimer);
   await sb.auth.signOut();
+  localStorage.removeItem(GUEST_MODE_KEY);
   localStorage.removeItem(CURRENT_STORAGE_KEY);
   state = buildSeedState();
+  _appInitialized = false;
+  showAuthReady();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
