@@ -48,7 +48,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260709c アプリ制限β";
+const APP_BUILD = "20260710a 設定整理";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -107,6 +107,18 @@ const REPLAN_MODES = {
   consult_block: "詰まりを相談する",
 };
 const SETUP_SECTIONS = {
+  home: {
+    label: "設定",
+    hint: "目標と集中環境",
+    title: "設定",
+    copy: "目標と集中環境を整えます。",
+  },
+  detail: {
+    label: "目標設定",
+    hint: "目標ごとに編集",
+    title: "目標設定",
+    copy: "目標に必要な設定をまとめて編集します。",
+  },
   goal: {
     label: "目標編集",
     hint: "登録済みを直す",
@@ -187,7 +199,13 @@ let state = loadState();
 let ui = {
   setupDraft: null,
   setupMode: "edit",
-  setupSection: "goal",
+  setupSection: "home",
+  appShieldStatus: {
+    available: Boolean(window.webkit?.messageHandlers?.appShield),
+    enabled: null,
+    authorized: null,
+    allowedAppCount: 0,
+  },
   goalLibraryDraft: null,
   deleteConfirmGoalId: null,
   roadmapDraft: null,
@@ -763,6 +781,36 @@ function syncDeviceAppLock() {
   requestDeviceAppLock(Boolean(state.activeSession && !ui.finishDraft));
 }
 
+function requestAppShieldStatus() {
+  const bridge = window.webkit?.messageHandlers?.appShield;
+  ui.appShieldStatus.available = Boolean(bridge);
+  if (!bridge) {
+    return false;
+  }
+
+  try {
+    bridge.postMessage({ action: "status" });
+    return true;
+  } catch (err) {
+    console.warn("app shield status unavailable:", err);
+    return false;
+  }
+}
+
+function handleAppShieldStatus(event) {
+  const detail = event.detail || {};
+  ui.appShieldStatus = {
+    available: detail.available !== false,
+    enabled: typeof detail.enabled === "boolean" ? detail.enabled : null,
+    authorized: typeof detail.authorized === "boolean" ? detail.authorized : null,
+    allowedAppCount: Math.max(0, Number(detail.allowedAppCount) || 0),
+  };
+
+  if (state.meta.currentView === "setup" && ui.setupSection === "home") {
+    render();
+  }
+}
+
 function buildFocusLockHelp(result = {}) {
   const fallbackButton = result.usesHomeIndicator === false ? "ホームボタン" : "サイドボタン";
   const shortcutButton = result.shortcutButton || fallbackButton;
@@ -1195,6 +1243,7 @@ function init() {
   startSessionTicker();
   bindEvents();
   render();
+  requestAppShieldStatus();
   syncDeviceAppLock();
   // 3分ごとに他デバイスの変更を自動取得（画面非表示中とタイマー中は行わない）
   setInterval(() => {
@@ -1234,6 +1283,7 @@ function bindEvents() {
   document.addEventListener("keydown", handleKeydown);
   window.addEventListener("focus-lock-result", handleGuidedAccessResult);
   window.addEventListener("guided-access-result", handleGuidedAccessResult);
+  window.addEventListener("app-shield-status", handleAppShieldStatus);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;
     if (state.activeSession && !ui.finishDraft) {
@@ -1393,9 +1443,10 @@ function handleClick(event) {
     ui.roadmapDraft = null;
     ui.reviewLogDraft = null;
     ui.reviewLogExpanded = false;
-    ui.setupSection = target.dataset.section || ui.setupSection || "goal";
+    ui.setupSection = target.dataset.section && target.dataset.section !== "home" ? "detail" : "home";
     state.meta.currentView = "setup";
     render();
+    requestAppShieldStatus();
     return;
   }
 
@@ -1406,9 +1457,34 @@ function handleClick(event) {
     ui.roadmapDraft = null;
     ui.reviewLogDraft = null;
     ui.reviewLogExpanded = false;
-    ui.setupSection = target.dataset.section || ui.setupSection || "goal";
+    ui.setupSection = "detail";
     state.meta.currentView = "setup";
     render();
+    return;
+  }
+
+  if (action === "open-goal-settings") {
+    const goalId = target.dataset.goalId || "";
+    if (!goalId || !activateGoal(goalId)) {
+      return;
+    }
+    ui.setupMode = "edit";
+    ui.setupDraft = expandSetup(state.setup);
+    ui.setupSection = "detail";
+    ui.deleteConfirmGoalId = null;
+    render();
+    if (screenFrame) screenFrame.scrollTop = 0;
+    return;
+  }
+
+  if (action === "back-to-settings") {
+    ui.setupMode = "edit";
+    ui.setupDraft = expandSetup(state.setup);
+    ui.setupSection = "home";
+    ui.deleteConfirmGoalId = null;
+    render();
+    requestAppShieldStatus();
+    if (screenFrame) screenFrame.scrollTop = 0;
     return;
   }
 
@@ -1448,6 +1524,10 @@ function handleClick(event) {
     ensureGoalCollection();
     const goal = state.goals.find(g => g.id === goalId);
     if (!goal) return;
+    if (listGoals().length <= 1) {
+      showToast("最後の目標は非表示にできません。");
+      return;
+    }
     goal.archived = true;
     goal.archivedAt = toISODate(new Date());
     // アーカイブ対象がアクティブ目標なら別の目標へ切り替え
@@ -1457,6 +1537,7 @@ function handleClick(event) {
     }
     ui.goalLibraryDraft = null;
     ui.deleteConfirmGoalId = null;
+    ui.setupSection = "home";
     saveState();
     render();
     showToast("目標を非表示にしました。");
@@ -1480,6 +1561,10 @@ function handleClick(event) {
   if (action === "delete-goal") {
     const goalId = target.dataset.goalId;
     ensureGoalCollection();
+    if (state.goals.length <= 1) {
+      showToast("最後の目標は削除できません。");
+      return;
+    }
     if (goalId === state.meta.activeGoalId) {
       const next = state.goals.find(g => !g.archived && g.id !== goalId);
       if (next) { applyGoalRecord(next); state.meta.activeGoalId = next.id; }
@@ -1487,6 +1572,7 @@ function handleClick(event) {
     state.goals = state.goals.filter(g => g.id !== goalId);
     ui.goalLibraryDraft = null;
     ui.deleteConfirmGoalId = null;
+    ui.setupSection = "home";
     saveState();
     render();
     showToast("目標を完全に削除しました。");
@@ -1548,9 +1634,13 @@ function handleClick(event) {
   }
 
   if (action === "configure-app-shield") {
-    // iOSネイティブの設定シートを開く(集中中も使うアプリを選ぶ)
+    const bridge = window.webkit?.messageHandlers?.appShield;
+    if (!bridge) {
+      showToast("集中中のアプリ設定はiPhoneアプリで利用できます。");
+      return;
+    }
     try {
-      window.webkit.messageHandlers.appShield.postMessage({ action: "configure" });
+      bridge.postMessage({ action: "configure" });
     } catch (err) {
       showToast("アプリ制限はiPhoneアプリでのみ使えます。");
     }
@@ -1569,7 +1659,7 @@ function handleClick(event) {
   }
 
   if (action === "select-setup-section") {
-    ui.setupSection = target.dataset.section || "goal";
+    ui.setupSection = target.dataset.section || "home";
     render();
     return;
   }
@@ -1609,15 +1699,15 @@ function handleClick(event) {
       showToast("新しい目標名を入れてください。");
       return;
     }
+    const conflicts = getPrimaryWindowRoster(ui.setupDraft).filter((item) => item.overlaps);
     const saveResult = commitSetupDraft();
     if (!saveResult) {
       return;
     }
-    const conflicts = ui.setupMode === "new_goal" || ui.setupSection !== "schedule"
-      ? []
-      : getPrimaryWindowRoster(ui.setupDraft).filter((item) => item.overlaps);
     ui.goalLibraryDraft = null;
+    ui.setupSection = "home";
     render();
+    requestAppShieldStatus();
     if (saveResult === "created" && conflicts.length) {
       showToast(`目標を追加しました。実施時間は ${conflicts.map((item) => item.label).join(" / ")} と重なっています。`);
     } else if (saveResult === "created") {
@@ -2483,7 +2573,7 @@ function render() {
     currentView = "setup";
     state.meta.currentView = "setup";
     ui.setupMode = ui.setupMode === "new_goal" ? "new_goal" : "edit";
-    ui.setupSection = SETUP_SECTIONS[ui.setupSection] ? ui.setupSection : "goal";
+    ui.setupSection = ui.setupMode === "new_goal" ? "detail" : "home";
     if (!ui.setupDraft) {
       ui.setupDraft = expandSetup(state.setup);
     }
@@ -2495,7 +2585,7 @@ function render() {
   if (currentView === "setup") {
     delete setupShortcut.dataset.section;
   } else {
-    setupShortcut.dataset.section = "goal";
+    setupShortcut.dataset.section = "home";
   }
 
   if (screenFrame) {
@@ -3093,80 +3183,177 @@ function renderActiveGoalContext(options = {}) {
   `;
 }
 
-function renderSetupView() {
-  ensureSetupDraft();
-  const draft = ui.setupDraft;
-  const isNewGoal = ui.setupMode === "new_goal";
-  const activeSectionKey = ui.setupSection === "roadmap" ? "goal" : (SETUP_SECTIONS[ui.setupSection] ? ui.setupSection : "goal");
-  ui.setupSection = activeSectionKey;
-  const showGoalSelector = !isNewGoal && activeSectionKey === "plan" && listGoals().length > 1;
-  const saveLabel = isNewGoal ? "追加する" : "保存する";
-  const showSaveAction = isNewGoal || activeSectionKey === "plan";
-  const setupMenu = [
-    renderSetupMenuItem({
-      action: "select-setup-section",
-      section: "goal",
-      label: "目標",
-      iconKey: "goal",
-      active: activeSectionKey === "goal",
-    }),
-    renderSetupMenuItem({
-      action: "select-setup-section",
-      section: "schedule",
-      label: "時間",
-      iconKey: "schedule",
-      active: activeSectionKey === "schedule",
-    }),
-    renderSetupMenuItem({
-      action: "select-setup-section",
-      section: "plan",
-      label: "分数",
-      iconKey: "plan",
-      active: activeSectionKey === "plan",
-    }),
-  ].filter(Boolean).join("");
+function renderSettingsIcon(iconKey) {
+  const icons = {
+    shield: '<path d="M12 3 5.5 5.6v5.7c0 4.2 2.7 7.8 6.5 9.2 3.8-1.4 6.5-5 6.5-9.2V5.6L12 3Z"></path><path d="m9.2 11.8 1.8 1.8 3.8-4"></path>',
+    goal: '<circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3.2"></circle>',
+    account: '<circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"></path>',
+    back: '<path d="m15 18-6-6 6-6"></path>',
+    chevron: '<path d="m9 18 6-6-6-6"></path>',
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[iconKey] || icons.goal}</svg>`;
+}
+
+function getAppShieldStatusCopy() {
+  const status = ui.appShieldStatus;
+  if (!status.available) {
+    return { value: "iPhoneアプリで設定", tone: "muted" };
+  }
+  if (status.enabled === null) {
+    return { value: "状態を確認中", tone: "muted" };
+  }
+  if (!status.enabled) {
+    return { value: "オフ", tone: "muted" };
+  }
+  if (status.authorized === false) {
+    return { value: "許可を完了してください", tone: "warning" };
+  }
+  return {
+    value: `オン · ${status.allowedAppCount}個を許可`,
+    tone: "active",
+  };
+}
+
+function renderSettingsHome() {
+  const goals = listGoals().sort(compareGoalsByPrimaryWindow);
+  const shieldCopy = getAppShieldStatusCopy();
 
   return `
-    <section class="screen screen--setup">
-      <section class="setup-layout setup-layout--menu">
-        <aside class="setup-nav setup-nav--menu setup-nav--simple">
-          <div class="setup-nav__list">${setupMenu}</div>
-          <details class="setup-data-menu">
-            <summary>データ</summary>
-            <div class="setup-nav__data-actions">
-              <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">書き出し</button>
-              <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">読み込み</button>
-              <button type="button" class="ghost-button setup-nav__data-btn" data-action="sign-out">ログアウト</button>
-              ${window.webkit?.messageHandlers?.appShield ? `<button type="button" class="ghost-button setup-nav__data-btn" data-action="configure-app-shield">アプリ制限</button>` : ""}
-              <p class="setup-build-label">build ${APP_BUILD}</p>
-            </div>
-          </details>
-        </aside>
-
-        ${showGoalSelector
-          ? `
-            <div class="setup-layout__selector">
-              ${renderActiveGoalContext({ sortByPrimaryWindow: true })}
-            </div>
-          `
-          : ""}
-
-        <section class="panel panel--warm stack setup-stage setup-stage--simple">
-          ${isNewGoal
-            ? `<div class="setup-stage__simple-head">
-                <h2 class="section-title">目標追加</h2>
-                <button type="button" class="soft-button" data-action="edit-current-goal" data-section="goal">戻る</button>
-              </div>`
-            : ""}
-          ${renderSetupSectionBody(activeSectionKey, draft)}
-        </section>
+    <div class="settings-home">
+      <section class="settings-group" aria-labelledby="settings-focus-title">
+        <div class="settings-group__heading">
+          <h2 id="settings-focus-title">集中</h2>
+        </div>
+        <button type="button" class="settings-row settings-row--primary" data-action="configure-app-shield">
+          <span class="settings-row__icon">${renderSettingsIcon("shield")}</span>
+          <span class="settings-row__body">
+            <strong>集中中のアプリ</strong>
+            <span>使ってよいアプリを選ぶ</span>
+          </span>
+          <span class="settings-row__value is-${shieldCopy.tone}">${escapeHtml(shieldCopy.value)}</span>
+          <span class="settings-row__chevron">${renderSettingsIcon("chevron")}</span>
+        </button>
       </section>
 
-      ${showSaveAction
-        ? `<div class="action-row">
-            <button type="button" class="action-button action-button--primary" data-action="save-setup">${escapeHtml(saveLabel)}</button>
-          </div>`
-        : ""}
+      <section class="settings-group" aria-labelledby="settings-goals-title">
+        <div class="settings-group__heading settings-group__heading--action">
+          <h2 id="settings-goals-title">目標</h2>
+          <button type="button" class="settings-add-button" data-action="start-new-goal" aria-label="目標を追加">＋</button>
+        </div>
+        <div class="settings-goal-list">
+          ${goals.map((goal) => {
+            const isHabit = goal.setup?.goalType === "habit";
+            const deadline = isHabit ? "習慣" : formatDeadlineBadge(goal.setup.deadline);
+            const timing = `${formatStudyDays(goal.setup.studyDays)} · ${goal.setup.primaryWindow} · ${getGoalDurationMinutes(goal)}分`;
+            const color = getGoalSignatureColor(goal.id);
+            return `
+              <button type="button" class="settings-goal-row" data-action="open-goal-settings" data-goal-id="${escapeHtml(goal.id)}" style="--goal-color:${color}">
+                <span class="settings-goal-row__dot"></span>
+                <span class="settings-goal-row__body">
+                  <strong>${escapeHtml(goal.setup.goal)}</strong>
+                  <span>${escapeHtml(`${deadline} · ${timing}`)}</span>
+                </span>
+                <span class="settings-row__chevron">${renderSettingsIcon("chevron")}</span>
+              </button>
+            `;
+          }).join("")}
+        </div>
+      </section>
+
+      <details class="settings-disclosure">
+        <summary>
+          <span class="settings-row__icon">${renderSettingsIcon("account")}</span>
+          <span>アカウントとデータ</span>
+          <span class="settings-row__chevron">${renderSettingsIcon("chevron")}</span>
+        </summary>
+        <div class="settings-disclosure__body">
+          <button type="button" data-action="export-data">バックアップを書き出す</button>
+          <button type="button" data-action="import-data">バックアップを読み込む</button>
+          <button type="button" data-action="sign-out">ログアウト</button>
+          <p class="setup-build-label">build ${APP_BUILD}</p>
+        </div>
+      </details>
+
+      ${renderAlbumSection()}
+    </div>
+  `;
+}
+
+function renderGoalSettingsDetail(draft) {
+  const isNewGoal = ui.setupMode === "new_goal";
+  const isHabit = draft.goalType === "habit";
+  const canArchive = !isNewGoal && listGoals().length > 1;
+
+  return `
+    <div class="goal-settings-detail">
+      <div class="goal-settings-detail__header">
+        <button type="button" class="goal-settings-back" data-action="back-to-settings" aria-label="設定に戻る">
+          ${renderSettingsIcon("back")}
+        </button>
+        <div>
+          <p>${isNewGoal ? "新しい目標" : "目標ごとの設定"}</p>
+          <h2>${isNewGoal ? "目標を追加" : escapeHtml(state.setup.goal)}</h2>
+        </div>
+      </div>
+
+      <section class="goal-settings-section">
+        <h3>基本</h3>
+        <div class="goal-type-toggle goal-type-toggle--settings">
+          <button type="button" class="goal-type-btn ${!isHabit ? "is-active" : ""}" data-action="select-goal-type" data-goal-type="goal">
+            <span class="goal-type-btn__label">目標</span>
+          </button>
+          <button type="button" class="goal-type-btn ${isHabit ? "is-active" : ""}" data-action="select-goal-type" data-goal-type="habit">
+            <span class="goal-type-btn__label">習慣</span>
+          </button>
+        </div>
+        <label class="field">
+          <span class="field__label">名前</span>
+          <input class="field__control" data-setup-field="goal" type="text" value="${escapeHtml(draft.goal)}" />
+        </label>
+        ${isHabit ? "" : `
+          <label class="field">
+            <span class="field__label">期限</span>
+            <input class="field__control" data-setup-field="deadline" type="date" value="${escapeHtml(draft.deadline)}" />
+          </label>
+        `}
+      </section>
+
+      <section class="goal-settings-section">
+        <h3>実施する時間</h3>
+        <div class="field">
+          <span class="field__label">曜日</span>
+          <div class="weekday-choice-row">
+            ${WEEKDAY_KEYS.map((weekdayKey) => renderWeekdayChip(weekdayKey, draft.studyDays)).join("")}
+          </div>
+        </div>
+        ${renderWindowField("時間帯", "primaryStart", "primaryEnd", draft.primaryStart, draft.primaryEnd)}
+      </section>
+
+      <section class="goal-settings-section">
+        <h3>1回の集中時間</h3>
+        <label class="settings-minutes-field">
+          <input class="field__control" data-setup-field="normalMinutes" type="number" min="5" max="180" inputmode="numeric" value="${escapeHtml(String(draft.normalMinutes))}" />
+          <span>分</span>
+        </label>
+      </section>
+
+      <button type="button" class="action-button action-button--primary goal-settings-save" data-action="save-setup">${isNewGoal ? "追加する" : "保存する"}</button>
+
+      ${canArchive ? `
+        <button type="button" class="goal-settings-archive" data-action="archive-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">この目標を非表示にする</button>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderSetupView() {
+  ensureSetupDraft();
+  const showHome = ui.setupSection === "home" && ui.setupMode !== "new_goal";
+  ui.setupSection = showHome ? "home" : "detail";
+
+  return `
+    <section class="screen screen--setup screen--settings">
+      ${showHome ? renderSettingsHome() : renderGoalSettingsDetail(ui.setupDraft)}
     </section>
   `;
 }
@@ -5847,13 +6034,14 @@ function commitSetupDraft() {
       replan: buildInitialReplan(),
     });
     state.goals = [newGoal, ...state.goals];
+    applyGoalRecord(newGoal);
     state.meta.demoMode = false;
     state.meta.currentView = "setup";
     ui.setupDraft = expandSetup(state.setup);
     ui.roadmapDraft = null;
     ui.setupMode = "edit";
-    ui.setupSection = "goal";
-      saveState();
+    ui.setupSection = "home";
+    saveState();
     return "created";
   }
 
