@@ -48,7 +48,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260709b 大掃除";
+const APP_BUILD = "20260709c アプリ制限β";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -1544,6 +1544,16 @@ function handleClick(event) {
 
   if (action === "sign-out") {
     signOut();
+    return;
+  }
+
+  if (action === "configure-app-shield") {
+    // iOSネイティブの設定シートを開く(集中中も使うアプリを選ぶ)
+    try {
+      window.webkit.messageHandlers.appShield.postMessage({ action: "configure" });
+    } catch (err) {
+      showToast("アプリ制限はiPhoneアプリでのみ使えます。");
+    }
     return;
   }
 
@@ -3127,6 +3137,7 @@ function renderSetupView() {
               <button type="button" class="ghost-button setup-nav__data-btn" data-action="export-data">書き出し</button>
               <button type="button" class="ghost-button setup-nav__data-btn" data-action="import-data">読み込み</button>
               <button type="button" class="ghost-button setup-nav__data-btn" data-action="sign-out">ログアウト</button>
+              ${window.webkit?.messageHandlers?.appShield ? `<button type="button" class="ghost-button setup-nav__data-btn" data-action="configure-app-shield">アプリ制限</button>` : ""}
               <p class="setup-build-label">build ${APP_BUILD}</p>
             </div>
           </details>
