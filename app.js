@@ -48,7 +48,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260713a 即時起動";
+const APP_BUILD = "20260713b 終了アラーム";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -811,6 +811,58 @@ function handleAppShieldStatus(event) {
   }
 }
 
+function getFocusAlarmBridge() {
+  return window.webkit?.messageHandlers?.focusAlarm || null;
+}
+
+function scheduleFocusAlarm(session = state.activeSession) {
+  const bridge = getFocusAlarmBridge();
+  if (!bridge || !session?.endsAt) {
+    return false;
+  }
+
+  const title = isTaskSession(session)
+    ? (session.taskTitle || "Task")
+    : (state.setup?.goal || "集中セッション");
+  try {
+    bridge.postMessage({
+      action: "schedule",
+      endsAt: Number(session.endsAt),
+      title,
+    });
+    return true;
+  } catch (_err) {
+    return false;
+  }
+}
+
+function cancelFocusAlarm() {
+  const bridge = getFocusAlarmBridge();
+  if (!bridge) {
+    return false;
+  }
+  try {
+    bridge.postMessage({ action: "cancel" });
+    return true;
+  } catch (_err) {
+    return false;
+  }
+}
+
+function syncFocusAlarm() {
+  if (state.activeSession && !ui.finishDraft) {
+    scheduleFocusAlarm(state.activeSession);
+  } else {
+    cancelFocusAlarm();
+  }
+}
+
+function handleFocusAlarmStatus(event) {
+  if (event.detail?.authorized === false) {
+    showToast("終了アラームがオフです。iPhoneの設定で砂時計の通知を許可してください。");
+  }
+}
+
 function buildFocusLockHelp(result = {}) {
   const fallbackButton = result.usesHomeIndicator === false ? "ホームボタン" : "サイドボタン";
   const shortcutButton = result.shortcutButton || fallbackButton;
@@ -947,6 +999,7 @@ function clearActiveSessionRuntime() {
   ui.sessionOpen = false;
   ui.finishDraft = null;
   ui.showAbortConfirm = false;
+  cancelFocusAlarm();
   syncDeviceAppLock();
 }
 
@@ -1245,6 +1298,7 @@ function init() {
   render();
   requestAppShieldStatus();
   syncDeviceAppLock();
+  syncFocusAlarm();
   // 3分ごとに他デバイスの変更を自動取得（画面非表示中とタイマー中は行わない）
   setInterval(() => {
     if (!document.hidden && !state.activeSession) _resyncFromSupabase();
@@ -1284,6 +1338,7 @@ function bindEvents() {
   window.addEventListener("focus-lock-result", handleGuidedAccessResult);
   window.addEventListener("guided-access-result", handleGuidedAccessResult);
   window.addEventListener("app-shield-status", handleAppShieldStatus);
+  window.addEventListener("focus-alarm-status", handleFocusAlarmStatus);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;
     if (state.activeSession && !ui.finishDraft) {
@@ -1958,6 +2013,7 @@ function handleClick(event) {
 
   if (action === "cancel-finish") {
     ui.finishDraft = null;
+    scheduleFocusAlarm(state.activeSession);
     syncDeviceAppLock();
     startSessionTicker();
     render();
@@ -1986,6 +2042,7 @@ function handleClick(event) {
     ui.sessionOpen = false;
     ui.finishDraft = null;
     ui.showAbortConfirm = false;
+    cancelFocusAlarm();
     syncDeviceAppLock();
     saveState();
     render();
@@ -4966,6 +5023,7 @@ function openFinishDraft(planKey) {
     window.clearInterval(ui.sessionTimer);
     ui.sessionTimer = null;
   }
+  cancelFocusAlarm();
   syncDeviceAppLock();
 }
 
@@ -4979,6 +5037,7 @@ function saveFinishDraft() {
   ui.sessionOpen = false;
   state.activeSession = null;
   releaseWakeLock();
+  cancelFocusAlarm();
   syncDeviceAppLock();
   saveState();
 }
@@ -5001,6 +5060,7 @@ function beginSession(planKey) {
   ui.sessionOpen = true;
   requestNotificationPermission();
   requestWakeLock();
+  scheduleFocusAlarm(state.activeSession);
   syncDeviceAppLock();
   saveState();
   startSessionTicker();
@@ -5030,6 +5090,7 @@ function beginTaskSession(taskId) {
   ui.showAbortConfirm = false;
   requestNotificationPermission();
   requestWakeLock();
+  scheduleFocusAlarm(state.activeSession);
   syncDeviceAppLock();
   saveState();
   startSessionTicker();
@@ -5051,6 +5112,7 @@ function completeTaskSession() {
   ui.finishDraft = null;
   ui.showAbortConfirm = false;
   releaseWakeLock();
+  cancelFocusAlarm();
   syncDeviceAppLock();
   saveState();
   startSessionTicker();
@@ -5061,6 +5123,7 @@ function completeSession(planKey) {
   state.activeSession = null;
   ui.sessionOpen = false;
   releaseWakeLock();
+  cancelFocusAlarm();
   syncDeviceAppLock();
   saveState();
   startSessionTicker();
