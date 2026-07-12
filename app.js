@@ -48,7 +48,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260710a 設定整理";
+const APP_BUILD = "20260713a 即時起動";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -7320,6 +7320,27 @@ _authForm.addEventListener("submit", async (e) => {
 
 // ── Auth state の監視 ─────────────────────────────────────
 
+function resumeCachedAppImmediately() {
+  if (_appInitialized) {
+    return false;
+  }
+
+  const hasLocalState = [CURRENT_STORAGE_KEY, ...LEGACY_STORAGE_KEYS]
+    .some((key) => Boolean(localStorage.getItem(key)));
+  const hasCachedSession = Boolean(localStorage.getItem("streakbonsai-auth-v1"));
+
+  if (!hasLocalState || (!hasCachedSession && !isGuestMode())) {
+    return false;
+  }
+
+  hideAuthOverlay();
+  _appInitialized = true;
+  init();
+  return true;
+}
+
+resumeCachedAppImmediately();
+
 sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
     if (!_appInitialized) {
@@ -7343,6 +7364,17 @@ sb.auth.onAuthStateChange(async (event, session) => {
       setupRealtimeSync(session.user.id);
       if (screenFrame) screenFrame.scrollTop = 0;
       setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100);
+    } else if (event === "INITIAL_SESSION") {
+      // 再起動時は端末内の状態を先に表示済み。クラウド確認は操作を止めず背後で行う。
+      localStorage.removeItem(GUEST_MODE_KEY);
+      hideAuthOverlay();
+      setupRealtimeSync(session.user.id);
+      const beforeSync = state.meta?.lastSavedAt || 0;
+      loadStateFromSupabase(session.user.id).then(() => {
+        if ((state.meta?.lastSavedAt || 0) !== beforeSync && !state.activeSession) {
+          safeRender();
+        }
+      });
     }
   } else {
     if (isGuestMode() || sb.__stub) {
