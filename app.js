@@ -48,7 +48,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260713b 終了アラーム";
+const APP_BUILD = "20260717a 続きから再開";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -485,6 +485,12 @@ function normalizeTask(task = {}) {
   const status = ["active", "shelved", "done"].includes(task.status)
     ? task.status
     : "active";
+  const rawPausedRemainingSeconds = Number(task.pausedRemainingSeconds);
+  const pausedRemainingSeconds = status !== "done"
+    && Number.isFinite(rawPausedRemainingSeconds)
+    && rawPausedRemainingSeconds > 0
+      ? Math.max(1, Math.min(240 * 60, Math.ceil(rawPausedRemainingSeconds)))
+      : null;
 
   return {
     id: task.id || createTaskId(),
@@ -497,6 +503,8 @@ function normalizeTask(task = {}) {
     completedAt: task.completedAt || null,
     shelvedAt: task.shelvedAt || null,
     lastStartedAt: task.lastStartedAt || null,
+    pausedRemainingSeconds,
+    pausedAt: pausedRemainingSeconds ? (task.pausedAt || now) : null,
     subtasks: normalizeTaskSubtasks(task.subtasks),
   };
 }
@@ -579,6 +587,21 @@ function updateTaskMinutes(taskId, minutes) {
   return updateTask(taskId, () => ({
     minutes: normalizeTaskMinutes(minutes),
   }));
+}
+
+function getTaskPausedSeconds(task) {
+  const seconds = Number(task?.pausedRemainingSeconds);
+  return Number.isFinite(seconds) && seconds > 0
+    ? Math.max(1, Math.min(240 * 60, Math.ceil(seconds)))
+    : 0;
+}
+
+function formatTaskRemaining(seconds) {
+  return formatCountdown(Math.max(1, Number(seconds) || 1) * 1000);
+}
+
+function getTaskStartLabel(task) {
+  return getTaskPausedSeconds(task) > 0 ? "再開" : "開始";
 }
 
 function getTaskQuadrantToastLabel(quadrantKey) {
@@ -1402,6 +1425,7 @@ const SESSION_LOCK_ACTIONS = new Set([
   "cancel-finish",
   "confirm-abort-session",
   "cancel-abort-confirm",
+  "hold-session",
   "abort-session",
 ]);
 
@@ -1867,6 +1891,8 @@ function handleClick(event) {
     const task = updateTask(taskId, () => ({
       status: "done",
       completedAt: new Date().toISOString(),
+      pausedRemainingSeconds: null,
+      pausedAt: null,
     }));
     if (task) {
       if (ui.selectedTaskId === taskId) {
@@ -2032,6 +2058,11 @@ function handleClick(event) {
     return;
   }
 
+  if (action === "hold-session") {
+    holdActiveSession();
+    return;
+  }
+
   if (action === "abort-session") {
     if (ui.sessionTimer) {
       window.clearInterval(ui.sessionTimer);
@@ -2046,7 +2077,7 @@ function handleClick(event) {
     syncDeviceAppLock();
     saveState();
     render();
-    showToast("タイマーを中断しました。");
+    showToast("今回はここで終了しました。");
     return;
   }
 
@@ -3451,6 +3482,7 @@ function renderTasksView() {
   const tasks = normalizeTasks(state.tasks);
   const activeTasks = tasks.filter((task) => task.status === "active");
   const activeGroups = groupActiveTasksByQuadrant(activeTasks);
+  const pausedTasks = activeTasks.filter((task) => getTaskPausedSeconds(task) > 0);
   const shelvedTasks = tasks.filter((task) => task.status === "shelved");
   const doneTasks = tasks.filter((task) => task.status === "done").slice(0, 5);
 
@@ -3467,13 +3499,14 @@ function renderTasksView() {
         </div>
       </section>
 
+      ${renderTaskResumeQueue(pausedTasks)}
       ${renderTaskQuadrantBoard(activeGroups)}
       ${renderSelectedTaskPanel(activeTasks)}
       ${renderTaskInbox(activeGroups[TASK_QUADRANT_DEFAULT])}
 
       <section class="task-list-section">
         <button type="button" class="task-shelf-toggle" data-action="toggle-shelved-tasks">
-          <span>保留中</span>
+          <span>棚上げ中</span>
           <span>${escapeHtml(`${shelvedTasks.length}件`)}</span>
         </button>
         ${ui.taskShowShelved
@@ -3493,6 +3526,30 @@ function renderTasksView() {
             </div>
           </details>`
         : ""}
+    </section>
+  `;
+}
+
+function renderTaskResumeQueue(tasks) {
+  if (!tasks.length) {
+    return "";
+  }
+
+  return `
+    <section class="task-resume-queue" aria-label="続きから再開">
+      <div class="task-resume-queue__head">
+        <strong>続き</strong>
+        <span>${escapeHtml(`${tasks.length}件`)}</span>
+      </div>
+      ${tasks.map((task) => `
+        <div class="task-resume-row">
+          <div class="task-resume-row__work">
+            <strong>${escapeHtml(task.title)}</strong>
+            <span>残り ${escapeHtml(formatTaskRemaining(getTaskPausedSeconds(task)))}</span>
+          </div>
+          <button type="button" class="task-resume-row__button" data-action="start-task-session" data-task-id="${escapeHtml(task.id)}">再開</button>
+        </div>
+      `).join("")}
     </section>
   `;
 }
@@ -3568,11 +3625,22 @@ function renderTaskDragGrip() {
   return `<span class="task-drag-grip" data-task-drag-handle aria-hidden="true"></span>`;
 }
 
+function renderTaskResumeBadge(task, className = "task-resume-badge") {
+  const seconds = getTaskPausedSeconds(task);
+  return seconds > 0
+    ? `<span class="${escapeHtml(className)}">残り ${escapeHtml(formatTaskRemaining(seconds))}</span>`
+    : "";
+}
+
 function renderTaskBoardItem(task) {
   const isSelected = ui.selectedTaskId === task.id;
   const progress = getTaskSubtaskProgress(task);
   const progressBadge = progress.total
     ? `<span class="task-board-item__breakdown">${escapeHtml(`${progress.done}/${progress.total}`)}</span>`
+    : "";
+  const resumeBadge = renderTaskResumeBadge(task, "task-board-item__resume");
+  const badges = resumeBadge || progressBadge
+    ? `<span class="task-board-item__badges">${resumeBadge}${progressBadge}</span>`
     : "";
   return `
     <button
@@ -3585,7 +3653,7 @@ function renderTaskBoardItem(task) {
     >
       ${renderTaskDragGrip()}
       <span class="task-board-item__title">${escapeHtml(task.title)}</span>
-      ${progressBadge}
+      ${badges}
     </button>
   `;
 }
@@ -3595,12 +3663,13 @@ function renderSelectedTaskPanel(tasks) {
   if (!selectedTask) {
     return "";
   }
+  const pausedSeconds = getTaskPausedSeconds(selectedTask);
 
   return `
     <section class="task-selected-panel">
       <div class="task-selected-panel__main">
         <label class="task-edit-title-wrap">
-          <span>Task</span>
+          <span>${pausedSeconds ? `続き · 残り ${escapeHtml(formatTaskRemaining(pausedSeconds))}` : "Task"}</span>
           <input class="task-edit-title" data-task-title-field="${escapeHtml(selectedTask.id)}" type="text" value="${escapeHtml(selectedTask.title)}" aria-label="Task名" />
         </label>
         <div class="task-card__meta">
@@ -3615,9 +3684,9 @@ function renderSelectedTaskPanel(tasks) {
       </div>
       ${renderTaskBreakdown(selectedTask)}
       <div class="task-card__actions">
-        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-task-session" data-task-id="${escapeHtml(selectedTask.id)}">開始</button>
+        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-task-session" data-task-id="${escapeHtml(selectedTask.id)}">${getTaskStartLabel(selectedTask)}</button>
         <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(selectedTask.id)}">完了</button>
-        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(selectedTask.id)}">保留</button>
+        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(selectedTask.id)}">棚上げ</button>
       </div>
     </section>
   `;
@@ -3681,6 +3750,7 @@ function renderActiveTaskCard(task) {
         <div class="task-card__title-row">
           ${renderTaskDragGrip()}
           <strong class="task-card__title">${escapeHtml(task.title)}</strong>
+          ${renderTaskResumeBadge(task)}
           ${progressBadge}
         </div>
         <div class="task-card__meta">
@@ -3694,20 +3764,21 @@ function renderActiveTaskCard(task) {
         </div>
       </div>
       <div class="task-card__actions">
-        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-task-session" data-task-id="${escapeHtml(task.id)}">開始</button>
+        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-task-session" data-task-id="${escapeHtml(task.id)}">${getTaskStartLabel(task)}</button>
         <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(task.id)}">完了</button>
-        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(task.id)}">保留</button>
+        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(task.id)}">棚上げ</button>
       </div>
     </article>
   `;
 }
 
 function renderShelvedTaskCard(task) {
+  const pausedSeconds = getTaskPausedSeconds(task);
   return `
     <article class="task-card task-card--shelved">
       <div class="task-card__main">
         <strong>${escapeHtml(task.title)}</strong>
-        <span>${escapeHtml(`${task.minutes}分`)}</span>
+        <span>${escapeHtml(pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `${task.minutes}分`)}</span>
       </div>
       <div class="task-card__actions">
         <button type="button" class="soft-button" data-action="restore-task" data-task-id="${escapeHtml(task.id)}">戻す</button>
@@ -4476,6 +4547,11 @@ function getSessionDurationMs(session = state.activeSession) {
     return 60 * 1000;
   }
 
+  const durationSeconds = Number(session.durationSeconds);
+  if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    return durationSeconds * 1000;
+  }
+
   const minutes = isTaskSession(session)
     ? normalizeTaskMinutes(session.minutes)
     : Number(state.plans?.[session.planKey]?.minutes || 0);
@@ -4485,6 +4561,13 @@ function getSessionDurationMs(session = state.activeSession) {
 
   const span = Number(session.endsAt) - Number(session.startedAt);
   return Number.isFinite(span) && span > 0 ? span : 60 * 1000;
+}
+
+function getSessionRemainingSeconds(session = state.activeSession) {
+  if (!session?.endsAt) {
+    return 0;
+  }
+  return Math.max(0, Math.ceil((Number(session.endsAt) - Date.now()) / 1000));
 }
 
 function getSessionProgressRatio(session = state.activeSession, remainingMs = null) {
@@ -4855,9 +4938,12 @@ function renderSessionSheet() {
                 : state.activeSession
                   ? ui.showAbortConfirm
                     ? `
-                      <div class="abort-confirm">
-                        <p class="abort-confirm__message">タイマーを中断すると、<br>この記録は保存されません。</p>
-                        <button type="button" class="action-button action-button--danger" data-action="abort-session">中断する</button>
+                      <div class="abort-confirm${overtime ? " abort-confirm--finished" : ""}">
+                        <p class="abort-confirm__message">${overtime
+                          ? "予定時間は終了しています。今回はここで終了しますか？"
+                          : `残り ${escapeHtml(formatCountdown(remaining))}。続きはTaskに残せます。`}</p>
+                        ${overtime ? "" : `<button type="button" class="action-button action-button--primary" data-action="hold-session">残りを保留</button>`}
+                        <button type="button" class="action-button action-button--danger" data-action="abort-session">今回は終了</button>
                         <button type="button" class="soft-button" data-action="cancel-abort-confirm">戻る</button>
                       </div>
                     `
@@ -5042,6 +5128,58 @@ function saveFinishDraft() {
   saveState();
 }
 
+function holdActiveSession() {
+  const session = state.activeSession;
+  const remainingSeconds = getSessionRemainingSeconds(session);
+  if (!session || remainingSeconds <= 0) {
+    ui.showAbortConfirm = false;
+    render();
+    showToast("予定時間を過ぎているため、残り時間は保留できません。");
+    return;
+  }
+
+  const pausedAt = new Date().toISOString();
+  let task = null;
+  if (isTaskSession(session)) {
+    task = updateTask(session.taskId, () => ({
+      status: "active",
+      completedAt: null,
+      shelvedAt: null,
+      pausedRemainingSeconds: remainingSeconds,
+      pausedAt,
+    }));
+  } else {
+    task = normalizeTask({
+      id: createTaskId(),
+      title: String(state.setup?.goal || state.today?.missionTitle || "続き").trim(),
+      minutes: Math.max(1, Math.ceil(remainingSeconds / 60)),
+      status: "active",
+      quadrant: TASK_QUADRANT_DEFAULT,
+      pausedRemainingSeconds: remainingSeconds,
+      pausedAt,
+      createdAt: pausedAt,
+      updatedAt: pausedAt,
+    });
+    state.tasks = [task, ...normalizeTasks(state.tasks)];
+  }
+
+  if (!task) {
+    showToast("Taskを保留できませんでした。");
+    return;
+  }
+
+  clearActiveSessionRuntime();
+  closePiP();
+  ui.selectedTaskId = task.id;
+  state.meta.currentView = "tasks";
+  saveState();
+  render();
+  if (screenFrame) {
+    screenFrame.scrollTop = 0;
+  }
+  showToast(`残り ${formatTaskRemaining(remainingSeconds)} をTaskに保留しました。`);
+}
+
 function beginSession(planKey) {
   const plan = state.plans[planKey];
   if (!plan) {
@@ -5074,17 +5212,24 @@ function beginTaskSession(taskId) {
   }
 
   const minutes = normalizeTaskMinutes(task.minutes);
+  const pausedRemainingSeconds = getTaskPausedSeconds(task);
+  const durationSeconds = pausedRemainingSeconds || minutes * 60;
   const now = Date.now();
   state.activeSession = {
     type: "task",
     taskId: task.id,
     taskTitle: task.title,
-    minutes,
+    minutes: Math.max(1, Math.ceil(durationSeconds / 60)),
+    durationSeconds,
     startedAt: now,
-    endsAt: now + minutes * 60 * 1000,
+    endsAt: now + durationSeconds * 1000,
     departures: 0,
   };
-  updateTask(task.id, () => ({ lastStartedAt: new Date(now).toISOString() }));
+  updateTask(task.id, () => ({
+    lastStartedAt: new Date(now).toISOString(),
+    pausedRemainingSeconds: null,
+    pausedAt: null,
+  }));
   ui.sessionOpen = true;
   ui.finishDraft = null;
   ui.showAbortConfirm = false;
@@ -5094,7 +5239,9 @@ function beginTaskSession(taskId) {
   syncDeviceAppLock();
   saveState();
   startSessionTicker();
-  showToast(`${minutes}分Taskを開始しました。`);
+  showToast(pausedRemainingSeconds
+    ? `残り ${formatTaskRemaining(durationSeconds)} から再開しました。`
+    : `${minutes}分Taskを開始しました。`);
 }
 
 function completeTaskSession() {
@@ -5106,6 +5253,8 @@ function completeTaskSession() {
   updateTask(session.taskId, () => ({
     status: "done",
     completedAt: new Date().toISOString(),
+    pausedRemainingSeconds: null,
+    pausedAt: null,
   }));
   state.activeSession = null;
   ui.sessionOpen = false;
