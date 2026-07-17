@@ -48,7 +48,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260717a 続きから再開";
+const APP_BUILD = "20260718a 開始元へ戻る";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -5138,9 +5138,10 @@ function holdActiveSession() {
     return;
   }
 
+  const startedFromTask = isTaskSession(session);
   const pausedAt = new Date().toISOString();
   let task = null;
-  if (isTaskSession(session)) {
+  if (startedFromTask) {
     task = updateTask(session.taskId, () => ({
       status: "active",
       completedAt: null,
@@ -5171,7 +5172,7 @@ function holdActiveSession() {
   clearActiveSessionRuntime();
   closePiP();
   ui.selectedTaskId = task.id;
-  state.meta.currentView = "tasks";
+  state.meta.currentView = startedFromTask ? "tasks" : "today";
   saveState();
   render();
   if (screenFrame) {
