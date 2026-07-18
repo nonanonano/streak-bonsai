@@ -5473,6 +5473,7 @@ function probeTimerVideo() {
   }, { once: true });
   probe.addEventListener("error", () => {
     _timerVideoState = "missing";
+    if (ui.sessionOpen) render();
   }, { once: true });
   probe.src = "./timer.mp4";
 }
@@ -5598,9 +5599,9 @@ function renderFocusTimerVideo(progressRatio = 0) {
 }
 
 function renderFocusTimerVisual(progressRatio = 0) {
-  return _timerVideoState === "available"
-    ? renderFocusTimerVideo(progressRatio)
-    : renderFocusSandClock(progressRatio);
+  return _timerVideoState === "missing"
+    ? renderFocusSandClock(progressRatio)
+    : renderFocusTimerVideo(progressRatio);
 }
 
 function updateFocusTimerVisual(remainingMs = null) {
