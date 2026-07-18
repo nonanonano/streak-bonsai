@@ -51,11 +51,15 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260718e 審査準備";
+const APP_BUILD = "20260719d 空き時間プレビュー";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
 const TASK_DEFAULT_MINUTES = 5;
+const MAX_AVAILABILITY_SLOTS = 8;
+const DEFAULT_AVAILABILITY_SLOTS = [
+  { id: "availability-evening", start: "20:00", end: "21:00" },
+];
 const TASK_QUADRANT_DEFAULT = "inbox";
 const TASK_QUADRANTS = [
   {
@@ -230,6 +234,11 @@ let ui = {
   taskSubtaskDrafts: {},
   taskEditRenderTimer: null,
   selectedTaskId: null,
+  todayPlannerOpen: true,
+  planPointerDrag: null,
+  availabilityDraft: null,
+  availabilityMode: "default",
+  availabilityReturnView: "setup",
   focusLockHelp: null,
   pendingFocusStart: null,
   sessionOpen: false,
@@ -501,18 +510,36 @@ function normalizeTask(task = {}) {
     && rawPausedRemainingSeconds > 0
       ? Math.max(1, Math.min(240 * 60, Math.ceil(rawPausedRemainingSeconds)))
       : null;
+  const minutes = normalizeTaskMinutes(task.minutes);
+  const completedMinutes = Math.max(
+    0,
+    Math.min(minutes, Math.round(Number(task.completedMinutes) || 0)),
+  );
+  const accumulatedSeconds = Math.max(0, Number(task.accumulatedSeconds) || 0);
+  const remainingMinutes = Math.max(1, minutes - completedMinutes);
+  const pausedSegmentMinutes = pausedRemainingSeconds
+    ? Math.max(
+        1,
+        Math.min(
+          remainingMinutes,
+          Math.round(Number(task.pausedSegmentMinutes))
+            || Math.ceil((pausedRemainingSeconds + accumulatedSeconds) / 60),
+        ),
+      )
+    : null;
 
   return {
     id: task.id || createTaskId(),
     title: title || "無題のTask",
-    minutes: normalizeTaskMinutes(task.minutes),
+    minutes,
+    completedMinutes,
     status,
     quadrant: normalizeTaskQuadrant(task.quadrant),
     priority: task.priority !== null && task.priority !== "" && Number.isFinite(Number(task.priority)) ? Number(task.priority) : null,
     plannedDate: /^\d{4}-\d{2}-\d{2}$/.test(String(task.plannedDate || "")) ? String(task.plannedDate) : "",
     sourceGoalId: String(task.sourceGoalId || ""),
     sourceGoalPlanKey: String(task.sourceGoalPlanKey || ""),
-    accumulatedSeconds: Math.max(0, Number(task.accumulatedSeconds) || 0),
+    accumulatedSeconds,
     plannedSeconds: Math.max(1, Number(task.plannedSeconds) || normalizeTaskMinutes(task.minutes) * 60),
     createdAt: task.createdAt || now,
     updatedAt: task.updatedAt || task.createdAt || now,
@@ -520,7 +547,9 @@ function normalizeTask(task = {}) {
     shelvedAt: task.shelvedAt || null,
     lastStartedAt: task.lastStartedAt || null,
     pausedRemainingSeconds,
+    pausedSegmentMinutes,
     pausedAt: pausedRemainingSeconds ? (task.pausedAt || now) : null,
+    pausedAllocationId: pausedRemainingSeconds ? String(task.pausedAllocationId || "") : "",
     subtasks: normalizeTaskSubtasks(task.subtasks),
   };
 }
@@ -645,17 +674,142 @@ function clearGoalContinuation(goalId) {
   return current;
 }
 
+function createAvailabilitySlotId(prefix = "availability") {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function createPlanAllocationId() {
+  return `allocation-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function clockTimeToMinutes(value) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value || "").trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+  return hours * 60 + minutes;
+}
+
+function minutesToClockTime(value) {
+  const minutes = Math.max(0, Math.min(1439, Math.round(Number(value) || 0)));
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function legacyCapacitySlots(capacityValue) {
+  const capacity = Number.isFinite(Number(capacityValue))
+    ? Math.max(15, Math.min(480, Math.round(Number(capacityValue) / 5) * 5))
+    : 60;
+  const endMinutes = 21 * 60;
+  return [{
+    id: "availability-evening",
+    start: minutesToClockTime(endMinutes - capacity),
+    end: minutesToClockTime(endMinutes),
+  }];
+}
+
+function normalizeAvailabilitySlot(slot = {}, index = 0) {
+  const startMinutes = clockTimeToMinutes(slot.start);
+  const endMinutes = clockTimeToMinutes(slot.end);
+  if (startMinutes === null || endMinutes === null || endMinutes - startMinutes < 5) {
+    return null;
+  }
+  return {
+    id: String(slot.id || createAvailabilitySlotId(`availability-${index + 1}`)),
+    start: minutesToClockTime(startMinutes),
+    end: minutesToClockTime(endMinutes),
+  };
+}
+
+function normalizeAvailabilitySlots(slots, fallbackCapacity = 60) {
+  const candidates = Array.isArray(slots) && slots.length
+    ? slots
+    : legacyCapacitySlots(fallbackCapacity);
+  const normalized = candidates
+    .slice(0, MAX_AVAILABILITY_SLOTS)
+    .map(normalizeAvailabilitySlot)
+    .filter(Boolean)
+    .sort((left, right) => clockTimeToMinutes(left.start) - clockTimeToMinutes(right.start));
+  const result = [];
+
+  normalized.forEach((slot) => {
+    const previous = result[result.length - 1];
+    const rawStart = clockTimeToMinutes(slot.start);
+    const end = clockTimeToMinutes(slot.end);
+    const start = previous
+      ? Math.max(rawStart, clockTimeToMinutes(previous.end))
+      : rawStart;
+    if (end - start < 5) return;
+    result.push({ ...slot, start: minutesToClockTime(start) });
+  });
+
+  return result.length ? result : cloneData(DEFAULT_AVAILABILITY_SLOTS);
+}
+
+function getAvailabilitySlotMinutes(slot) {
+  const start = clockTimeToMinutes(slot?.start);
+  const end = clockTimeToMinutes(slot?.end);
+  return start === null || end === null ? 0 : Math.max(0, end - start);
+}
+
+function getAvailabilityMinutes(slots) {
+  return normalizeAvailabilitySlots(slots)
+    .reduce((sum, slot) => sum + getAvailabilitySlotMinutes(slot), 0);
+}
+
+function normalizePlanAllocations(allocations, slots) {
+  const slotMap = new Map((slots || []).map((slot) => [slot.id, slot]));
+  const usedBySlot = new Map();
+  const now = new Date().toISOString();
+
+  return (Array.isArray(allocations) ? allocations : []).reduce((result, allocation) => {
+    const slot = slotMap.get(String(allocation?.slotId || ""));
+    const workId = String(allocation?.workId || "");
+    if (!slot || !workId) return result;
+    const used = usedBySlot.get(slot.id) || 0;
+    const available = Math.max(0, getAvailabilitySlotMinutes(slot) - used);
+    const minutes = Math.min(available, Math.max(0, Math.round(Number(allocation.minutes) || 0)));
+    if (minutes < 1) return result;
+    usedBySlot.set(slot.id, used + minutes);
+    result.push({
+      id: String(allocation.id || createPlanAllocationId()),
+      workId,
+      slotId: slot.id,
+      minutes,
+      createdAt: allocation.createdAt || now,
+      completedAt: allocation.completedAt || null,
+    });
+    return result;
+  }, []);
+}
+
 function normalizeDailyPlan(plan = {}) {
   const today = toISODate(new Date());
-  const capacity = Number(plan.capacityMinutes);
+  const defaultSlots = normalizeAvailabilitySlots(
+    plan.defaultSlots,
+    plan.capacityMinutes,
+  );
+  const isToday = String(plan.date || "") === today;
+  const slots = normalizeAvailabilitySlots(
+    isToday && Array.isArray(plan.slots) ? plan.slots : defaultSlots,
+    getAvailabilityMinutes(defaultSlots),
+  );
+
   return {
     date: today,
-    capacityMinutes: Number.isFinite(capacity) ? Math.max(15, Math.min(480, Math.round(capacity / 5) * 5)) : 60,
+    capacityMinutes: getAvailabilityMinutes(slots),
+    defaultSlots,
+    slots,
+    allocations: normalizePlanAllocations(isToday ? plan.allocations : [], slots),
   };
 }
 
 function ensureDailyPlan() {
   state.dailyPlan = normalizeDailyPlan(state.dailyPlan);
+  reconcileDailyPlanAllocations(state.dailyPlan);
+  state.dailyPlan.capacityMinutes = getAvailabilityMinutes(state.dailyPlan.slots);
   return state.dailyPlan;
 }
 
@@ -696,6 +850,9 @@ function normalizeGoalQuadrant(value) {
 }
 
 function workItemPriority(item, fallback = 9999) {
+  if (item?.priority === null || item?.priority === undefined || item?.priority === "") {
+    return fallback;
+  }
   const value = Number(item?.priority);
   return Number.isFinite(value) ? value : fallback;
 }
@@ -745,6 +902,277 @@ function getActiveWorkItems() {
   const goals = listGoals()
     .map(goalToWorkItem);
   return [...goals, ...tasks].sort(compareWorkItems);
+}
+
+function getTaskRemainingMinutes(task) {
+  const normalized = normalizeTask(task);
+  return Math.max(0, normalized.minutes - normalized.completedMinutes);
+}
+
+function getTaskPausedSegmentMinutes(task) {
+  const normalized = normalizeTask(task);
+  if (!normalized.pausedRemainingSeconds) return 0;
+  return Math.min(
+    getTaskRemainingMinutes(normalized),
+    Math.max(1, Number(normalized.pausedSegmentMinutes) || 1),
+  );
+}
+
+function getWorkItemPlannableMinutes(item) {
+  if (!item) return 0;
+  if (item.kind === "task") {
+    return item.status === "done" ? 0 : getTaskRemainingMinutes(item);
+  }
+  if (getGoalMissionStateForDate(item.goal).isClosed) {
+    return 0;
+  }
+  const continuation = getGoalContinuation(item.sourceId);
+  return continuation
+    ? Math.max(1, Math.ceil(continuation.remainingSeconds / 60))
+    : Math.max(1, Number(item.minutes) || getGoalDurationMinutes(item.goal));
+}
+
+function getDailyPlanningItems() {
+  const goalsById = new Map();
+  listGoals().forEach((goal, index) => {
+    if (isGoalScheduledForDate(goal) || getGoalContinuation(goal.id)) {
+      goalsById.set(goal.id, goalToWorkItem(goal, index));
+    }
+  });
+  const tasks = normalizeTasks(state.tasks)
+    .filter((task) => task.status !== "shelved" && isTaskPlannedToday(task))
+    .map(taskToWorkItem);
+  return [...goalsById.values(), ...tasks].sort(compareWorkItems);
+}
+
+function getPlanAllocationsForWork(plan, workId, { includeCompleted = true } = {}) {
+  return (plan?.allocations || []).filter((allocation) => (
+    allocation.workId === workId
+    && (includeCompleted || !allocation.completedAt)
+  ));
+}
+
+function getPlanSlotUsedMinutes(plan, slotId) {
+  return (plan?.allocations || [])
+    .filter((allocation) => allocation.slotId === slotId)
+    .reduce((sum, allocation) => sum + allocation.minutes, 0);
+}
+
+function appendPlanAllocation(plan, workId, slotId, minutes) {
+  const rounded = Math.max(0, Math.round(Number(minutes) || 0));
+  if (!plan || !workId || !slotId || rounded < 1) return null;
+  const allocation = {
+    id: createPlanAllocationId(),
+    workId,
+    slotId,
+    minutes: rounded,
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+  };
+  plan.allocations.push(allocation);
+  return allocation;
+}
+
+function allocateWorkItemIntoPlan(plan, item, requestedMinutes, startSlotId = "") {
+  const minutes = Math.max(0, Math.round(Number(requestedMinutes) || 0));
+  if (!plan || !item || minutes < 1) {
+    return { allocatedMinutes: 0, remainingMinutes: minutes };
+  }
+  const startIndex = Math.max(0, plan.slots.findIndex((slot) => slot.id === startSlotId));
+  const slots = plan.slots.slice(startIndex);
+  let remaining = minutes;
+  let allocatedMinutes = 0;
+
+  if (item.kind !== "task") {
+    const target = slots.find((slot) => (
+      getAvailabilitySlotMinutes(slot) - getPlanSlotUsedMinutes(plan, slot.id) >= remaining
+    ));
+    if (target) {
+      appendPlanAllocation(plan, item.id, target.id, remaining);
+      allocatedMinutes = remaining;
+      remaining = 0;
+    }
+    return { allocatedMinutes, remainingMinutes: remaining };
+  }
+
+  let allocationSlots = slots;
+  const pausedSegmentMinutes = getTaskPausedSegmentMinutes(item);
+  if (pausedSegmentMinutes > 0) {
+    const segmentMinutes = Math.min(remaining, pausedSegmentMinutes);
+    const targetIndex = slots.findIndex((slot) => (
+      getAvailabilitySlotMinutes(slot) - getPlanSlotUsedMinutes(plan, slot.id) >= segmentMinutes
+    ));
+    if (targetIndex < 0) {
+      return { allocatedMinutes, remainingMinutes: remaining };
+    }
+    appendPlanAllocation(plan, item.id, slots[targetIndex].id, segmentMinutes);
+    allocatedMinutes += segmentMinutes;
+    remaining -= segmentMinutes;
+    allocationSlots = slots.slice(targetIndex);
+  }
+
+  allocationSlots.forEach((slot) => {
+    if (remaining <= 0) return;
+    const available = Math.max(
+      0,
+      getAvailabilitySlotMinutes(slot) - getPlanSlotUsedMinutes(plan, slot.id),
+    );
+    const take = Math.min(remaining, available);
+    if (take < 1) return;
+    appendPlanAllocation(plan, item.id, slot.id, take);
+    allocatedMinutes += take;
+    remaining -= take;
+  });
+
+  return { allocatedMinutes, remainingMinutes: remaining };
+}
+
+function trimPendingWorkAllocations(plan, workId, targetMinutes) {
+  let remaining = Math.max(0, Math.round(Number(targetMinutes) || 0));
+  plan.allocations = (plan.allocations || []).reduce((result, allocation) => {
+    if (allocation.workId !== workId || allocation.completedAt) {
+      result.push(allocation);
+      return result;
+    }
+    if (remaining <= 0) return result;
+    const minutes = Math.min(allocation.minutes, remaining);
+    result.push({ ...allocation, minutes });
+    remaining -= minutes;
+    return result;
+  }, []);
+}
+
+function removePendingWorkAllocations(plan, workId) {
+  plan.allocations = (plan.allocations || []).filter((allocation) => (
+    allocation.workId !== workId || allocation.completedAt
+  ));
+}
+
+function reconcileDailyPlanAllocations(plan) {
+  if (!plan || !Array.isArray(plan.slots)) return plan;
+  const planningItems = getDailyPlanningItems();
+  const itemById = new Map(planningItems.map((item) => [item.id, item]));
+  plan.allocations = normalizePlanAllocations(plan.allocations, plan.slots)
+    .filter((allocation) => itemById.has(allocation.workId));
+
+  planningItems.forEach((item) => {
+    const outstanding = getWorkItemPlannableMinutes(item);
+    let pending = getPlanAllocationsForWork(plan, item.id, { includeCompleted: false });
+    const pausedSegmentMinutes = item.kind === "task" ? getTaskPausedSegmentMinutes(item) : 0;
+    if (pausedSegmentMinutes > 0 && pending.length && pending[0].minutes !== pausedSegmentMinutes) {
+      const resumeSlotId = pending[0].slotId;
+      removePendingWorkAllocations(plan, item.id);
+      allocateWorkItemIntoPlan(plan, item, outstanding, resumeSlotId);
+      pending = getPlanAllocationsForWork(plan, item.id, { includeCompleted: false });
+    }
+    const pendingMinutes = pending.reduce((sum, allocation) => sum + allocation.minutes, 0);
+    if (pendingMinutes > outstanding) {
+      trimPendingWorkAllocations(plan, item.id, outstanding);
+    }
+    const nextPendingMinutes = getPlanAllocationsForWork(plan, item.id, { includeCompleted: false })
+      .reduce((sum, allocation) => sum + allocation.minutes, 0);
+    const missing = Math.max(0, outstanding - nextPendingMinutes);
+    if (missing > 0) {
+      allocateWorkItemIntoPlan(plan, item, missing);
+    }
+  });
+
+  return plan;
+}
+
+function planWorkItemToday(workId, startSlotId = "") {
+  const item = getWorkItemById(workId);
+  if (!item) return null;
+  if (item.kind === "task" && !isTaskPlannedToday(item)) {
+    updateTask(item.sourceId, () => ({ plannedDate: toISODate(new Date()) }));
+  }
+  const refreshedItem = getWorkItemById(workId);
+  const plan = ensureDailyPlan();
+  removePendingWorkAllocations(plan, workId);
+  const result = allocateWorkItemIntoPlan(
+    plan,
+    refreshedItem,
+    getWorkItemPlannableMinutes(refreshedItem),
+    startSlotId,
+  );
+  plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
+  return { item: refreshedItem, ...result };
+}
+
+function removeWorkItemFromDailyPlan(workId) {
+  const plan = ensureDailyPlan();
+  plan.allocations = plan.allocations.filter((allocation) => allocation.workId !== workId);
+}
+
+function markPlanAllocationCompleted(allocationId) {
+  const plan = ensureDailyPlan();
+  let completed = null;
+  plan.allocations = plan.allocations.map((allocation) => {
+    if (allocation.id !== allocationId) return allocation;
+    completed = { ...allocation, completedAt: allocation.completedAt || new Date().toISOString() };
+    return completed;
+  });
+  return completed;
+}
+
+function getTodayPlanningOverflow(plan = ensureDailyPlan()) {
+  return getDailyPlanningItems().map((item) => {
+    const pendingMinutes = getPlanAllocationsForWork(plan, item.id, { includeCompleted: false })
+      .reduce((sum, allocation) => sum + allocation.minutes, 0);
+    return {
+      item,
+      minutes: Math.max(0, getWorkItemPlannableMinutes(item) - pendingMinutes),
+    };
+  }).filter((entry) => entry.minutes > 0);
+}
+
+function getTodayPlanStats(plan = ensureDailyPlan()) {
+  const capacityMinutes = getAvailabilityMinutes(plan.slots);
+  const allocatedMinutes = (plan.allocations || [])
+    .reduce((sum, allocation) => sum + allocation.minutes, 0);
+  const overflowMinutes = getTodayPlanningOverflow(plan)
+    .reduce((sum, entry) => sum + entry.minutes, 0);
+  return {
+    capacityMinutes,
+    allocatedMinutes,
+    freeMinutes: Math.max(0, capacityMinutes - allocatedMinutes),
+    overflowMinutes,
+  };
+}
+
+function autoArrangeTodayPlan() {
+  const plan = ensureDailyPlan();
+  plan.allocations = plan.allocations.filter((allocation) => allocation.completedAt);
+  getDailyPlanningItems().forEach((item) => {
+    const minutes = getWorkItemPlannableMinutes(item);
+    if (minutes > 0) {
+      allocateWorkItemIntoPlan(plan, item, minutes);
+    }
+  });
+  plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
+  return getTodayPlanStats(plan);
+}
+
+function buildAvailabilityDraft(mode = "default") {
+  const plan = ensureDailyPlan();
+  const slots = mode === "today" ? plan.slots : plan.defaultSlots;
+  return cloneData(normalizeAvailabilitySlots(slots, plan.capacityMinutes));
+}
+
+function createNextAvailabilitySlot(slots) {
+  const normalized = normalizeAvailabilitySlots(slots);
+  const last = normalized[normalized.length - 1];
+  const lastEnd = clockTimeToMinutes(last?.end);
+  let start = lastEnd === null ? 20 * 60 : lastEnd;
+  if (start > 22 * 60 + 30) {
+    start = 7 * 60;
+  }
+  const end = Math.min(23 * 60 + 59, start + 30);
+  return {
+    id: createAvailabilitySlotId(),
+    start: minutesToClockTime(start),
+    end: minutesToClockTime(end),
+  };
 }
 
 function getWorkItemById(workId) {
@@ -1162,7 +1590,7 @@ function startPendingFocusSession(pending = ui.pendingFocusStart) {
   }
 
   if (pending.type === "task") {
-    beginTaskSession(pending.taskId || "");
+    beginTaskSession(pending.taskId || "", pending.allocationId || "");
     render();
     return;
   }
@@ -1172,7 +1600,7 @@ function startPendingFocusSession(pending = ui.pendingFocusStart) {
   }
 
   const planKey = pending.planKey || ui.selectedSessionPlan;
-  const started = beginSession(planKey);
+  const started = beginSession(planKey, pending.allocationId || "");
   if (!started) return;
   render();
   showToast(started.isResume
@@ -1503,7 +1931,6 @@ function syncActiveGoalRecord() {
 
 function listGoals() {
   ensureGoalCollection();
-  ensureDailyPlan();
   return [...state.goals].filter(g => !g.archived).sort((left, right) => {
     if (left.id === state.meta.activeGoalId) return -1;
     if (right.id === state.meta.activeGoalId) return 1;
@@ -1576,6 +2003,7 @@ function init() {
     state = buildSeedState();
   }
   ensureGoalCollection();
+  ensureDailyPlan();
   if (state.meta.demoMode && state.meta.currentView === "setup") {
     state.meta.currentView = "today";
     saveNavState();
@@ -1834,12 +2262,108 @@ function handleClick(event) {
     return;
   }
 
-  if (action === "adjust-today-capacity") {
-    const plan = ensureDailyPlan();
-    const delta = Number(target.dataset.delta || 0);
-    plan.capacityMinutes = Math.max(15, Math.min(480, plan.capacityMinutes + delta));
+  if (action === "toggle-today-planner") {
+    ui.todayPlannerOpen = !ui.todayPlannerOpen;
+    renderWithTransition();
+    return;
+  }
+
+  if (action === "auto-plan-today") {
+    const stats = autoArrangeTodayPlan();
     saveState();
+    renderWithTransition();
+    showToast(stats.overflowMinutes > 0
+      ? `空き枠に入り切らない ${stats.overflowMinutes}分は残してあります。`
+      : "空き時間に沿って並べました。");
+    return;
+  }
+
+  if (action === "plan-work-today") {
+    const result = planWorkItemToday(target.dataset.workId || "", target.dataset.slotId || "");
+    if (!result) return;
+    saveState();
+    renderWithTransition();
+    showToast(result.remainingMinutes > 0
+      ? `${result.allocatedMinutes}分を入れ、残り${result.remainingMinutes}分は未配置にしました。`
+      : "空き時間に入れました。");
+    return;
+  }
+
+  if (action === "open-availability-settings" || action === "open-today-availability" || action === "adjust-today-capacity") {
+    ui.availabilityMode = action === "open-availability-settings" ? "default" : "today";
+    ui.availabilityReturnView = ui.availabilityMode === "today" ? "today" : "setup";
+    ui.availabilityDraft = buildAvailabilityDraft(ui.availabilityMode);
+    ui.setupSection = "availability";
+    state.meta.currentView = "setup";
+    renderWithTransition();
+    if (screenFrame) screenFrame.scrollTop = 0;
+    return;
+  }
+
+  if (action === "add-availability-slot") {
+    const draft = Array.isArray(ui.availabilityDraft) ? ui.availabilityDraft : buildAvailabilityDraft(ui.availabilityMode);
+    if (draft.length >= MAX_AVAILABILITY_SLOTS) {
+      showToast(`空き枠は${MAX_AVAILABILITY_SLOTS}個までです。`);
+      return;
+    }
+    ui.availabilityDraft = [...draft, createNextAvailabilitySlot(draft)];
     render();
+    return;
+  }
+
+  if (action === "remove-availability-slot") {
+    const slotId = target.dataset.slotId || "";
+    const draft = Array.isArray(ui.availabilityDraft) ? ui.availabilityDraft : [];
+    if (draft.length <= 1) {
+      showToast("空き枠は1つ以上残してください。");
+      return;
+    }
+    ui.availabilityDraft = draft.filter((slot) => slot.id !== slotId);
+    render();
+    return;
+  }
+
+  if (action === "cancel-availability-settings") {
+    ui.availabilityDraft = null;
+    if (ui.availabilityReturnView === "today") {
+      state.meta.currentView = "today";
+      ui.todayMode = "execution";
+      ui.todayPlannerOpen = true;
+    } else {
+      ui.setupSection = "home";
+    }
+    renderWithTransition();
+    return;
+  }
+
+  if (action === "save-availability-settings") {
+    const rawDraft = Array.isArray(ui.availabilityDraft) ? ui.availabilityDraft : [];
+    const validDraft = rawDraft.map(normalizeAvailabilitySlot).filter(Boolean);
+    if (!validDraft.length) {
+      showToast("開始と終了を5分以上あけて設定してください。");
+      return;
+    }
+    const slots = normalizeAvailabilitySlots(validDraft);
+    const plan = ensureDailyPlan();
+    const completedAllocations = plan.allocations.filter((allocation) => allocation.completedAt);
+    if (ui.availabilityMode === "default") {
+      plan.defaultSlots = cloneData(slots);
+    }
+    plan.slots = cloneData(slots);
+    plan.allocations = normalizePlanAllocations(completedAllocations, plan.slots);
+    reconcileDailyPlanAllocations(plan);
+    plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
+    ui.availabilityDraft = null;
+    if (ui.availabilityReturnView === "today") {
+      state.meta.currentView = "today";
+      ui.todayMode = "execution";
+      ui.todayPlannerOpen = true;
+    } else {
+      ui.setupSection = "home";
+    }
+    saveState();
+    renderWithTransition();
+    showToast(ui.availabilityMode === "default" ? "いつもの空き時間を保存しました。" : "今日の空き時間を更新しました。");
     return;
   }
 
@@ -1861,6 +2385,7 @@ function handleClick(event) {
       createdAt: now,
       updatedAt: now,
     }), ...normalizeTasks(state.tasks)];
+    ensureDailyPlan();
     resetTaskDraft();
     saveState();
     render();
@@ -1873,9 +2398,14 @@ function handleClick(event) {
     const task = getTaskById(taskId);
     if (!task) return;
     const addToToday = !isTaskPlannedToday(task);
-    updateTask(taskId, () => ({ plannedDate: addToToday ? toISODate(new Date()) : "" }));
+    if (addToToday) {
+      planWorkItemToday(taskId);
+    } else {
+      updateTask(taskId, () => ({ plannedDate: "" }));
+      removeWorkItemFromDailyPlan(taskId);
+    }
     saveState();
-    render();
+    renderWithTransition();
     showToast(addToToday ? "今日に入れました。" : "今日から外しました。");
     return;
   }
@@ -2245,6 +2775,7 @@ function handleClick(event) {
 
   if (action === "start-task-session") {
     const taskId = target.dataset.taskId || "";
+    const allocationId = target.dataset.allocationId || "";
     if (state.meta.currentView === "today" && ui.todayMode === "organize") {
       const task = getTaskById(taskId);
       if (task && !isTaskPlannedToday(task)) {
@@ -2258,7 +2789,7 @@ function handleClick(event) {
       showToast("開始は「今日」から行います。");
       return;
     }
-    const pending = { type: "task", taskId };
+    const pending = { type: "task", taskId, allocationId };
     requireDeviceAppLockBeforeStart(() => {
       startPendingFocusSession(pending);
     }, pending);
@@ -2319,13 +2850,17 @@ function handleClick(event) {
 
   if (action === "complete-task") {
     const taskId = target.dataset.taskId || "";
-    const task = updateTask(taskId, () => ({
+    const task = updateTask(taskId, (currentTask) => ({
       status: "done",
+      completedMinutes: currentTask.minutes,
       completedAt: new Date().toISOString(),
       pausedRemainingSeconds: null,
+      pausedSegmentMinutes: null,
       pausedAt: null,
+      pausedAllocationId: "",
     }));
     if (task) {
+      removeWorkItemFromDailyPlan(taskId);
       if (ui.selectedTaskId === taskId) {
         ui.selectedTaskId = null;
       }
@@ -2343,6 +2878,7 @@ function handleClick(event) {
       shelvedAt: new Date().toISOString(),
     }));
     if (task) {
+      removeWorkItemFromDailyPlan(taskId);
       if (ui.selectedTaskId === taskId) {
         ui.selectedTaskId = null;
       }
@@ -2369,6 +2905,7 @@ function handleClick(event) {
   if (action === "delete-task") {
     const taskId = target.dataset.taskId || "";
     const before = normalizeTasks(state.tasks).length;
+    removeWorkItemFromDailyPlan(taskId);
     state.tasks = normalizeTasks(state.tasks).filter((task) => task.id !== taskId);
     if (state.tasks.length !== before) {
       if (ui.selectedTaskId === taskId) {
@@ -2389,6 +2926,7 @@ function handleClick(event) {
 
   if (action === "start-goal-session") {
     const goalId = target.dataset.goalId || "";
+    const allocationId = target.dataset.allocationId || "";
     const goal = listGoals().find((item) => item.id === goalId);
     if (goal && getGoalMissionStateForDate(goal).isClosed) {
       ui.reviewGoalFilter = goal.id;
@@ -2412,7 +2950,7 @@ function handleClick(event) {
     }
     const planKey = getLaunchPlan(state);
     ui.selectedSessionPlan = planKey;
-    const pending = { type: "goal", goalId: goalId || state.meta.activeGoalId, planKey };
+    const pending = { type: "goal", goalId: goalId || state.meta.activeGoalId, planKey, allocationId };
     requireDeviceAppLockBeforeStart(() => {
       startPendingFocusSession(pending);
     }, pending);
@@ -2470,9 +3008,13 @@ function handleClick(event) {
   if (action === "complete-session") {
     if (isTaskSession()) {
       const completesLegacyGoal = Boolean(state.activeSession?.sourceGoalId);
-      completeTaskSession();
+      const result = completeTaskSession();
       render();
-      showToast(completesLegacyGoal ? "習慣・目標を完了にしました。" : "Taskを完了にしました。");
+      showToast(completesLegacyGoal
+        ? "習慣・目標を完了にしました。"
+        : result?.taskCompleted
+          ? "Taskを完了にしました。"
+          : "この時間枠を完了しました。");
       return;
     }
     openFinishDraft(state.activeSession ? state.activeSession.planKey : ui.selectedSessionPlan);
@@ -2640,6 +3182,18 @@ function handleClick(event) {
 function handleInput(event) {
   const target = event.target;
 
+  if (target.matches("[data-availability-field]")) {
+    const slotId = target.dataset.slotId || "";
+    const field = target.dataset.availabilityField;
+    if (!["start", "end"].includes(field) || !Array.isArray(ui.availabilityDraft)) {
+      return;
+    }
+    ui.availabilityDraft = ui.availabilityDraft.map((slot) => (
+      slot.id === slotId ? { ...slot, [field]: target.value } : slot
+    ));
+    return;
+  }
+
   if (state.meta.currentView === "setup") {
     ensureSetupDraft();
 
@@ -2741,6 +3295,11 @@ function handleInput(event) {
 
 function handleChange(event) {
   const target = event.target;
+
+  if (target.matches("[data-availability-field]")) {
+    render();
+    return;
+  }
 
   if (target.matches("[data-review-goal-filter]")) {
     ui.reviewGoalFilter = target.value || "all";
@@ -2971,7 +3530,136 @@ function handleTaskDragEnd() {
   clearTaskDragState();
 }
 
+function getPlanPointerDragCard(target) {
+  const handle = target?.closest?.("[data-plan-drag-handle]");
+  return handle ? handle.closest("[data-plan-work-id]") : null;
+}
+
+function clearPlanPointerDragState() {
+  document.querySelectorAll(".day-plan-slot__track.is-drag-over, [data-plan-work-id].is-dragging")
+    .forEach((element) => element.classList.remove("is-drag-over", "is-dragging"));
+  ui.planPointerDrag?.previewEl?.remove();
+  document.querySelector(".day-plan-drag-preview")?.remove();
+  document.body.classList.remove("is-day-plan-dragging");
+}
+
+function createPlanDragPreview(source, event) {
+  const rect = source.getBoundingClientRect();
+  const title = source.querySelector(".day-plan-segment__title, strong")?.textContent?.trim() || "Task";
+  const preview = document.createElement("div");
+  const width = Math.min(Math.max(rect.width, 156), 280);
+  preview.className = "day-plan-drag-preview";
+  preview.style.width = `${width}px`;
+  preview.innerHTML = `
+    ${renderPlanDragGrip()}
+    <strong>${escapeHtml(title)}</strong>
+  `;
+  document.body.appendChild(preview);
+  ui.planPointerDrag.previewEl = preview;
+  ui.planPointerDrag.offsetX = Math.min(Math.max(event.clientX - rect.left, 18), width - 18);
+  ui.planPointerDrag.offsetY = Math.min(Math.max(event.clientY - rect.top, 12), rect.height - 8);
+  updatePlanDragPreview(event.clientX, event.clientY);
+}
+
+function updatePlanDragPreview(clientX, clientY) {
+  const drag = ui.planPointerDrag;
+  if (!drag?.previewEl) return;
+  const x = Math.round(clientX - drag.offsetX);
+  const y = Math.round(clientY - drag.offsetY);
+  drag.previewEl.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(-1deg)`;
+}
+
+function setPlanPointerDropZone(clientX, clientY) {
+  const drag = ui.planPointerDrag;
+  if (!drag) return null;
+  const target = document.elementFromPoint(clientX, clientY);
+  const zone = target?.closest?.("[data-plan-slot-id]") || null;
+  document.querySelectorAll(".day-plan-slot__track.is-drag-over").forEach((element) => {
+    if (element !== zone) element.classList.remove("is-drag-over");
+  });
+  if (!zone) {
+    drag.overSlotId = "";
+    return null;
+  }
+  zone.classList.add("is-drag-over");
+  drag.overSlotId = zone.dataset.planSlotId || "";
+  return zone;
+}
+
+function startPlanPointerDrag(event) {
+  if (state.activeSession || !event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) {
+    return false;
+  }
+  const source = getPlanPointerDragCard(event.target);
+  if (!source) return false;
+
+  event.preventDefault();
+  event.stopPropagation();
+  ui.planPointerDrag = {
+    workId: source.dataset.planWorkId || "",
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    hasMoved: false,
+    overSlotId: "",
+    sourceEl: source,
+    previewEl: null,
+    offsetX: 18,
+    offsetY: 16,
+  };
+  source.setPointerCapture?.(event.pointerId);
+  source.classList.add("is-dragging");
+  document.body.classList.add("is-day-plan-dragging");
+  createPlanDragPreview(source, event);
+  return true;
+}
+
+function movePlanPointerDrag(event) {
+  const drag = ui.planPointerDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return false;
+  const deltaX = event.clientX - drag.startX;
+  const deltaY = event.clientY - drag.startY;
+  if (Math.hypot(deltaX, deltaY) >= 3) {
+    drag.hasMoved = true;
+  }
+  event.preventDefault();
+  updatePlanDragPreview(event.clientX, event.clientY);
+  if (drag.hasMoved) {
+    autoScrollTaskDrag(event.clientY);
+    setPlanPointerDropZone(event.clientX, event.clientY);
+  }
+  return true;
+}
+
+function endPlanPointerDrag(event) {
+  const drag = ui.planPointerDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return false;
+  const wasCancelled = event.type === "pointercancel";
+  const slotId = drag.hasMoved && !wasCancelled
+    ? drag.overSlotId || setPlanPointerDropZone(event.clientX, event.clientY)?.dataset.planSlotId || ""
+    : "";
+  drag.sourceEl?.releasePointerCapture?.(event.pointerId);
+  ui.planPointerDrag = null;
+  ui.taskSuppressClickUntil = Date.now() + 350;
+  clearPlanPointerDragState();
+  event.preventDefault();
+  if (wasCancelled || !drag.hasMoved || !slotId || state.activeSession) return true;
+
+  const result = planWorkItemToday(drag.workId, slotId);
+  if (result) {
+    saveState();
+    renderWithTransition();
+    showToast(result.remainingMinutes > 0
+      ? `入る分だけ配置し、残り${result.remainingMinutes}分を残しました。`
+      : "空き時間に移しました。");
+  }
+  return true;
+}
+
 function handleTaskPointerDown(event) {
+  if (startPlanPointerDrag(event)) {
+    return;
+  }
   if (state.activeSession || !event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) {
     return;
   }
@@ -3040,6 +3728,9 @@ function autoScrollTaskDrag(clientY) {
 }
 
 function handleTaskPointerMove(event) {
+  if (movePlanPointerDrag(event)) {
+    return;
+  }
   const drag = ui.taskPointerDrag;
   if (!drag || drag.pointerId !== event.pointerId || state.activeSession) {
     return;
@@ -3063,6 +3754,9 @@ function handleTaskPointerMove(event) {
 }
 
 function handleTaskPointerEnd(event) {
+  if (endPlanPointerDrag(event)) {
+    return;
+  }
   const drag = ui.taskPointerDrag;
   if (!drag || drag.pointerId !== event.pointerId) {
     return;
@@ -3742,6 +4436,7 @@ function renderActiveGoalContext(options = {}) {
 function renderSettingsIcon(iconKey) {
   const icons = {
     shield: '<path d="M12 3 5.5 5.6v5.7c0 4.2 2.7 7.8 6.5 9.2 3.8-1.4 6.5-5 6.5-9.2V5.6L12 3Z"></path><path d="m9.2 11.8 1.8 1.8 3.8-4"></path>',
+    clock: '<circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5l3.4 2.1"></path>',
     goal: '<circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3.2"></circle>',
     account: '<circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"></path>',
     document: '<path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v5h4M10 12h5M10 16h5"></path>',
@@ -3774,6 +4469,8 @@ function getAppShieldStatusCopy() {
 function renderSettingsHome() {
   const goals = listGoals().sort(compareGoalsByPrimaryWindow);
   const shieldCopy = getAppShieldStatusCopy();
+  const plan = ensureDailyPlan();
+  const defaultMinutes = getAvailabilityMinutes(plan.defaultSlots);
 
   return `
     <div class="settings-home">
@@ -3788,6 +4485,15 @@ function renderSettingsHome() {
             <span>使ってよいアプリを選ぶ</span>
           </span>
           <span class="settings-row__value is-${shieldCopy.tone}">${escapeHtml(shieldCopy.value)}</span>
+          <span class="settings-row__chevron">${renderSettingsIcon("chevron")}</span>
+        </button>
+        <button type="button" class="settings-row" data-action="open-availability-settings">
+          <span class="settings-row__icon">${renderSettingsIcon("clock")}</span>
+          <span class="settings-row__body">
+            <strong>いつもの空き時間</strong>
+            <span>Todayの時間枠</span>
+          </span>
+          <span class="settings-row__value">${escapeHtml(`${plan.defaultSlots.length}枠 · ${formatLoggedDuration(defaultMinutes * 60)}`)}</span>
           <span class="settings-row__chevron">${renderSettingsIcon("chevron")}</span>
         </button>
       </section>
@@ -3846,6 +4552,61 @@ function renderSettingsHome() {
       </section>
 
       ${renderAlbumSection()}
+    </div>
+  `;
+}
+
+function renderAvailabilitySettings() {
+  const mode = ui.availabilityMode === "today" ? "today" : "default";
+  const draft = Array.isArray(ui.availabilityDraft)
+    ? ui.availabilityDraft
+    : buildAvailabilityDraft(mode);
+  const validSlots = draft.map(normalizeAvailabilitySlot).filter(Boolean);
+  const totalMinutes = validSlots.reduce((sum, slot) => sum + getAvailabilitySlotMinutes(slot), 0);
+
+  return `
+    <div class="availability-settings">
+      <div class="goal-settings-detail__header">
+        <button type="button" class="goal-settings-back" data-action="cancel-availability-settings" aria-label="戻る">
+          ${renderSettingsIcon("back")}
+        </button>
+        <div>
+          <p>${mode === "today" ? "今日だけ" : "毎日の初期値"}</p>
+          <h2>${mode === "today" ? "今日の空き時間" : "いつもの空き時間"}</h2>
+        </div>
+      </div>
+
+      <section class="availability-editor">
+        <div class="availability-editor__summary">
+          <span>${escapeHtml(`${draft.length}枠`)}</span>
+          <strong>${escapeHtml(formatLoggedDuration(totalMinutes * 60))}</strong>
+        </div>
+        <div class="availability-editor__slots">
+          ${draft.map((slot, index) => `
+            <div class="availability-editor__slot">
+              <span class="availability-editor__index">${index + 1}</span>
+              <label>
+                <span class="sr-only">開始</span>
+                <input class="field__control" type="time" value="${escapeHtml(slot.start)}" data-availability-field="start" data-slot-id="${escapeHtml(slot.id)}" />
+              </label>
+              <span aria-hidden="true">–</span>
+              <label>
+                <span class="sr-only">終了</span>
+                <input class="field__control" type="time" value="${escapeHtml(slot.end)}" data-availability-field="end" data-slot-id="${escapeHtml(slot.id)}" />
+              </label>
+              <button type="button" data-action="remove-availability-slot" data-slot-id="${escapeHtml(slot.id)}" aria-label="${index + 1}番目の空き枠を削除">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"></path></svg>
+              </button>
+            </div>
+          `).join("")}
+        </div>
+        <button type="button" class="availability-editor__add" data-action="add-availability-slot">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          <span>空き枠を追加</span>
+        </button>
+      </section>
+
+      <button type="button" class="action-button action-button--primary goal-settings-save" data-action="save-availability-settings">保存する</button>
     </div>
   `;
 }
@@ -3927,6 +4688,13 @@ function renderGoalSettingsDetail(draft) {
 
 function renderSetupView() {
   ensureSetupDraft();
+  if (ui.setupSection === "availability") {
+    return `
+      <section class="screen screen--setup screen--settings">
+        ${renderAvailabilitySettings()}
+      </section>
+    `;
+  }
   const showHome = ui.setupSection === "home" && ui.setupMode !== "new_goal";
   ui.setupSection = showHome ? "home" : "detail";
 
@@ -3949,24 +4717,75 @@ function renderTodayView() {
   `;
 }
 
-function getTodayExecutionItems() {
-  const quadrantOrder = new Map(TASK_QUADRANTS.map((quadrant, index) => [quadrant.key, index]));
-  const activeTasks = normalizeTasks(state.tasks)
-    .filter((task) => task.status === "active" && (isTaskPlannedToday(task) || getTaskPausedSeconds(task) > 0))
-  const goalsById = new Map(listGoalsForToday().map((goal) => [goal.id, goal]));
-  listGoals().forEach((goal) => {
-    if (getGoalContinuation(goal.id)) {
-      goalsById.set(goal.id, goal);
-    }
-  });
-  const goals = [...goalsById.values()].map(goalToWorkItem);
-  const tasks = activeTasks.map(taskToWorkItem);
+function getTaskResumeAllocationId(plan, task) {
+  if (!task || getTaskPausedSeconds(task) <= 0) return "";
+  const pendingAllocations = getPlanAllocationsForWork(plan, task.id, { includeCompleted: false });
+  return pendingAllocations.find((allocation) => allocation.id === task.pausedAllocationId)?.id
+    || pendingAllocations[0]?.id
+    || "";
+}
 
-  return [...goals, ...tasks].sort((left, right) => {
+function getTodayExecutionItems() {
+  const plan = ensureDailyPlan();
+  const slotOrder = new Map(plan.slots.map((slot, index) => [slot.id, index]));
+  const allocationOrder = new Map(plan.allocations.map((allocation, index) => [allocation.id, index]));
+  const represented = new Set();
+  const items = plan.allocations
+    .filter((allocation) => !allocation.completedAt)
+    .map((allocation) => {
+      const item = getWorkItemById(allocation.workId);
+      if (!item || getWorkItemPlannableMinutes(item) <= 0) return null;
+      represented.add(item.id);
+      const segments = getPlanAllocationsForWork(plan, item.id);
+      const pausedSeconds = item.kind === "task" ? getTaskPausedSeconds(item) : 0;
+      const resumeAllocationId = pausedSeconds ? getTaskResumeAllocationId(plan, item) : "";
+      if (pausedSeconds && resumeAllocationId && allocation.id !== resumeAllocationId) return null;
+      const segmentIndex = Math.max(0, segments.findIndex((segment) => segment.id === allocation.id));
+      return {
+        ...item,
+        minutes: allocation.minutes,
+        allocationId: allocation.id,
+        pausedAllocationId: resumeAllocationId,
+        pausedRemainingSeconds: pausedSeconds || null,
+        slotId: allocation.slotId,
+        segmentIndex,
+        segmentCount: segments.length,
+      };
+    })
+    .filter(Boolean);
+
+  normalizeTasks(state.tasks)
+    .filter((task) => task.status === "active" && getTaskPausedSeconds(task) > 0 && !represented.has(task.id))
+    .forEach((task) => {
+      items.push({
+        ...taskToWorkItem(task),
+        minutes: Math.max(1, Math.ceil(getTaskPausedSeconds(task) / 60)),
+        allocationId: task.pausedAllocationId || "",
+        slotId: "",
+        segmentIndex: 0,
+        segmentCount: 1,
+      });
+    });
+  listGoals().forEach((goal) => {
+    const continuation = getGoalContinuation(goal.id);
+    const workId = goalWorkId(goal.id);
+    if (!continuation || represented.has(workId)) return;
+    items.push({
+      ...goalToWorkItem(goal),
+      minutes: Math.max(1, Math.ceil(continuation.remainingSeconds / 60)),
+      allocationId: "",
+      slotId: "",
+      segmentIndex: 0,
+      segmentCount: 1,
+    });
+  });
+
+  return items.sort((left, right) => {
     const pausedGap = Number(getTaskPausedSeconds(right) > 0) - Number(getTaskPausedSeconds(left) > 0);
     if (pausedGap !== 0) return pausedGap;
-    const quadrantGap = (quadrantOrder.get(left.quadrant) ?? 9) - (quadrantOrder.get(right.quadrant) ?? 9);
-    return quadrantGap || compareWorkItems(left, right);
+    const slotGap = (slotOrder.get(left.slotId) ?? -1) - (slotOrder.get(right.slotId) ?? -1);
+    if (slotGap !== 0) return slotGap;
+    return (allocationOrder.get(left.allocationId) ?? -1) - (allocationOrder.get(right.allocationId) ?? -1);
   });
 }
 
@@ -3981,47 +4800,19 @@ function getUnplannedTasks() {
 }
 
 function getTodayPlannedMinutes() {
-  const plannedTasks = normalizeTasks(state.tasks)
-    .filter((task) => isTaskPlannedToday(task) && task.status !== "shelved");
-  const goalMinutes = listGoals()
-    .filter((goal) => isGoalScheduledForDate(goal) || getGoalContinuation(goal.id))
-    .reduce((sum, goal) => {
-      if (isGoalScheduledForDate(goal)) {
-        return sum + getGoalDurationMinutes(goal);
-      }
-      const continuation = getGoalContinuation(goal.id);
-      return sum + Math.max(1, Math.ceil(Number(continuation?.remainingSeconds || 0) / 60));
-    }, 0);
-  const taskMinutes = plannedTasks
-    .reduce((sum, task) => sum + Math.max(1, Math.ceil(Number(task.plannedSeconds || task.minutes * 60) / 60)), 0);
-  return goalMinutes + taskMinutes;
+  return ensureDailyPlan().allocations
+    .reduce((sum, allocation) => sum + allocation.minutes, 0);
 }
 
 function renderTodayExecutionView() {
   const items = getTodayExecutionItems();
   const unplannedTasks = getUnplannedTasks();
   const plan = ensureDailyPlan();
-  const plannedMinutes = getTodayPlannedMinutes();
-  const remainingMinutes = plan.capacityMinutes - plannedMinutes;
-  const progress = Math.min(100, Math.round((plannedMinutes / Math.max(1, plan.capacityMinutes)) * 100));
-  const allDoneToday = !items.length && plannedMinutes > 0;
+  const allDoneToday = !items.length && plan.allocations.some((allocation) => allocation.completedAt);
 
   return `
     <div class="today-execution">
-      <section class="today-capacity ${remainingMinutes < 0 ? "is-over" : ""}">
-        <div class="today-capacity__head">
-          <div>
-            <span class="today-capacity__label">今日の枠</span>
-            <strong>${escapeHtml(`${plannedMinutes}/${plan.capacityMinutes}分`)}</strong>
-          </div>
-          <div class="today-capacity__stepper" aria-label="今日の枠を調整">
-            <button type="button" data-action="adjust-today-capacity" data-delta="-15" aria-label="15分減らす">−</button>
-            <button type="button" data-action="adjust-today-capacity" data-delta="15" aria-label="15分増やす">＋</button>
-          </div>
-        </div>
-        <div class="today-capacity__track" aria-hidden="true"><span style="width:${progress}%"></span></div>
-        <p>${remainingMinutes < 0 ? escapeHtml(`あと${Math.abs(remainingMinutes)}分外す`) : escapeHtml(`残り${remainingMinutes}分`)}</p>
-      </section>
+      ${renderTodayPlanner(plan, unplannedTasks)}
 
       <div class="today-work-list">
         ${items.length
@@ -4042,35 +4833,133 @@ function renderTodayExecutionView() {
         </label>
         <button type="button" data-action="add-today-task" aria-label="今日やることを追加">＋</button>
       </section>
-
-      ${renderTodayUnplannedTasks(unplannedTasks)}
     </div>
   `;
 }
 
-function renderTodayUnplannedTasks(tasks) {
-  if (!tasks.length) return "";
+function renderPlanDragGrip(label = "移動") {
+  return `
+    <span class="day-plan-grip" data-plan-drag-handle aria-label="${escapeHtml(label)}" role="img">
+      <svg viewBox="0 0 16 20" aria-hidden="true">
+        <circle cx="5" cy="4" r="1.3"></circle><circle cx="11" cy="4" r="1.3"></circle>
+        <circle cx="5" cy="10" r="1.3"></circle><circle cx="11" cy="10" r="1.3"></circle>
+        <circle cx="5" cy="16" r="1.3"></circle><circle cx="11" cy="16" r="1.3"></circle>
+      </svg>
+    </span>
+  `;
+}
+
+function renderTodayPlanSlot(slot, plan) {
+  const allocations = plan.allocations.filter((allocation) => allocation.slotId === slot.id);
+  const slotMinutes = getAvailabilitySlotMinutes(slot);
+  const usedMinutes = allocations.reduce((sum, allocation) => sum + allocation.minutes, 0);
+  const freeMinutes = Math.max(0, slotMinutes - usedMinutes);
 
   return `
-    <section class="today-unplanned" aria-label="まだ日を決めていないTask">
-      <div class="today-unplanned__head">
-        <div>
-          <span>未計画</span>
-          <strong>${escapeHtml(`${tasks.length}件`)}</strong>
-        </div>
-        <button type="button" data-action="set-today-mode" data-mode="organize">整理する</button>
+    <div class="day-plan-slot">
+      <div class="day-plan-slot__time">
+        <strong>${escapeHtml(slot.start)}</strong>
+        <span>${escapeHtml(slot.end)}</span>
       </div>
-      <div class="today-unplanned__list">
-        ${tasks.map((task) => `
-          <article style="--work-accent:${getQuadrantColor(task.quadrant)}">
-            <div>
-              <strong>${escapeHtml(task.title)}</strong>
-              <span>${escapeHtml(`${task.minutes}分`)}</span>
+      <div class="day-plan-slot__track${allocations.length ? "" : " is-empty"}" data-plan-slot-id="${escapeHtml(slot.id)}">
+        ${allocations.map((allocation) => {
+          const item = getWorkItemById(allocation.workId);
+          if (!item) return "";
+          const color = getQuadrantColor(item.quadrant);
+          const width = Math.max(7, (allocation.minutes / Math.max(1, slotMinutes)) * 100);
+          const segmentList = getPlanAllocationsForWork(plan, item.id);
+          const segmentIndex = Math.max(0, segmentList.findIndex((segment) => segment.id === allocation.id));
+          const splitLabel = segmentList.length > 1 ? ` ${segmentIndex + 1}/${segmentList.length}` : "";
+          return `
+            <div
+              class="day-plan-segment${allocation.completedAt ? " is-complete" : ""}"
+              style="--segment-color:${color};--segment-width:${width}%"
+              data-plan-work-id="${escapeHtml(item.id)}"
+            >
+              ${allocation.completedAt ? '<span class="day-plan-segment__check" aria-label="完了">✓</span>' : renderPlanDragGrip(`${item.title}を移動`)}
+              <span class="day-plan-segment__title">${escapeHtml(item.title)}</span>
+              <small>${escapeHtml(`${allocation.minutes}分${splitLabel}`)}</small>
             </div>
-            <button type="button" data-action="toggle-task-today" data-task-id="${escapeHtml(task.id)}">今日へ</button>
-          </article>
-        `).join("")}
+          `;
+        }).join("")}
+        ${freeMinutes > 0 ? `<div class="day-plan-slot__free" style="--free-width:${(freeMinutes / Math.max(1, slotMinutes)) * 100}%"><span>空き ${freeMinutes}分</span></div>` : ""}
       </div>
+    </div>
+  `;
+}
+
+function renderTodayPlanner(plan, unplannedTasks) {
+  const stats = getTodayPlanStats(plan);
+  const overflow = getTodayPlanningOverflow(plan);
+  const fillRatio = Math.min(100, Math.round((stats.allocatedMinutes / Math.max(1, stats.capacityMinutes)) * 100));
+
+  return `
+    <section class="day-plan${stats.overflowMinutes > 0 ? " has-overflow" : ""}">
+      <button type="button" class="day-plan__summary" data-action="toggle-today-planner" aria-expanded="${ui.todayPlannerOpen}">
+        <span>
+          <small>今日の時間</small>
+          <strong>${escapeHtml(`${stats.allocatedMinutes}/${stats.capacityMinutes}分`)}</strong>
+        </span>
+        <span class="day-plan__balance${stats.overflowMinutes > 0 ? " is-overflow" : ""}">
+          ${stats.overflowMinutes > 0 ? escapeHtml(`入らない ${stats.overflowMinutes}分`) : escapeHtml(`空き ${stats.freeMinutes}分`)}
+        </span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
+      </button>
+      <div class="day-plan__progress" aria-hidden="true"><span style="width:${fillRatio}%"></span></div>
+
+      ${ui.todayPlannerOpen ? `
+        <div class="day-plan__body">
+          <div class="day-plan__slots">
+            ${plan.slots.map((slot) => renderTodayPlanSlot(slot, plan)).join("")}
+          </div>
+
+          ${overflow.length ? `
+            <div class="day-plan-overflow">
+              <div class="day-plan-overflow__head">
+                <span>今日は入らない</span>
+                <strong>${escapeHtml(`${stats.overflowMinutes}分`)}</strong>
+              </div>
+              ${overflow.map(({ item, minutes }) => `
+                <div class="day-plan-overflow__item">
+                  <span style="--work-accent:${getQuadrantColor(item.quadrant)}"></span>
+                  <strong>${escapeHtml(item.title)}</strong>
+                  <small>${escapeHtml(`${minutes}分`)}</small>
+                </div>
+              `).join("")}
+            </div>
+          ` : ""}
+
+          ${unplannedTasks.length ? `
+            <div class="day-plan-inbox">
+              <div class="day-plan-inbox__head">
+                <span>未計画</span>
+                <button type="button" data-action="set-today-mode" data-mode="organize">整理</button>
+              </div>
+              <div class="day-plan-inbox__list">
+                ${unplannedTasks.map((task) => `
+                  <div class="day-plan-inbox__item" data-plan-work-id="${escapeHtml(task.id)}">
+                    ${renderPlanDragGrip(`${task.title}を空き時間へ移動`)}
+                    <strong>${escapeHtml(task.title)}</strong>
+                    <small>${escapeHtml(`${getTaskRemainingMinutes(task)}分`)}</small>
+                    <button type="button" data-action="plan-work-today" data-work-id="${escapeHtml(task.id)}" aria-label="${escapeHtml(task.title)}を今日に入れる">＋</button>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          ` : ""}
+
+          <div class="day-plan__actions">
+            <button type="button" data-action="auto-plan-today">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9M5 12h14M5 17h11"></path><path d="m16 5 3 2-3 2"></path></svg>
+              <span>整える</span>
+            </button>
+            <button type="button" data-action="open-today-availability">
+              ${renderSettingsIcon("clock")}
+              <span>時間</span>
+            </button>
+          </div>
+        </div>
+      ` : ""}
     </section>
   `;
 }
@@ -4078,12 +4967,16 @@ function renderTodayUnplannedTasks(tasks) {
 function renderTodayWorkItem(item, index) {
   const quadrant = getTaskQuadrantMeta(item.quadrant) || getTaskQuadrantMeta("notUrgentImportant");
   const pausedSeconds = getTaskPausedSeconds(item);
-  const minutesLabel = pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `${item.minutes}分`;
+  const segmentLabel = item.segmentCount > 1 ? ` · ${item.segmentIndex + 1}/${item.segmentCount}` : "";
+  const minutesLabel = pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `${item.minutes}分${segmentLabel}`;
   const itemType = item.kind === "goal" ? (item.isHabit ? "習慣" : "目標") : quadrant.concept;
   const startAction = item.kind === "goal" ? "start-goal-session" : "start-task-session";
   const idAttribute = item.kind === "goal"
     ? `data-goal-id="${escapeHtml(item.sourceId)}"`
     : `data-task-id="${escapeHtml(item.sourceId)}"`;
+  const allocationAttribute = item.allocationId
+    ? `data-allocation-id="${escapeHtml(item.allocationId)}"`
+    : "";
 
   return `
     <article class="today-work-item ${index === 0 ? "is-next" : ""}" style="--work-accent:${getQuadrantColor(item.quadrant)}">
@@ -4097,7 +4990,7 @@ function renderTodayWorkItem(item, index) {
       <div class="today-work-item__actions">
         <span>${escapeHtml(minutesLabel)}</span>
         ${item.kind === "task" ? `<button type="button" class="today-work-item__remove" data-action="toggle-task-today" data-task-id="${escapeHtml(item.sourceId)}" aria-label="今日から外す">外す</button>` : ""}
-        <button type="button" class="today-work-item__start" data-action="${startAction}" ${idAttribute}>${pausedSeconds ? "再開" : "開始"}</button>
+        <button type="button" class="today-work-item__start" data-action="${startAction}" ${idAttribute} ${allocationAttribute}>${pausedSeconds ? "再開" : "開始"}</button>
       </div>
     </article>
   `;
@@ -4202,7 +5095,7 @@ function renderTaskInbox(tasks) {
 
 function renderTaskQuadrantBoard(groups) {
   const assignedTasks = TASK_QUADRANTS.flatMap((quadrant) => groups[quadrant.key] || []);
-  const totalMinutes = assignedTasks.reduce((sum, task) => sum + normalizeTaskMinutes(task.minutes), 0);
+  const totalMinutes = assignedTasks.reduce((sum, task) => sum + getWorkItemPlannableMinutes(task), 0);
 
   return `
     <section class="task-quadrant-board">
@@ -4220,7 +5113,7 @@ function renderTaskQuadrantBoard(groups) {
 }
 
 function renderTaskQuadrant(quadrant, tasks, boardTotalMinutes = 0) {
-  const totalMinutes = tasks.reduce((sum, task) => sum + normalizeTaskMinutes(task.minutes), 0);
+  const totalMinutes = tasks.reduce((sum, task) => sum + getWorkItemPlannableMinutes(task), 0);
 
   return `
     <section class="task-quadrant task-quadrant--${escapeHtml(quadrant.key)}" data-task-quadrant-zone="${escapeHtml(quadrant.key)}" style="--quadrant-color:${getQuadrantColor(quadrant.key)}">
@@ -4456,7 +5349,7 @@ function renderShelvedTaskCard(task) {
     <article class="task-card task-card--shelved">
       <div class="task-card__main">
         <strong>${escapeHtml(task.title)}</strong>
-        <span>${escapeHtml(pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `${task.minutes}分`)}</span>
+        <span>${escapeHtml(pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `残り ${getTaskRemainingMinutes(task)}分`)}</span>
       </div>
       <div class="task-card__actions">
         <button type="button" class="soft-button" data-action="restore-task" data-task-id="${escapeHtml(task.id)}">戻す</button>
@@ -6001,6 +6894,10 @@ function saveFinishDraft() {
     return;
   }
 
+  const allocationId = state.activeSession?.allocationId || "";
+  if (allocationId) {
+    markPlanAllocationCompleted(allocationId);
+  }
   recordLog(ui.finishDraft.outcome, null, ui.finishDraft);
   ui.finishDraft = null;
   ui.sessionOpen = false;
@@ -6057,9 +6954,14 @@ function holdActiveSession() {
       completedAt: null,
       shelvedAt: null,
       pausedRemainingSeconds: remainingSeconds,
+      pausedSegmentMinutes: Math.max(
+        1,
+        Number(session.segmentMinutes) || Math.ceil(Number(session.plannedSeconds || remainingSeconds) / 60),
+      ),
       pausedAt,
       plannedDate: toISODate(new Date()),
       accumulatedSeconds,
+      pausedAllocationId: session.allocationId || "",
     }));
   }
 
@@ -6083,7 +6985,7 @@ function holdActiveSession() {
     : `残り ${formatTaskRemaining(remainingSeconds)} をこのTaskに残しました。`);
 }
 
-function beginSession(planKey) {
+function beginSession(planKey, allocationId = "") {
   const goalId = state.meta.activeGoalId;
   const continuation = getGoalContinuation(goalId);
   const activePlanKey = continuation?.planKey && state.plans[continuation.planKey]
@@ -6094,7 +6996,11 @@ function beginSession(planKey) {
     showToast("プランが見つかりません。設定を確認してください。");
     return null;
   }
-  const durationSeconds = continuation?.remainingSeconds || plan.minutes * 60;
+  const dailyPlan = ensureDailyPlan();
+  const allocation = dailyPlan.allocations.find((item) => (
+    item.id === allocationId && item.workId === goalWorkId(goalId) && !item.completedAt
+  ));
+  const durationSeconds = continuation?.remainingSeconds || allocation?.minutes * 60 || plan.minutes * 60;
   const now = Date.now();
   state.activeSession = {
     type: "goal",
@@ -6104,6 +7010,7 @@ function beginSession(planKey) {
     durationSeconds,
     plannedSeconds: continuation?.plannedSeconds || plan.minutes * 60,
     accumulatedSeconds: continuation?.accumulatedSeconds || 0,
+    allocationId: allocation?.id || "",
     originMode: ui.todayMode || "execution",
     startedAt: now,
     endsAt: now + durationSeconds * 1000,
@@ -6122,7 +7029,7 @@ function beginSession(planKey) {
   return { isResume: Boolean(continuation), durationSeconds };
 }
 
-function beginTaskSession(taskId) {
+function beginTaskSession(taskId, allocationId = "") {
   const task = getTaskById(taskId);
   if (!task || task.status !== "active") {
     showToast("開始できるTaskが見つかりません。");
@@ -6131,19 +7038,34 @@ function beginTaskSession(taskId) {
 
   const minutes = normalizeTaskMinutes(task.minutes);
   const pausedRemainingSeconds = getTaskPausedSeconds(task);
-  const durationSeconds = pausedRemainingSeconds || minutes * 60;
+  const dailyPlan = ensureDailyPlan();
+  const preferredAllocationIds = pausedRemainingSeconds
+    ? [task.pausedAllocationId, allocationId]
+    : [allocationId];
+  const allocation = preferredAllocationIds
+    .filter((id, index, ids) => id && ids.indexOf(id) === index)
+    .map((id) => dailyPlan.allocations.find((item) => (
+      item.id === id && item.workId === task.id && !item.completedAt
+    )))
+    .find(Boolean) || null;
+  const segmentMinutes = pausedRemainingSeconds
+    ? getTaskPausedSegmentMinutes(task)
+    : Math.max(1, Number(allocation?.minutes) || getTaskRemainingMinutes(task) || minutes);
+  const durationSeconds = pausedRemainingSeconds || allocation?.minutes * 60 || getTaskRemainingMinutes(task) * 60 || minutes * 60;
   const now = Date.now();
   state.activeSession = {
     type: "task",
     taskId: task.id,
     taskTitle: task.title,
     minutes: Math.max(1, Math.ceil(durationSeconds / 60)),
+    segmentMinutes,
     durationSeconds,
-    plannedSeconds: Math.max(1, Number(task.plannedSeconds) || minutes * 60),
+    plannedSeconds: Math.max(1, segmentMinutes * 60),
     accumulatedSeconds: Math.max(0, Number(task.accumulatedSeconds) || 0),
     sourceGoalId: task.sourceGoalId || "",
     sourceGoalPlanKey: task.sourceGoalPlanKey || "",
     quadrant: task.quadrant,
+    allocationId: allocation?.id || "",
     originMode: ui.todayMode || "execution",
     startedAt: now,
     endsAt: now + durationSeconds * 1000,
@@ -6152,7 +7074,9 @@ function beginTaskSession(taskId) {
   updateTask(task.id, () => ({
     lastStartedAt: new Date(now).toISOString(),
     pausedRemainingSeconds: null,
+    pausedSegmentMinutes: null,
     pausedAt: null,
+    pausedAllocationId: "",
   }));
   ui.sessionOpen = true;
   ui.finishDraft = null;
@@ -6165,7 +7089,7 @@ function beginTaskSession(taskId) {
   startSessionTicker();
   showToast(pausedRemainingSeconds
     ? `残り ${formatTaskRemaining(durationSeconds)} から再開しました。`
-    : `${minutes}分Taskを開始しました。`);
+    : `${Math.max(1, Math.ceil(durationSeconds / 60))}分Taskを開始しました。`);
 }
 
 function recordTaskExecution(task, session, elapsedSeconds) {
@@ -6234,6 +7158,9 @@ function completeTaskSession() {
   }
 
   const task = getTaskById(session.taskId);
+  const allocation = session.allocationId
+    ? ensureDailyPlan().allocations.find((item) => item.id === session.allocationId)
+    : null;
   const elapsedThisRun = Math.max(1, Math.round((Date.now() - Number(session.startedAt || Date.now())) / 1000));
   const elapsedSeconds = Math.max(1, Number(session.accumulatedSeconds || task?.accumulatedSeconds || 0) + elapsedThisRun);
   if (task) {
@@ -6242,12 +7169,27 @@ function completeTaskSession() {
 
   if (task?.sourceGoalId) {
     state.tasks = normalizeTasks(state.tasks).filter((item) => item.id !== session.taskId);
-  } else {
+  } else if (task) {
+    if (allocation) {
+      markPlanAllocationCompleted(allocation.id);
+    }
+    const completedSegmentMinutes = Math.min(
+      getTaskRemainingMinutes(task),
+      Math.max(1, Number(session.segmentMinutes) || Number(allocation?.minutes) || getTaskRemainingMinutes(task)),
+    );
+    const nextCompletedMinutes = Math.min(
+      task.minutes,
+      Math.max(0, Number(task.completedMinutes) || 0) + completedSegmentMinutes,
+    );
+    const taskCompleted = nextCompletedMinutes >= task.minutes;
     updateTask(session.taskId, () => ({
-      status: "done",
-      completedAt: new Date().toISOString(),
+      status: taskCompleted ? "done" : "active",
+      completedMinutes: nextCompletedMinutes,
+      completedAt: taskCompleted ? new Date().toISOString() : null,
       pausedRemainingSeconds: null,
+      pausedSegmentMinutes: null,
       pausedAt: null,
+      pausedAllocationId: "",
       accumulatedSeconds: 0,
     }));
   }
@@ -6260,9 +7202,17 @@ function completeTaskSession() {
   syncDeviceAppLock();
   saveState();
   startSessionTicker();
+  const updatedTask = getTaskById(session.taskId);
+  return {
+    taskCompleted: !updatedTask || updatedTask.status === "done",
+    segmentCompleted: Boolean(allocation),
+  };
 }
 
 function completeSession(planKey) {
+  if (state.activeSession?.allocationId) {
+    markPlanAllocationCompleted(state.activeSession.allocationId);
+  }
   recordLog(planKey, null);
   state.activeSession = null;
   ui.sessionOpen = false;
