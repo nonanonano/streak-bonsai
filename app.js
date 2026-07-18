@@ -220,6 +220,7 @@ let ui = {
   reviewLogDraft: null,
   reviewLogExpanded: false,
   reviewGoalFilter: "all",
+  reviewRangeDays: 7,
   taskDraft: { title: "", minutes: String(TASK_DEFAULT_MINUTES) },
   taskShowShelved: false,
   taskDragId: null,
@@ -1631,11 +1632,21 @@ function bindEvents() {
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;
     if (state.activeSession && !ui.finishDraft) {
-      // 画面復帰時にウェイクロックを再取得（スリープ解除後も継続）
+      // 復帰時は保存済みの終了時刻を正として画面を組み直す。
+      // WebViewのタイマーが停止していても、残り時間を最初からに戻さない。
+      ui.sessionOpen = true;
       requestWakeLock();
+      render();
+      scheduleFocusAlarm(state.activeSession);
+      return;
     }
     // タブに戻ったとき他のデバイスの変更を取得
     _resyncFromSupabase();
+  });
+  window.addEventListener("pagehide", () => {
+    if (!state.activeSession) return;
+    syncActiveGoalRecord();
+    localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
   });
 }
 
@@ -1794,6 +1805,35 @@ function handleClick(event) {
     return;
   }
 
+  if (action === "go-to-today") {
+    state.meta.currentView = "today";
+    ui.todayMode = "execution";
+    ui.selectedTaskId = null;
+    saveNavState();
+    renderWithTransition();
+    if (screenFrame) screenFrame.scrollTop = 0;
+    return;
+  }
+
+  if (action === "open-review") {
+    const goalId = target.dataset.goalId || "";
+    ui.reviewGoalFilter = goalId || "all";
+    ui.reviewLogDraft = null;
+    ui.reviewLogExpanded = false;
+    state.meta.currentView = "review";
+    saveNavState();
+    renderWithTransition();
+    if (screenFrame) screenFrame.scrollTop = 0;
+    return;
+  }
+
+  if (action === "set-review-range") {
+    const days = Number(target.dataset.days);
+    ui.reviewRangeDays = days === 30 ? 30 : 7;
+    render();
+    return;
+  }
+
   if (action === "adjust-today-capacity") {
     const plan = ensureDailyPlan();
     const delta = Number(target.dataset.delta || 0);
@@ -1837,6 +1877,45 @@ function handleClick(event) {
     saveState();
     render();
     showToast(addToToday ? "今日に入れました。" : "今日から外しました。");
+    return;
+  }
+
+  if (action === "repeat-review-entry") {
+    const entry = getAllExecutionLogs().find((item) => item.logId === target.dataset.logId);
+    if (!entry) {
+      showToast("記録が見つかりませんでした。");
+      return;
+    }
+
+    if (entry.itemKind === "goal") {
+      const goal = listGoals().find((item) => item.id === entry.goalId);
+      if (!goal) {
+        showToast("元の習慣・目標が見つかりませんでした。");
+        return;
+      }
+      const planKey = state.plans?.[entry.outcome] ? entry.outcome : getLaunchPlan(state);
+      const pending = { type: "goal", goalId: goal.id, planKey, explicitRepeat: true };
+      requireDeviceAppLockBeforeStart(() => startPendingFocusSession(pending), pending);
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const minutes = Math.max(1, Math.ceil(Number(entry.plannedSeconds || entry.elapsedSeconds || 300) / 60));
+    const repeatedTask = normalizeTask({
+      id: createTaskId(),
+      title: entry.itemTitle || "Task",
+      minutes,
+      status: "active",
+      quadrant: entry.quadrant,
+      plannedDate: toISODate(new Date()),
+      plannedSeconds: minutes * 60,
+      createdAt: now,
+      updatedAt: now,
+    });
+    state.tasks = [repeatedTask, ...normalizeTasks(state.tasks)];
+    saveState();
+    const pending = { type: "task", taskId: repeatedTask.id, explicitRepeat: true };
+    requireDeviceAppLockBeforeStart(() => startPendingFocusSession(pending), pending);
     return;
   }
 
@@ -2166,6 +2245,19 @@ function handleClick(event) {
 
   if (action === "start-task-session") {
     const taskId = target.dataset.taskId || "";
+    if (state.meta.currentView === "today" && ui.todayMode === "organize") {
+      const task = getTaskById(taskId);
+      if (task && !isTaskPlannedToday(task)) {
+        updateTask(taskId, () => ({ plannedDate: toISODate(new Date()) }));
+        saveState();
+      }
+      ui.todayMode = "execution";
+      ui.selectedTaskId = null;
+      renderWithTransition();
+      if (screenFrame) screenFrame.scrollTop = 0;
+      showToast("開始は「今日」から行います。");
+      return;
+    }
     const pending = { type: "task", taskId };
     requireDeviceAppLockBeforeStart(() => {
       startPendingFocusSession(pending);
@@ -2297,6 +2389,24 @@ function handleClick(event) {
 
   if (action === "start-goal-session") {
     const goalId = target.dataset.goalId || "";
+    const goal = listGoals().find((item) => item.id === goalId);
+    if (goal && getGoalMissionStateForDate(goal).isClosed) {
+      ui.reviewGoalFilter = goal.id;
+      state.meta.currentView = "review";
+      saveNavState();
+      renderWithTransition();
+      if (screenFrame) screenFrame.scrollTop = 0;
+      showToast("今日は完了済みです。もう一度行う場合はReviewから選べます。");
+      return;
+    }
+    if (state.meta.currentView === "today" && ui.todayMode === "organize") {
+      ui.todayMode = "execution";
+      ui.selectedTaskId = null;
+      renderWithTransition();
+      if (screenFrame) screenFrame.scrollTop = 0;
+      showToast("開始は「今日」から行います。");
+      return;
+    }
     if (goalId && goalId !== state.meta.activeGoalId) {
       activateGoal(goalId);
     }
@@ -3860,6 +3970,16 @@ function getTodayExecutionItems() {
   });
 }
 
+function getUnplannedTasks() {
+  return normalizeTasks(state.tasks)
+    .filter((task) => (
+      task.status === "active"
+      && !isTaskPlannedToday(task)
+      && getTaskPausedSeconds(task) <= 0
+    ))
+    .sort(compareWorkItems);
+}
+
 function getTodayPlannedMinutes() {
   const plannedTasks = normalizeTasks(state.tasks)
     .filter((task) => isTaskPlannedToday(task) && task.status !== "shelved");
@@ -3879,6 +3999,7 @@ function getTodayPlannedMinutes() {
 
 function renderTodayExecutionView() {
   const items = getTodayExecutionItems();
+  const unplannedTasks = getUnplannedTasks();
   const plan = ensureDailyPlan();
   const plannedMinutes = getTodayPlannedMinutes();
   const remainingMinutes = plan.capacityMinutes - plannedMinutes;
@@ -3921,7 +4042,36 @@ function renderTodayExecutionView() {
         </label>
         <button type="button" data-action="add-today-task" aria-label="今日やることを追加">＋</button>
       </section>
+
+      ${renderTodayUnplannedTasks(unplannedTasks)}
     </div>
+  `;
+}
+
+function renderTodayUnplannedTasks(tasks) {
+  if (!tasks.length) return "";
+
+  return `
+    <section class="today-unplanned" aria-label="まだ日を決めていないTask">
+      <div class="today-unplanned__head">
+        <div>
+          <span>未計画</span>
+          <strong>${escapeHtml(`${tasks.length}件`)}</strong>
+        </div>
+        <button type="button" data-action="set-today-mode" data-mode="organize">整理する</button>
+      </div>
+      <div class="today-unplanned__list">
+        ${tasks.map((task) => `
+          <article style="--work-accent:${getQuadrantColor(task.quadrant)}">
+            <div>
+              <strong>${escapeHtml(task.title)}</strong>
+              <span>${escapeHtml(`${task.minutes}分`)}</span>
+            </div>
+            <button type="button" data-action="toggle-task-today" data-task-id="${escapeHtml(task.id)}">今日へ</button>
+          </article>
+        `).join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -4112,8 +4262,9 @@ function renderTaskBoardItem(task) {
     ? `<span class="task-board-item__breakdown">${escapeHtml(`${progress.done}/${progress.total}`)}</span>`
     : "";
   const resumeBadge = renderTaskResumeBadge(task, "task-board-item__resume");
+  const completedToday = task.kind === "goal" && getGoalMissionStateForDate(task.goal).isClosed;
   const typeBadge = task.kind === "goal"
-    ? `<span class="task-board-item__type">${task.isHabit ? "習慣" : "目標"}</span>`
+    ? `<span class="task-board-item__type${completedToday ? " is-complete" : ""}">${completedToday ? "今日完了" : (task.isHabit ? "習慣" : "目標")}</span>`
     : (isTaskPlannedToday(task) ? `<span class="task-board-item__type is-today">今日</span>` : "");
   const badges = resumeBadge || progressBadge || typeBadge
     ? `<span class="task-board-item__badges">${typeBadge}${resumeBadge}${progressBadge}</span>`
@@ -4164,8 +4315,10 @@ function renderSelectedTaskPanel(tasks) {
       </div>
       ${renderTaskBreakdown(selectedTask)}
       <div class="task-card__actions">
-        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-task-session" data-task-id="${escapeHtml(selectedTask.id)}">${getTaskStartLabel(selectedTask)}</button>
-        <button type="button" class="soft-button" data-action="toggle-task-today" data-task-id="${escapeHtml(selectedTask.id)}">${plannedToday ? "今日から外す" : "今日やる"}</button>
+        ${plannedToday
+          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">今日を見る</button>`
+          : `<button type="button" class="action-button action-button--primary" data-action="toggle-task-today" data-task-id="${escapeHtml(selectedTask.id)}">今日に入れる</button>`}
+        ${plannedToday ? `<button type="button" class="soft-button" data-action="toggle-task-today" data-task-id="${escapeHtml(selectedTask.id)}">今日から外す</button>` : ""}
         <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(selectedTask.id)}">完了</button>
         <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(selectedTask.id)}">あとで</button>
       </div>
@@ -4177,6 +4330,8 @@ function renderSelectedGoalPanel(item) {
   const goal = item.goal;
   const timing = `${formatStudyDays(goal.setup.studyDays)} · ${goal.setup.primaryWindow}`;
   const pausedSeconds = getTaskPausedSeconds(item);
+  const completedToday = getGoalMissionStateForDate(goal).isClosed;
+  const availableToday = isGoalScheduledForDate(goal) || pausedSeconds > 0;
   return `
     <section class="task-selected-panel task-selected-panel--goal">
       <div class="task-selected-panel__main">
@@ -4193,7 +4348,12 @@ function renderSelectedGoalPanel(item) {
         <p class="task-selected-panel__schedule">${escapeHtml(timing)}</p>
       </div>
       <div class="task-card__actions">
-        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-goal-session" data-goal-id="${escapeHtml(item.sourceId)}">${pausedSeconds ? "再開" : "開始"}</button>
+        ${completedToday
+          ? `<button type="button" class="action-button action-button--primary" disabled>今日完了</button>
+             <button type="button" class="soft-button" data-action="open-review" data-goal-id="${escapeHtml(item.sourceId)}">Reviewを見る</button>`
+          : availableToday
+            ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">${pausedSeconds ? "続きは今日から" : "今日を見る"}</button>`
+            : `<button type="button" class="action-button action-button--primary" disabled>今日は予定なし</button>`}
         <button type="button" class="soft-button" data-action="open-goal-settings" data-goal-id="${escapeHtml(item.sourceId)}">設定</button>
       </div>
     </section>
@@ -4259,6 +4419,7 @@ function renderActiveTaskCard(task) {
     ? `<span class="task-card__breakdown">${escapeHtml(`${progress.done}/${progress.total}`)}</span>`
     : "";
   const isSelected = ui.selectedTaskId === task.id;
+  const plannedToday = isTaskPlannedToday(task);
   return `
     <article class="task-card task-card--active${isSelected ? " is-selected" : ""}" data-action="select-task" data-task-id="${escapeHtml(task.id)}" data-task-draggable="true" data-task-drop-item="true">
       <div class="task-card__main">
@@ -4279,7 +4440,9 @@ function renderActiveTaskCard(task) {
         </div>
       </div>
       <div class="task-card__actions">
-        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-task-session" data-task-id="${escapeHtml(task.id)}">${getTaskStartLabel(task)}</button>
+        ${plannedToday
+          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">今日を見る</button>`
+          : `<button type="button" class="action-button action-button--primary" data-action="toggle-task-today" data-task-id="${escapeHtml(task.id)}">今日に入れる</button>`}
         <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(task.id)}">完了</button>
         <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(task.id)}">棚上げ</button>
       </div>
@@ -4563,12 +4726,17 @@ function renderReviewView() {
     : ui.reviewGoalFilter === "tasks"
       ? allLogs.filter((entry) => entry.itemKind === "task")
       : allLogs.filter((entry) => entry.goalId === ui.reviewGoalFilter);
-  const weekStart = toISODate(addDays(new Date(), -6));
-  const weekLogs = filteredLogs.filter((entry) => entry.date >= weekStart);
+  const rangeDays = ui.reviewRangeDays === 30 ? 30 : 7;
+  const periodStart = toISODate(addDays(new Date(), -(rangeDays - 1)));
+  const periodLogs = filteredLogs.filter((entry) => entry.date >= periodStart);
 
   return `
     <section class="screen screen--review screen--review-allocation">
-      <div class="review-filter-row">
+      <div class="review-toolbar">
+        <div class="review-range-switch" role="group" aria-label="表示期間">
+          <button type="button" class="${rangeDays === 7 ? "is-active" : ""}" data-action="set-review-range" data-days="7">7日</button>
+          <button type="button" class="${rangeDays === 30 ? "is-active" : ""}" data-action="set-review-range" data-days="30">30日</button>
+        </div>
         <label>
           <span>表示</span>
           <select data-review-goal-filter aria-label="Reviewの対象">
@@ -4579,7 +4747,8 @@ function renderReviewView() {
         </label>
       </div>
 
-      ${renderAllocationReview(weekLogs)}
+      ${renderDailyHistoryChart(periodLogs, rangeDays)}
+      ${renderAllocationReview(periodLogs)}
       ${renderRecentActivity(filteredLogs)}
 
       ${ui.reviewGoalFilter !== "tasks" ? `
@@ -4588,6 +4757,70 @@ function renderReviewView() {
           ${renderReviewLogEditPanel()}
         </details>
       ` : ""}
+    </section>
+  `;
+}
+
+function getNiceMinuteScale(maxMinutes) {
+  const value = Math.max(0, Number(maxMinutes) || 0);
+  if (value <= 10) return 10;
+  if (value <= 30) return Math.ceil(value / 5) * 5;
+  if (value <= 60) return Math.ceil(value / 10) * 10;
+  if (value <= 120) return Math.ceil(value / 30) * 30;
+  return Math.ceil(value / 60) * 60;
+}
+
+function renderDailyHistoryChart(logs, rangeDays) {
+  const today = new Date();
+  const days = Array.from({ length: rangeDays }, (_, index) => {
+    const date = toISODate(addDays(today, index - (rangeDays - 1)));
+    const seconds = logs
+      .filter((entry) => entry.date === date)
+      .reduce((sum, entry) => sum + getLoggedSeconds(entry), 0);
+    return { date, seconds, minutes: seconds / 60 };
+  });
+  const totalSeconds = days.reduce((sum, day) => sum + day.seconds, 0);
+  const executedDays = days.filter((day) => day.seconds > 0).length;
+  const scaleMinutes = getNiceMinuteScale(Math.max(0, ...days.map((day) => day.minutes)));
+  const halfScale = Math.round(scaleMinutes / 2);
+
+  return `
+    <section class="review-history">
+      <div class="review-history__headline">
+        <div>
+          <span>${escapeHtml(`直近${rangeDays}日 合計`)}</span>
+          <strong>${escapeHtml(formatReviewDuration(totalSeconds))}</strong>
+        </div>
+        <p>${escapeHtml(`${executedDays}日実行`)}</p>
+      </div>
+      <div class="review-history__chart" style="--review-days:${rangeDays}">
+        <div class="review-history__axis" aria-hidden="true">
+          <span>${escapeHtml(`${scaleMinutes}分`)}</span>
+          <span>${escapeHtml(`${halfScale}分`)}</span>
+          <span>0</span>
+        </div>
+        <div class="review-history__plot" aria-label="日ごとの実行時間">
+          <i class="review-history__grid review-history__grid--top" aria-hidden="true"></i>
+          <i class="review-history__grid review-history__grid--middle" aria-hidden="true"></i>
+          <div class="review-history__bars">
+            ${days.map((day, index) => {
+              const height = day.minutes > 0
+                ? Math.max(4, Math.min(100, (day.minutes / scaleMinutes) * 100))
+                : 0;
+              const showLabel = rangeDays === 7 || index === 0 || index === rangeDays - 1 || index % 5 === 0;
+              const label = day.date.slice(5).replace("-", "/");
+              return `
+                <div class="review-history__day" title="${escapeHtml(`${label} ${formatReviewDuration(day.seconds)}`)}">
+                  <div class="review-history__bar-wrap">
+                    <span class="review-history__bar${day.seconds > 0 ? " is-filled" : ""}" style="height:${height.toFixed(2)}%"></span>
+                  </div>
+                  <small>${showLabel ? escapeHtml(label) : ""}</small>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>
+      </div>
     </section>
   `;
 }
@@ -4637,8 +4870,8 @@ function renderAllocationReview(logs) {
     <section class="review-allocation">
       <div class="review-allocation__headline">
         <div>
-          <span>直近7日</span>
-          <strong>${escapeHtml(formatReviewDuration(totalSeconds))}</strong>
+          <span>時間の使い方</span>
+          <strong>${escapeHtml(`${executedDays}日`)}</strong>
         </div>
         <div class="review-allocation__future">
           <span>育てる</span>
@@ -4691,6 +4924,7 @@ function renderRecentActivity(logs) {
                 <span>${escapeHtml(`${formatReviewLogDate(entry.date)} · ${quadrant?.concept || "未整理"}`)}</span>
               </div>
               <b>${escapeHtml(formatLoggedDuration(getLoggedSeconds(entry)))}</b>
+              <button type="button" data-action="repeat-review-entry" data-log-id="${escapeHtml(entry.logId)}">もう一度</button>
             </article>
           `;
         }).join("")}
@@ -8066,6 +8300,13 @@ async function loadStateFromSupabase(userId, { force = false } = {}) {
     if (data?.state && Object.keys(data.state).length > 0) {
       const supabaseTs = data.state.meta?.lastSavedAt || 0;
       const localTs = state.meta?.lastSavedAt || 0;
+      // 実行中の端末を最優先する。SupabaseのSIGNED_INイベントは
+      // アプリ復帰時にも届くため、ここで上書きするとタイマーが開始時点へ戻る。
+      if (state.activeSession) {
+        localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+        if (supabaseTs <= localTs) scheduleSyncToSupabase();
+        return;
+      }
       // force=true（ログイン時）: Supabaseを常に優先。タイムスタンプ比較はしない。
       // これにより「PCで少し前に操作→スマホで完了→PCでログイン」でも正しく同期される。
       if (force || supabaseTs >= localTs) {
@@ -8359,12 +8600,13 @@ sb.auth.onAuthStateChange(async (event, session) => {
       if (screenFrame) screenFrame.scrollTop = 0;
       setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100);
     } else if (event === "SIGNED_IN") {
-      // 再ログイン時も必ずSupabaseを優先（force=true）
-      await loadStateFromSupabase(session.user.id, { force: true });
+      // SIGNED_INはアプリ復帰時にも発火する。初回起動後は新しい側だけを採用する。
+      const beforeSync = state.meta?.lastSavedAt || 0;
+      await loadStateFromSupabase(session.user.id);
       localStorage.removeItem(GUEST_MODE_KEY);
       hideAuthOverlay();
       window.scrollTo(0, 0); // キーボード入力後のスクロールをリセット
-      render();
+      if ((state.meta?.lastSavedAt || 0) !== beforeSync || state.activeSession) render();
       setupRealtimeSync(session.user.id);
       if (screenFrame) screenFrame.scrollTop = 0;
       setTimeout(() => { if (screenFrame) screenFrame.scrollTop = 0; }, 100);
