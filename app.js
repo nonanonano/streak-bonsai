@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260718d アカウント削除";
+const APP_BUILD = "20260718e 審査準備";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -2046,6 +2046,11 @@ function handleClick(event) {
     return;
   }
 
+  if (action === "open-privacy") {
+    window.location.assign("./privacy.html");
+    return;
+  }
+
   if (action === "configure-app-shield") {
     const bridge = window.webkit?.messageHandlers?.appShield;
     if (!bridge) {
@@ -3629,6 +3634,7 @@ function renderSettingsIcon(iconKey) {
     shield: '<path d="M12 3 5.5 5.6v5.7c0 4.2 2.7 7.8 6.5 9.2 3.8-1.4 6.5-5 6.5-9.2V5.6L12 3Z"></path><path d="m9.2 11.8 1.8 1.8 3.8-4"></path>',
     goal: '<circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3.2"></circle>',
     account: '<circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6"></path>',
+    document: '<path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v5h4M10 12h5M10 16h5"></path>',
     back: '<path d="m15 18-6-6 6-6"></path>',
     chevron: '<path d="m9 18 6-6-6-6"></path>',
   };
@@ -3715,6 +3721,19 @@ function renderSettingsHome() {
           <p class="setup-build-label">build ${APP_BUILD}</p>
         </div>
       </details>
+
+      <section class="settings-group" aria-labelledby="settings-info-title">
+        <div class="settings-group__heading">
+          <h2 id="settings-info-title">情報</h2>
+        </div>
+        <button type="button" class="settings-row" data-action="open-privacy">
+          <span class="settings-row__icon">${renderSettingsIcon("document")}</span>
+          <span class="settings-row__body">
+            <strong>プライバシーポリシー</strong>
+          </span>
+          <span class="settings-row__chevron">${renderSettingsIcon("chevron")}</span>
+        </button>
+      </section>
 
       ${renderAlbumSection()}
     </div>

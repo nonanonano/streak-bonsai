@@ -24,10 +24,20 @@
     p, li { font-size: 0.95rem; margin: 0 0 10px; }
     ul { padding-left: 22px; margin: 0 0 10px; }
     a { color: #c75e33; }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      margin: -8px 0 18px;
+      color: #5f554a;
+      font-size: 0.9rem;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
   <main>
+    <a class="back-link" href="./index.html" id="back-to-app">&#8592; 砂時計に戻る</a>
     <h1>プライバシーポリシー</h1>
     <p class="updated">最終更新日: 2026年7月18日</p>
 
@@ -68,5 +78,17 @@
     <h2>変更について</h2>
     <p>本ポリシーを変更する場合は、本ページで告知します。</p>
   </main>
+  <script>
+    document.getElementById("back-to-app").addEventListener("click", (event) => {
+      if (!document.referrer) return;
+
+      try {
+        if (new URL(document.referrer).origin === window.location.origin) {
+          event.preventDefault();
+          window.history.back();
+        }
+      } catch (_) {}
+    });
+  </script>
 </body>
 </html>
