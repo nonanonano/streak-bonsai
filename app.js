@@ -26,6 +26,9 @@ function createSupabaseStub() {
       async resetPasswordForEmail() { return { error: offlineError }; },
       async signOut() { return { error: null }; },
     },
+    functions: {
+      async invoke() { return { data: null, error: offlineError }; },
+    },
     from() { return query; },
     channel() { return { on() { return this; }, subscribe() { return this; } }; },
     removeChannel() {},
@@ -48,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260718a 開始元へ戻る";
+const APP_BUILD = "20260718d アカウント削除";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -58,7 +61,8 @@ const TASK_QUADRANTS = [
   {
     key: "urgentImportant",
     title: "緊急×重要",
-    concept: "ビッグロック",
+    concept: "今やる",
+    frameworkLabel: "ビッグロック",
     axis: "緊急度 高 / 重要度 高",
     target: 30,
     defaultMinutes: 30,
@@ -67,7 +71,8 @@ const TASK_QUADRANTS = [
   {
     key: "notUrgentImportant",
     title: "重要・非緊急",
-    concept: "未来投資",
+    concept: "育てる",
+    frameworkLabel: "未来投資",
     axis: "緊急度 低 / 重要度 高",
     target: 50,
     defaultMinutes: 45,
@@ -76,7 +81,8 @@ const TASK_QUADRANTS = [
   {
     key: "urgentNotImportant",
     title: "緊急・低重要",
-    concept: "小石",
+    concept: "軽くする",
+    frameworkLabel: "小石",
     axis: "緊急度 高 / 重要度 低",
     target: 20,
     defaultMinutes: 10,
@@ -85,7 +91,8 @@ const TASK_QUADRANTS = [
   {
     key: "notUrgentNotImportant",
     title: "低重要・非緊急",
-    concept: "砂・水",
+    concept: "手放す",
+    frameworkLabel: "砂・水",
     axis: "緊急度 低 / 重要度 低",
     target: 0,
     defaultMinutes: 5,
@@ -197,6 +204,7 @@ const toastEl = document.querySelector("#toast");
 
 let state = loadState();
 let ui = {
+  todayMode: "execution",
   setupDraft: null,
   setupMode: "edit",
   setupSection: "home",
@@ -211,6 +219,7 @@ let ui = {
   roadmapDraft: null,
   reviewLogDraft: null,
   reviewLogExpanded: false,
+  reviewGoalFilter: "all",
   taskDraft: { title: "", minutes: String(TASK_DEFAULT_MINUTES) },
   taskShowShelved: false,
   taskDragId: null,
@@ -498,6 +507,12 @@ function normalizeTask(task = {}) {
     minutes: normalizeTaskMinutes(task.minutes),
     status,
     quadrant: normalizeTaskQuadrant(task.quadrant),
+    priority: task.priority !== null && task.priority !== "" && Number.isFinite(Number(task.priority)) ? Number(task.priority) : null,
+    plannedDate: /^\d{4}-\d{2}-\d{2}$/.test(String(task.plannedDate || "")) ? String(task.plannedDate) : "",
+    sourceGoalId: String(task.sourceGoalId || ""),
+    sourceGoalPlanKey: String(task.sourceGoalPlanKey || ""),
+    accumulatedSeconds: Math.max(0, Number(task.accumulatedSeconds) || 0),
+    plannedSeconds: Math.max(1, Number(task.plannedSeconds) || normalizeTaskMinutes(task.minutes) * 60),
     createdAt: task.createdAt || now,
     updatedAt: task.updatedAt || task.createdAt || now,
     completedAt: task.completedAt || null,
@@ -513,11 +528,235 @@ function normalizeTasks(tasks) {
   return Array.isArray(tasks) ? tasks.map(normalizeTask) : [];
 }
 
+function migrateLegacyTaskSources(tasks, goals) {
+  const candidates = Array.isArray(goals) ? goals : [];
+  return normalizeTasks(tasks).map((task) => {
+    if (task.sourceGoalId || getTaskPausedSeconds(task) <= 0) return task;
+    const matchingGoal = candidates.find((goal) => (
+      String(goal?.setup?.goal || goal?.title || "").trim() === task.title
+    ));
+    if (!matchingGoal) return task;
+    return normalizeTask({
+      ...task,
+      sourceGoalId: matchingGoal.id,
+      sourceGoalPlanKey: "A",
+      quadrant: normalizeGoalQuadrant(matchingGoal.setup?.quadrant),
+      plannedDate: task.plannedDate || toISODate(new Date()),
+      plannedSeconds: Math.max(task.plannedSeconds, getGoalDurationMinutes(matchingGoal) * 60),
+    });
+  });
+}
+
+function normalizeGoalContinuation(continuation = {}) {
+  const remainingSeconds = Number(continuation.remainingSeconds ?? continuation.pausedRemainingSeconds);
+  if (!Number.isFinite(remainingSeconds) || remainingSeconds <= 0) {
+    return null;
+  }
+
+  const normalizedRemaining = Math.max(1, Math.min(240 * 60, Math.ceil(remainingSeconds)));
+  const accumulatedSeconds = Math.max(0, Math.round(Number(continuation.accumulatedSeconds) || 0));
+  const plannedSeconds = Math.max(
+    normalizedRemaining + accumulatedSeconds,
+    Math.round(Number(continuation.plannedSeconds) || 0),
+  );
+
+  return {
+    remainingSeconds: normalizedRemaining,
+    accumulatedSeconds,
+    plannedSeconds,
+    planKey: ["A", "B", "C"].includes(continuation.planKey) ? continuation.planKey : "A",
+    pausedAt: continuation.pausedAt || new Date().toISOString(),
+  };
+}
+
+function normalizeGoalContinuations(continuations) {
+  if (!continuations || typeof continuations !== "object" || Array.isArray(continuations)) {
+    return {};
+  }
+
+  return Object.entries(continuations).reduce((result, [goalId, continuation]) => {
+    const normalized = normalizeGoalContinuation(continuation);
+    if (goalId && normalized) {
+      result[goalId] = normalized;
+    }
+    return result;
+  }, {});
+}
+
+function migrateLegacyGoalContinuations(tasks, goals, continuations) {
+  const candidates = Array.isArray(goals) ? goals : [];
+  const goalIds = new Set(candidates.map((goal) => goal?.id).filter(Boolean));
+  const nextContinuations = normalizeGoalContinuations(continuations);
+  const nextTasks = [];
+
+  migrateLegacyTaskSources(tasks, candidates).forEach((task) => {
+    const remainingSeconds = getTaskPausedSeconds(task);
+    if (!task.sourceGoalId || !goalIds.has(task.sourceGoalId) || remainingSeconds <= 0) {
+      nextTasks.push(task);
+      return;
+    }
+
+    const candidate = normalizeGoalContinuation({
+      remainingSeconds,
+      accumulatedSeconds: task.accumulatedSeconds,
+      plannedSeconds: task.plannedSeconds,
+      planKey: task.sourceGoalPlanKey,
+      pausedAt: task.pausedAt,
+    });
+    const current = nextContinuations[task.sourceGoalId];
+    const candidateTime = Date.parse(candidate?.pausedAt || "") || 0;
+    const currentTime = Date.parse(current?.pausedAt || "") || 0;
+    if (candidate && (!current || candidateTime >= currentTime)) {
+      nextContinuations[task.sourceGoalId] = candidate;
+    }
+  });
+
+  return {
+    tasks: nextTasks,
+    goalContinuations: nextContinuations,
+  };
+}
+
+function ensureGoalContinuations() {
+  state.goalContinuations = normalizeGoalContinuations(state.goalContinuations);
+  return state.goalContinuations;
+}
+
+function getGoalContinuation(goalId) {
+  if (!goalId) return null;
+  return ensureGoalContinuations()[goalId] || null;
+}
+
+function setGoalContinuation(goalId, continuation) {
+  const normalized = normalizeGoalContinuation(continuation);
+  if (!goalId || !normalized) return null;
+  const continuations = ensureGoalContinuations();
+  continuations[goalId] = normalized;
+  return normalized;
+}
+
+function clearGoalContinuation(goalId) {
+  const continuations = ensureGoalContinuations();
+  const current = continuations[goalId] || null;
+  if (goalId && current) {
+    delete continuations[goalId];
+  }
+  return current;
+}
+
+function normalizeDailyPlan(plan = {}) {
+  const today = toISODate(new Date());
+  const capacity = Number(plan.capacityMinutes);
+  return {
+    date: today,
+    capacityMinutes: Number.isFinite(capacity) ? Math.max(15, Math.min(480, Math.round(capacity / 5) * 5)) : 60,
+  };
+}
+
+function ensureDailyPlan() {
+  state.dailyPlan = normalizeDailyPlan(state.dailyPlan);
+  return state.dailyPlan;
+}
+
+function isTaskPlannedToday(task, date = new Date()) {
+  return String(task?.plannedDate || "") === toISODate(date);
+}
+
 function getTaskQuadrantMeta(quadrantKey) {
   return TASK_QUADRANTS.find((quadrant) => quadrant.key === quadrantKey) || null;
 }
 
-function groupActiveTasksByQuadrant(tasks) {
+function getQuadrantColor(quadrantKey) {
+  return {
+    urgentImportant: "#c45b48",
+    notUrgentImportant: "#327a62",
+    urgentNotImportant: "#b4812c",
+    notUrgentNotImportant: "#7b7d78",
+    inbox: "#8a8176",
+  }[quadrantKey] || "#8a8176";
+}
+
+const GOAL_WORK_PREFIX = "goal::";
+
+function goalWorkId(goalId) {
+  return `${GOAL_WORK_PREFIX}${goalId}`;
+}
+
+function isGoalWorkId(workId) {
+  return String(workId || "").startsWith(GOAL_WORK_PREFIX);
+}
+
+function goalIdFromWorkId(workId) {
+  return isGoalWorkId(workId) ? String(workId).slice(GOAL_WORK_PREFIX.length) : "";
+}
+
+function normalizeGoalQuadrant(value) {
+  return TASK_QUADRANT_KEYS.includes(value) ? value : "notUrgentImportant";
+}
+
+function workItemPriority(item, fallback = 9999) {
+  const value = Number(item?.priority);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function compareWorkItems(left, right) {
+  const priorityGap = workItemPriority(left) - workItemPriority(right);
+  if (priorityGap !== 0) return priorityGap;
+  if (left.kind !== right.kind) return left.kind === "goal" ? -1 : 1;
+  return String(left.createdAt || left.title || "").localeCompare(String(right.createdAt || right.title || ""), "ja");
+}
+
+function goalToWorkItem(goal, index = 0) {
+  const continuation = getGoalContinuation(goal.id);
+  return {
+    id: goalWorkId(goal.id),
+    sourceId: goal.id,
+    kind: "goal",
+    title: goal.setup?.goal || goal.title || "目標",
+    minutes: getGoalDurationMinutes(goal),
+    quadrant: normalizeGoalQuadrant(goal.setup?.quadrant),
+    priority: goal.setup?.priority !== null && goal.setup?.priority !== "" && Number.isFinite(Number(goal.setup?.priority))
+      ? Number(goal.setup.priority)
+      : 100 + index,
+    goal,
+    isHabit: goal.setup?.goalType === "habit",
+    plannedDate: isGoalScheduledForDate(goal) ? toISODate(new Date()) : "",
+    pausedRemainingSeconds: continuation?.remainingSeconds || 0,
+    accumulatedSeconds: continuation?.accumulatedSeconds || 0,
+    plannedSeconds: continuation?.plannedSeconds || getGoalDurationMinutes(goal) * 60,
+    subtasks: [],
+  };
+}
+
+function taskToWorkItem(task) {
+  return {
+    ...task,
+    kind: "task",
+    sourceId: task.id,
+    isHabit: false,
+  };
+}
+
+function getActiveWorkItems() {
+  const tasks = normalizeTasks(state.tasks)
+    .filter((task) => task.status === "active")
+    .map(taskToWorkItem);
+  const goals = listGoals()
+    .map(goalToWorkItem);
+  return [...goals, ...tasks].sort(compareWorkItems);
+}
+
+function getWorkItemById(workId) {
+  if (isGoalWorkId(workId)) {
+    const goalId = goalIdFromWorkId(workId);
+    const goal = listGoals().find((item) => item.id === goalId);
+    return goal ? goalToWorkItem(goal) : null;
+  }
+  const task = getTaskById(workId);
+  return task ? taskToWorkItem(task) : null;
+}
+
+function groupActiveWorkItemsByQuadrant(items = getActiveWorkItems()) {
   const groups = {
     [TASK_QUADRANT_DEFAULT]: [],
   };
@@ -525,58 +764,75 @@ function groupActiveTasksByQuadrant(tasks) {
     groups[quadrant.key] = [];
   });
 
-  tasks.forEach((task) => {
-    const key = normalizeTaskQuadrant(task.quadrant);
-    groups[key].push(task);
+  items.forEach((item) => {
+    const key = item.kind === "goal"
+      ? normalizeGoalQuadrant(item.quadrant)
+      : normalizeTaskQuadrant(item.quadrant);
+    groups[key].push(item);
   });
+
+  Object.values(groups).forEach((itemsInGroup) => itemsInGroup.sort(compareWorkItems));
 
   return groups;
 }
 
-function moveTaskToQuadrant(taskId, quadrantKey, beforeTaskId = null) {
-  const nextQuadrant = normalizeTaskQuadrant(quadrantKey);
-  const meta = getTaskQuadrantMeta(nextQuadrant);
-  let movedTask = null;
-  const nextTasks = normalizeTasks(state.tasks).filter((task) => {
-    if (task.id !== taskId) {
-      return true;
-    }
-    movedTask = normalizeTask({
-      ...task,
-      quadrant: nextQuadrant,
-      minutes: meta
-        && task.quadrant !== nextQuadrant
-        && task.minutes === TASK_DEFAULT_MINUTES
-        && meta.defaultMinutes !== TASK_DEFAULT_MINUTES
-          ? meta.defaultMinutes
-          : task.minutes,
-      updatedAt: new Date().toISOString(),
+function patchWorkItem(workId, patch) {
+  if (isGoalWorkId(workId)) {
+    const goalId = goalIdFromWorkId(workId);
+    state.goals = state.goals.map((goal) => {
+      if (goal.id !== goalId) return goal;
+      return { ...goal, setup: { ...goal.setup, ...patch } };
     });
-    return false;
-  });
-
-  if (!movedTask) {
-    return null;
-  }
-
-  const beforeIndex = beforeTaskId
-    ? nextTasks.findIndex((task) => task.id === beforeTaskId)
-    : -1;
-  if (beforeIndex >= 0) {
-    nextTasks.splice(beforeIndex, 0, movedTask);
-  } else {
-    let insertIndex = nextTasks.length;
-    for (let index = nextTasks.length - 1; index >= 0; index -= 1) {
-      if (normalizeTaskQuadrant(nextTasks[index].quadrant) === nextQuadrant) {
-        insertIndex = index + 1;
-        break;
-      }
+    if (state.meta.activeGoalId === goalId) {
+      state.setup = { ...state.setup, ...patch };
     }
-    nextTasks.splice(insertIndex, 0, movedTask);
+    return;
   }
+  const sourceGoalId = getTaskById(workId)?.sourceGoalId || "";
+  state.tasks = normalizeTasks(state.tasks).map((task) => (
+    task.id === workId ? normalizeTask({ ...task, ...patch, updatedAt: new Date().toISOString() }) : task
+  ));
+  if (sourceGoalId && patch.quadrant) {
+    state.goals = state.goals.map((goal) => (
+      goal.id === sourceGoalId ? { ...goal, setup: { ...goal.setup, quadrant: normalizeGoalQuadrant(patch.quadrant) } } : goal
+    ));
+    if (state.meta.activeGoalId === sourceGoalId) {
+      state.setup = { ...state.setup, quadrant: normalizeGoalQuadrant(patch.quadrant) };
+    }
+  }
+}
 
-  state.tasks = nextTasks;
-  return movedTask;
+function moveTaskToQuadrant(workId, quadrantKey, beforeWorkId = null) {
+  syncActiveGoalRecord();
+  const current = getWorkItemById(workId);
+  if (!current) return null;
+
+  const nextQuadrant = current.kind === "goal"
+    ? normalizeGoalQuadrant(quadrantKey)
+    : normalizeTaskQuadrant(quadrantKey);
+  const meta = getTaskQuadrantMeta(nextQuadrant);
+  const patch = { quadrant: nextQuadrant };
+  if (
+    current.kind === "task"
+    && meta
+    && current.quadrant !== nextQuadrant
+    && current.minutes === TASK_DEFAULT_MINUTES
+    && meta.defaultMinutes !== TASK_DEFAULT_MINUTES
+  ) {
+    patch.minutes = meta.defaultMinutes;
+  }
+  patchWorkItem(workId, patch);
+
+  const targetItems = getActiveWorkItems()
+    .filter((item) => item.quadrant === nextQuadrant && item.id !== workId);
+  const moved = getWorkItemById(workId);
+  const beforeIndex = beforeWorkId
+    ? targetItems.findIndex((item) => item.id === beforeWorkId)
+    : -1;
+  targetItems.splice(beforeIndex >= 0 ? beforeIndex : targetItems.length, 0, moved);
+  targetItems.forEach((item, index) => patchWorkItem(item.id, { priority: index }));
+
+  return getWorkItemById(workId);
 }
 
 function assignTaskQuadrant(taskId, quadrantKey) {
@@ -910,10 +1166,17 @@ function startPendingFocusSession(pending = ui.pendingFocusStart) {
     return;
   }
 
+  if (pending.type === "goal" && pending.goalId && pending.goalId !== state.meta.activeGoalId) {
+    activateGoal(pending.goalId);
+  }
+
   const planKey = pending.planKey || ui.selectedSessionPlan;
-  beginSession(planKey);
+  const started = beginSession(planKey);
+  if (!started) return;
   render();
-  showToast(`${state.plans?.[planKey]?.minutes || state.setup.normalMinutes || 30}分を開始しました。`);
+  showToast(started.isResume
+    ? `残り ${formatTaskRemaining(started.durationSeconds)} から再開しました。`
+    : `${Math.max(1, Math.ceil(started.durationSeconds / 60))}分を開始しました。`);
 }
 
 function retryPendingFocusStart() {
@@ -1087,6 +1350,8 @@ function mergePlanDefinition(basePlan, savedPlan) {
 function createGoalRecord(config = {}) {
   const setup = cloneData(config.setup || state?.setup || {});
   setup.studyDays = normalizeStudyDays(setup.studyDays);
+  setup.quadrant = normalizeGoalQuadrant(setup.quadrant);
+  setup.priority = setup.priority !== null && setup.priority !== "" && Number.isFinite(Number(setup.priority)) ? Number(setup.priority) : null;
   setup.flowerType = normalizeFlowerType(setup.flowerType, setup);
   setup.goalType = setup.goalType === "habit" ? "habit" : "goal";
   setup.bonsaiKey = BONSAI_LIBRARY[setup.bonsaiKey] ? setup.bonsaiKey : "pine";
@@ -1237,6 +1502,7 @@ function syncActiveGoalRecord() {
 
 function listGoals() {
   ensureGoalCollection();
+  ensureDailyPlan();
   return [...state.goals].filter(g => !g.archived).sort((left, right) => {
     if (left.id === state.meta.activeGoalId) return -1;
     if (right.id === state.meta.activeGoalId) return 1;
@@ -1381,7 +1647,7 @@ function handleKeydown(event) {
     return;
   }
 
-  const tabViews = ["today", "tasks", "review"];
+  const tabViews = ["today", "review"];
   const viewIndex = Number(event.key) - 1;
   if (viewIndex >= 0 && viewIndex < tabViews.length) {
     if (state.activeSession) {
@@ -1391,6 +1657,9 @@ function handleKeydown(event) {
       return;
     }
     state.meta.currentView = tabViews[viewIndex];
+    if (state.meta.currentView === "today") {
+      ui.todayMode = "execution";
+    }
     saveNavState();
     render();
     if (screenFrame) screenFrame.scrollTop = 0;
@@ -1504,10 +1773,70 @@ function handleClick(event) {
       ui.reviewLogDraft = null;
       ui.reviewLogExpanded = false;
     }
-    state.meta.currentView = target.dataset.view === "garden" ? "today" : target.dataset.view;
+    const requestedView = target.dataset.view;
+    if (requestedView === "tasks") {
+      ui.todayMode = "organize";
+    } else if (requestedView === "today") {
+      ui.todayMode = "execution";
+    }
+    state.meta.currentView = requestedView === "garden" || requestedView === "tasks" ? "today" : requestedView;
     saveNavState();
     render();
     if (screenFrame) screenFrame.scrollTop = 0;
+    return;
+  }
+
+  if (action === "set-today-mode") {
+    ui.todayMode = target.dataset.mode === "organize" ? "organize" : "execution";
+    ui.selectedTaskId = null;
+    renderWithTransition();
+    if (screenFrame) screenFrame.scrollTop = 0;
+    return;
+  }
+
+  if (action === "adjust-today-capacity") {
+    const plan = ensureDailyPlan();
+    const delta = Number(target.dataset.delta || 0);
+    plan.capacityMinutes = Math.max(15, Math.min(480, plan.capacityMinutes + delta));
+    saveState();
+    render();
+    return;
+  }
+
+  if (action === "add-today-task") {
+    const draft = ensureTaskDraft();
+    const title = String(draft.title || "").trim();
+    if (!title) {
+      showToast("やることを入れてください。");
+      return;
+    }
+    const now = new Date().toISOString();
+    state.tasks = [normalizeTask({
+      id: createTaskId(),
+      title,
+      minutes: normalizeTaskMinutes(draft.minutes),
+      status: "active",
+      quadrant: TASK_QUADRANT_DEFAULT,
+      plannedDate: toISODate(new Date()),
+      createdAt: now,
+      updatedAt: now,
+    }), ...normalizeTasks(state.tasks)];
+    resetTaskDraft();
+    saveState();
+    render();
+    showToast("今日に追加しました。");
+    return;
+  }
+
+  if (action === "toggle-task-today") {
+    const taskId = target.dataset.taskId || "";
+    const task = getTaskById(taskId);
+    if (!task) return;
+    const addToToday = !isTaskPlannedToday(task);
+    updateTask(taskId, () => ({ plannedDate: addToToday ? toISODate(new Date()) : "" }));
+    saveState();
+    render();
+    showToast(addToToday ? "今日に入れました。" : "今日から外しました。");
     return;
   }
 
@@ -1709,6 +2038,11 @@ function handleClick(event) {
 
   if (action === "sign-out") {
     signOut();
+    return;
+  }
+
+  if (action === "delete-account") {
+    deleteAccount();
     return;
   }
 
@@ -1963,7 +2297,7 @@ function handleClick(event) {
     }
     const planKey = getLaunchPlan(state);
     ui.selectedSessionPlan = planKey;
-    const pending = { type: "plan", planKey };
+    const pending = { type: "goal", goalId: goalId || state.meta.activeGoalId, planKey };
     requireDeviceAppLockBeforeStart(() => {
       startPendingFocusSession(pending);
     }, pending);
@@ -2020,9 +2354,10 @@ function handleClick(event) {
 
   if (action === "complete-session") {
     if (isTaskSession()) {
+      const completesLegacyGoal = Boolean(state.activeSession?.sourceGoalId);
       completeTaskSession();
       render();
-      showToast("Taskを完了にしました。");
+      showToast(completesLegacyGoal ? "習慣・目標を完了にしました。" : "Taskを完了にしました。");
       return;
     }
     openFinishDraft(state.activeSession ? state.activeSession.planKey : ui.selectedSessionPlan);
@@ -2064,11 +2399,17 @@ function handleClick(event) {
   }
 
   if (action === "abort-session") {
+    const legacyGoalTaskId = isTaskSession() && state.activeSession?.sourceGoalId
+      ? state.activeSession.taskId
+      : "";
     if (ui.sessionTimer) {
       window.clearInterval(ui.sessionTimer);
       ui.sessionTimer = null;
     }
     releaseWakeLock();
+    if (legacyGoalTaskId) {
+      state.tasks = normalizeTasks(state.tasks).filter((task) => task.id !== legacyGoalTaskId);
+    }
     state.activeSession = null;
     ui.sessionOpen = false;
     ui.finishDraft = null;
@@ -2285,6 +2626,13 @@ function handleInput(event) {
 
 function handleChange(event) {
   const target = event.target;
+
+  if (target.matches("[data-review-goal-filter]")) {
+    ui.reviewGoalFilter = target.value || "all";
+    ui.reviewLogDraft = null;
+    render();
+    return;
+  }
 
   if (target.matches("[data-task-title-field]")) {
     const task = updateTaskTitle(target.dataset.taskTitleField || "", target.value);
@@ -2653,6 +3001,11 @@ function render() {
     ui.sessionOpen = true;
   }
   let currentView = state.meta.currentView || "today";
+  if (currentView === "tasks") {
+    ui.todayMode = "organize";
+    currentView = "today";
+    state.meta.currentView = "today";
+  }
   if (currentView === "garden" || currentView === "roadmap") {
     currentView = "today";
     state.meta.currentView = "today";
@@ -3325,8 +3678,8 @@ function renderSettingsHome() {
 
       <section class="settings-group" aria-labelledby="settings-goals-title">
         <div class="settings-group__heading settings-group__heading--action">
-          <h2 id="settings-goals-title">目標</h2>
-          <button type="button" class="settings-add-button" data-action="start-new-goal" aria-label="目標を追加">＋</button>
+          <h2 id="settings-goals-title">習慣・目標</h2>
+          <button type="button" class="settings-add-button" data-action="start-new-goal" aria-label="習慣・目標を追加">＋</button>
         </div>
         <div class="settings-goal-list">
           ${goals.map((goal) => {
@@ -3358,6 +3711,7 @@ function renderSettingsHome() {
           <button type="button" data-action="export-data">バックアップを書き出す</button>
           <button type="button" data-action="import-data">バックアップを読み込む</button>
           <button type="button" data-action="sign-out">ログアウト</button>
+          <button type="button" class="is-danger" data-action="delete-account">アカウントを削除</button>
           <p class="setup-build-label">build ${APP_BUILD}</p>
         </div>
       </details>
@@ -3379,7 +3733,7 @@ function renderGoalSettingsDetail(draft) {
           ${renderSettingsIcon("back")}
         </button>
         <div>
-          <p>${isNewGoal ? "新しい目標" : "目標ごとの設定"}</p>
+          <p>${isNewGoal ? "新しい項目" : "項目の設定"}</p>
           <h2>${isNewGoal ? "目標を追加" : escapeHtml(state.setup.goal)}</h2>
         </div>
       </div>
@@ -3404,6 +3758,14 @@ function renderGoalSettingsDetail(draft) {
             <input class="field__control" data-setup-field="deadline" type="date" value="${escapeHtml(draft.deadline)}" />
           </label>
         `}
+        <label class="field">
+          <span class="field__label">優先度</span>
+          <select class="field__control" data-setup-field="quadrant">
+            ${TASK_QUADRANTS.map((quadrant) => `
+              <option value="${escapeHtml(quadrant.key)}"${normalizeGoalQuadrant(draft.quadrant) === quadrant.key ? " selected" : ""}>${escapeHtml(quadrant.concept)} · ${escapeHtml(quadrant.title)}</option>
+            `).join("")}
+          </select>
+        </label>
       </section>
 
       <section class="goal-settings-section">
@@ -3447,47 +3809,142 @@ function renderSetupView() {
 }
 
 function renderTodayView() {
-  const goals = listGoalsForToday();
-  const todayKey = weekdayKeyFromDate(new Date());
-  // スケジュール上は今日の対象だが、すべて実施済みで一覧から消えている状態
-  const allDoneToday = !goals.length && listGoals().some((goal) => isGoalScheduledForDate(goal));
-
   return `
-    <section class="screen screen--today screen--today-minimal">
-      <div class="focus-goal-list">
-        ${goals.length
-          ? goals.map((goal, index) => renderTodayGoalCard(goal, index)).join("")
-          : allDoneToday
-            ? `
-              <section class="panel panel--warm stack empty-state">
-                <span class="status-badge status-badge--accent">完了</span>
-                <h2 class="section-title">今日の分はおわり</h2>
-                <p class="section-copy">おつかれさま。つづきはまた明日。</p>
-              </section>
-            `
-            : `
-              <section class="panel panel--warm stack empty-state">
-                <span class="status-badge">${escapeHtml(weekdayLabel(todayKey))}</span>
-                <h2 class="section-title">今日はなし</h2>
-                <button type="button" class="soft-button" data-action="open-setup" data-section="schedule">曜日を変える</button>
-              </section>
-            `}
+    <section class="screen screen--today screen--today-unified">
+      <div class="today-mode-switch" role="tablist" aria-label="Todayの表示">
+        <button type="button" role="tab" class="today-mode-switch__button ${ui.todayMode === "execution" ? "is-active" : ""}" data-action="set-today-mode" data-mode="execution" aria-selected="${ui.todayMode === "execution"}">今日</button>
+        <button type="button" role="tab" class="today-mode-switch__button ${ui.todayMode === "organize" ? "is-active" : ""}" data-action="set-today-mode" data-mode="organize" aria-selected="${ui.todayMode === "organize"}">整理</button>
       </div>
+      ${ui.todayMode === "organize" ? renderTodayOrganizeView() : renderTodayExecutionView()}
     </section>
   `;
 }
 
-function renderTasksView() {
+function getTodayExecutionItems() {
+  const quadrantOrder = new Map(TASK_QUADRANTS.map((quadrant, index) => [quadrant.key, index]));
+  const activeTasks = normalizeTasks(state.tasks)
+    .filter((task) => task.status === "active" && (isTaskPlannedToday(task) || getTaskPausedSeconds(task) > 0))
+  const goalsById = new Map(listGoalsForToday().map((goal) => [goal.id, goal]));
+  listGoals().forEach((goal) => {
+    if (getGoalContinuation(goal.id)) {
+      goalsById.set(goal.id, goal);
+    }
+  });
+  const goals = [...goalsById.values()].map(goalToWorkItem);
+  const tasks = activeTasks.map(taskToWorkItem);
+
+  return [...goals, ...tasks].sort((left, right) => {
+    const pausedGap = Number(getTaskPausedSeconds(right) > 0) - Number(getTaskPausedSeconds(left) > 0);
+    if (pausedGap !== 0) return pausedGap;
+    const quadrantGap = (quadrantOrder.get(left.quadrant) ?? 9) - (quadrantOrder.get(right.quadrant) ?? 9);
+    return quadrantGap || compareWorkItems(left, right);
+  });
+}
+
+function getTodayPlannedMinutes() {
+  const plannedTasks = normalizeTasks(state.tasks)
+    .filter((task) => isTaskPlannedToday(task) && task.status !== "shelved");
+  const goalMinutes = listGoals()
+    .filter((goal) => isGoalScheduledForDate(goal) || getGoalContinuation(goal.id))
+    .reduce((sum, goal) => {
+      if (isGoalScheduledForDate(goal)) {
+        return sum + getGoalDurationMinutes(goal);
+      }
+      const continuation = getGoalContinuation(goal.id);
+      return sum + Math.max(1, Math.ceil(Number(continuation?.remainingSeconds || 0) / 60));
+    }, 0);
+  const taskMinutes = plannedTasks
+    .reduce((sum, task) => sum + Math.max(1, Math.ceil(Number(task.plannedSeconds || task.minutes * 60) / 60)), 0);
+  return goalMinutes + taskMinutes;
+}
+
+function renderTodayExecutionView() {
+  const items = getTodayExecutionItems();
+  const plan = ensureDailyPlan();
+  const plannedMinutes = getTodayPlannedMinutes();
+  const remainingMinutes = plan.capacityMinutes - plannedMinutes;
+  const progress = Math.min(100, Math.round((plannedMinutes / Math.max(1, plan.capacityMinutes)) * 100));
+  const allDoneToday = !items.length && plannedMinutes > 0;
+
+  return `
+    <div class="today-execution">
+      <section class="today-capacity ${remainingMinutes < 0 ? "is-over" : ""}">
+        <div class="today-capacity__head">
+          <div>
+            <span class="today-capacity__label">今日の枠</span>
+            <strong>${escapeHtml(`${plannedMinutes}/${plan.capacityMinutes}分`)}</strong>
+          </div>
+          <div class="today-capacity__stepper" aria-label="今日の枠を調整">
+            <button type="button" data-action="adjust-today-capacity" data-delta="-15" aria-label="15分減らす">−</button>
+            <button type="button" data-action="adjust-today-capacity" data-delta="15" aria-label="15分増やす">＋</button>
+          </div>
+        </div>
+        <div class="today-capacity__track" aria-hidden="true"><span style="width:${progress}%"></span></div>
+        <p>${remainingMinutes < 0 ? escapeHtml(`あと${Math.abs(remainingMinutes)}分外す`) : escapeHtml(`残り${remainingMinutes}分`)}</p>
+      </section>
+
+      <div class="today-work-list">
+        ${items.length
+          ? items.map((item, index) => renderTodayWorkItem(item, index)).join("")
+          : `
+            <section class="today-clear-state">
+              <span>${allDoneToday ? "完了" : "空き"}</span>
+              <h2>${allDoneToday ? "今日の分はおわり" : "今日はまだ空いています"}</h2>
+            </section>
+          `}
+      </div>
+
+      <section class="today-quick-add" aria-label="今日やることを追加">
+        <input class="field__control" data-task-draft-field="title" type="text" value="${escapeHtml(ensureTaskDraft().title || "")}" placeholder="今日やること" />
+        <label>
+          <input class="field__control" data-task-draft-field="minutes" type="number" min="1" max="240" inputmode="numeric" value="${escapeHtml(String(ensureTaskDraft().minutes || TASK_DEFAULT_MINUTES))}" aria-label="予定分数" />
+          <span>分</span>
+        </label>
+        <button type="button" data-action="add-today-task" aria-label="今日やることを追加">＋</button>
+      </section>
+    </div>
+  `;
+}
+
+function renderTodayWorkItem(item, index) {
+  const quadrant = getTaskQuadrantMeta(item.quadrant) || getTaskQuadrantMeta("notUrgentImportant");
+  const pausedSeconds = getTaskPausedSeconds(item);
+  const minutesLabel = pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `${item.minutes}分`;
+  const itemType = item.kind === "goal" ? (item.isHabit ? "習慣" : "目標") : quadrant.concept;
+  const startAction = item.kind === "goal" ? "start-goal-session" : "start-task-session";
+  const idAttribute = item.kind === "goal"
+    ? `data-goal-id="${escapeHtml(item.sourceId)}"`
+    : `data-task-id="${escapeHtml(item.sourceId)}"`;
+
+  return `
+    <article class="today-work-item ${index === 0 ? "is-next" : ""}" style="--work-accent:${getQuadrantColor(item.quadrant)}">
+      <div class="today-work-item__copy">
+        <div class="today-work-item__meta">
+          <span>${index === 0 ? "次にやる" : escapeHtml(itemType)}</span>
+          ${index === 0 ? `<small>${escapeHtml(itemType)}</small>` : ""}
+        </div>
+        <h2>${escapeHtml(item.title)}</h2>
+      </div>
+      <div class="today-work-item__actions">
+        <span>${escapeHtml(minutesLabel)}</span>
+        ${item.kind === "task" ? `<button type="button" class="today-work-item__remove" data-action="toggle-task-today" data-task-id="${escapeHtml(item.sourceId)}" aria-label="今日から外す">外す</button>` : ""}
+        <button type="button" class="today-work-item__start" data-action="${startAction}" ${idAttribute}>${pausedSeconds ? "再開" : "開始"}</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderTodayOrganizeView() {
   const draft = ensureTaskDraft();
   const tasks = normalizeTasks(state.tasks);
   const activeTasks = tasks.filter((task) => task.status === "active");
-  const activeGroups = groupActiveTasksByQuadrant(activeTasks);
-  const pausedTasks = activeTasks.filter((task) => getTaskPausedSeconds(task) > 0);
+  const workItems = getActiveWorkItems();
+  const activeGroups = groupActiveWorkItemsByQuadrant(workItems);
   const shelvedTasks = tasks.filter((task) => task.status === "shelved");
   const doneTasks = tasks.filter((task) => task.status === "done").slice(0, 5);
 
   return `
-    <section class="screen screen--tasks">
+    <div class="today-organize">
       <section class="panel task-composer task-composer--simple">
         <div class="task-add-row task-add-row--simple">
           <input class="field__control task-title-input" data-task-draft-field="title" type="text" value="${escapeHtml(draft.title || "")}" placeholder="あとでやること" />
@@ -3499,9 +3956,8 @@ function renderTasksView() {
         </div>
       </section>
 
-      ${renderTaskResumeQueue(pausedTasks)}
       ${renderTaskQuadrantBoard(activeGroups)}
-      ${renderSelectedTaskPanel(activeTasks)}
+      ${renderSelectedTaskPanel(workItems)}
       ${renderTaskInbox(activeGroups[TASK_QUADRANT_DEFAULT])}
 
       <section class="task-list-section">
@@ -3526,8 +3982,13 @@ function renderTasksView() {
             </div>
           </details>`
         : ""}
-    </section>
+    </div>
   `;
+}
+
+function renderTasksView() {
+  ui.todayMode = "organize";
+  return renderTodayView();
 }
 
 function renderTaskResumeQueue(tasks) {
@@ -3591,26 +4052,19 @@ function renderTaskQuadrantBoard(groups) {
 
 function renderTaskQuadrant(quadrant, tasks, boardTotalMinutes = 0) {
   const totalMinutes = tasks.reduce((sum, task) => sum + normalizeTaskMinutes(task.minutes), 0);
-  // A2Eは配分の本。目安に対して「今」何%割いているかを並記する
-  const share = boardTotalMinutes > 0 ? Math.round((totalMinutes / boardTotalMinutes) * 100) : null;
-  const shareLabel = share === null ? "" : ` ・ 今 ${share}%`;
 
   return `
-    <section class="task-quadrant task-quadrant--${escapeHtml(quadrant.key)}" data-task-quadrant-zone="${escapeHtml(quadrant.key)}">
+    <section class="task-quadrant task-quadrant--${escapeHtml(quadrant.key)}" data-task-quadrant-zone="${escapeHtml(quadrant.key)}" style="--quadrant-color:${getQuadrantColor(quadrant.key)}">
       <div class="task-quadrant__head">
         <div class="task-quadrant__label">
-          <span class="task-quadrant__axis">${escapeHtml(quadrant.axis)}</span>
-          <h4>${escapeHtml(quadrant.title)}</h4>
-          <p>${escapeHtml(quadrant.concept)}</p>
+          <span class="task-quadrant__axis">${escapeHtml(quadrant.frameworkLabel)}</span>
+          <h4>${escapeHtml(quadrant.concept)}</h4>
+          <p>${escapeHtml(quadrant.title)}</p>
         </div>
         <div class="task-quadrant__time">
           <strong>${escapeHtml(String(totalMinutes))}</strong>
           <span>分</span>
         </div>
-      </div>
-      <div class="task-quadrant__meta">
-        <span>目安 ${escapeHtml(String(quadrant.target))}%${escapeHtml(shareLabel)}</span>
-        <span>${escapeHtml(quadrant.note)}</span>
       </div>
       <div class="task-quadrant__list">
         ${tasks.length
@@ -3639,13 +4093,16 @@ function renderTaskBoardItem(task) {
     ? `<span class="task-board-item__breakdown">${escapeHtml(`${progress.done}/${progress.total}`)}</span>`
     : "";
   const resumeBadge = renderTaskResumeBadge(task, "task-board-item__resume");
-  const badges = resumeBadge || progressBadge
-    ? `<span class="task-board-item__badges">${resumeBadge}${progressBadge}</span>`
+  const typeBadge = task.kind === "goal"
+    ? `<span class="task-board-item__type">${task.isHabit ? "習慣" : "目標"}</span>`
+    : (isTaskPlannedToday(task) ? `<span class="task-board-item__type is-today">今日</span>` : "");
+  const badges = resumeBadge || progressBadge || typeBadge
+    ? `<span class="task-board-item__badges">${typeBadge}${resumeBadge}${progressBadge}</span>`
     : "";
   return `
     <button
       type="button"
-      class="task-board-item${isSelected ? " is-selected" : ""}"
+      class="task-board-item task-board-item--${escapeHtml(task.kind || "task")}${isSelected ? " is-selected" : ""}"
       data-action="select-task"
       data-task-id="${escapeHtml(task.id)}"
       data-task-draggable="true"
@@ -3663,7 +4120,11 @@ function renderSelectedTaskPanel(tasks) {
   if (!selectedTask) {
     return "";
   }
+  if (selectedTask.kind === "goal") {
+    return renderSelectedGoalPanel(selectedTask);
+  }
   const pausedSeconds = getTaskPausedSeconds(selectedTask);
+  const plannedToday = isTaskPlannedToday(selectedTask);
 
   return `
     <section class="task-selected-panel">
@@ -3685,8 +4146,36 @@ function renderSelectedTaskPanel(tasks) {
       ${renderTaskBreakdown(selectedTask)}
       <div class="task-card__actions">
         <button type="button" class="action-button action-button--primary task-card__start" data-action="start-task-session" data-task-id="${escapeHtml(selectedTask.id)}">${getTaskStartLabel(selectedTask)}</button>
+        <button type="button" class="soft-button" data-action="toggle-task-today" data-task-id="${escapeHtml(selectedTask.id)}">${plannedToday ? "今日から外す" : "今日やる"}</button>
         <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(selectedTask.id)}">完了</button>
-        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(selectedTask.id)}">棚上げ</button>
+        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(selectedTask.id)}">あとで</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderSelectedGoalPanel(item) {
+  const goal = item.goal;
+  const timing = `${formatStudyDays(goal.setup.studyDays)} · ${goal.setup.primaryWindow}`;
+  const pausedSeconds = getTaskPausedSeconds(item);
+  return `
+    <section class="task-selected-panel task-selected-panel--goal">
+      <div class="task-selected-panel__main">
+        <div class="task-edit-title-wrap">
+          <span>${pausedSeconds ? `続き · 残り ${escapeHtml(formatTaskRemaining(pausedSeconds))}` : (item.isHabit ? "習慣" : "目標")}</span>
+          <strong class="task-edit-title task-edit-title--static">${escapeHtml(item.title)}</strong>
+        </div>
+        <div class="task-card__meta">
+          <span class="task-card__minutes task-card__minutes--static">${escapeHtml(pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `${item.minutes}分`)}</span>
+          <select class="task-card__quadrant-select" data-task-quadrant-select="${escapeHtml(item.id)}" aria-label="分類">
+            ${renderGoalQuadrantOptions(item.quadrant)}
+          </select>
+        </div>
+        <p class="task-selected-panel__schedule">${escapeHtml(timing)}</p>
+      </div>
+      <div class="task-card__actions">
+        <button type="button" class="action-button action-button--primary task-card__start" data-action="start-goal-session" data-goal-id="${escapeHtml(item.sourceId)}">${pausedSeconds ? "再開" : "開始"}</button>
+        <button type="button" class="soft-button" data-action="open-goal-settings" data-goal-id="${escapeHtml(item.sourceId)}">設定</button>
       </div>
     </section>
   `;
@@ -3735,6 +4224,13 @@ function renderTaskQuadrantOptions(selectedQuadrant) {
 
   return options.map((option) => `
     <option value="${escapeHtml(option.key)}"${normalized === option.key ? " selected" : ""}>${escapeHtml(option.label)}</option>
+  `).join("");
+}
+
+function renderGoalQuadrantOptions(selectedQuadrant) {
+  const normalized = normalizeGoalQuadrant(selectedQuadrant);
+  return TASK_QUADRANTS.map((quadrant) => `
+    <option value="${escapeHtml(quadrant.key)}"${normalized === quadrant.key ? " selected" : ""}>${escapeHtml(quadrant.concept)}</option>
   `).join("");
 }
 
@@ -4042,19 +4538,144 @@ function renderRoadmapEditor(stepLabel = "+") {
   `;
 }
 function renderReviewView() {
-  const metrics = computeReviewMetrics(state);
-  const totalStudySeconds = state.logs.reduce((sum, entry) => (
-    isExecutionOutcome(entry.outcome) ? sum + getLoggedSeconds(entry) : sum
-  ), 0);
-  const weekLog = getTrailingEntries(7);
+  const allLogs = getAllExecutionLogs();
+  const filteredLogs = ui.reviewGoalFilter === "all"
+    ? allLogs
+    : ui.reviewGoalFilter === "tasks"
+      ? allLogs.filter((entry) => entry.itemKind === "task")
+      : allLogs.filter((entry) => entry.goalId === ui.reviewGoalFilter);
+  const weekStart = toISODate(addDays(new Date(), -6));
+  const weekLogs = filteredLogs.filter((entry) => entry.date >= weekStart);
 
   return `
-    <section class="screen screen--review">
-      ${listGoals().length > 1 ? `<div class="review-goal-switch">${renderActiveGoalContext()}</div>` : ""}
+    <section class="screen screen--review screen--review-allocation">
+      <div class="review-filter-row">
+        <label>
+          <span>表示</span>
+          <select data-review-goal-filter aria-label="Reviewの対象">
+            <option value="all"${ui.reviewGoalFilter === "all" ? " selected" : ""}>すべて</option>
+            ${listGoals().map((goal) => `<option value="${escapeHtml(goal.id)}"${ui.reviewGoalFilter === goal.id ? " selected" : ""}>${escapeHtml(goal.setup.goal)}</option>`).join("")}
+            <option value="tasks"${ui.reviewGoalFilter === "tasks" ? " selected" : ""}>単発Task</option>
+          </select>
+        </label>
+      </div>
 
-      ${renderReviewOverview(weekLog, metrics, totalStudySeconds)}
+      ${renderAllocationReview(weekLogs)}
+      ${renderRecentActivity(filteredLogs)}
 
-      ${renderReviewLogEditPanel()}
+      ${ui.reviewGoalFilter !== "tasks" ? `
+        <details class="review-maintenance">
+          <summary>記録を修正</summary>
+          ${renderReviewLogEditPanel()}
+        </details>
+      ` : ""}
+    </section>
+  `;
+}
+
+function getAllExecutionLogs() {
+  syncActiveGoalRecord();
+  const goalLogs = (state.goals || []).flatMap((goal) => (
+    normalizeLogs(goal.logs || [])
+      .filter((entry) => isExecutionOutcome(entry.outcome))
+      .map((entry) => ({
+        ...entry,
+        itemKind: "goal",
+        itemId: entry.itemId || goal.id,
+        itemTitle: entry.itemTitle || entry.missionTitle || goal.setup?.goal || "目標",
+        goalId: entry.goalId || goal.id,
+        quadrant: normalizeGoalQuadrant(entry.quadrant || goal.setup?.quadrant),
+      }))
+  ));
+  const taskLogs = normalizeLogs(state.taskLogs || []).map((entry) => ({
+    ...entry,
+    itemKind: "task",
+    itemTitle: entry.itemTitle || "Task",
+    quadrant: normalizeTaskQuadrant(entry.quadrant),
+  }));
+
+  return [...goalLogs, ...taskLogs]
+    .sort((left, right) => new Date(right.recordedAt) - new Date(left.recordedAt));
+}
+
+function renderAllocationReview(logs) {
+  const totalSeconds = logs.reduce((sum, entry) => sum + getLoggedSeconds(entry), 0);
+  const plannedSeconds = logs.reduce((sum, entry) => sum + Math.max(0, Number(entry.plannedSeconds) || 0), 0);
+  const executedDays = new Set(logs.map((entry) => entry.date)).size;
+  const segments = TASK_QUADRANTS.map((quadrant) => {
+    const seconds = logs
+      .filter((entry) => entry.quadrant === quadrant.key)
+      .reduce((sum, entry) => sum + getLoggedSeconds(entry), 0);
+    return {
+      ...quadrant,
+      seconds,
+      share: totalSeconds > 0 ? Math.round((seconds / totalSeconds) * 100) : 0,
+    };
+  });
+  const futureShare = segments.find((item) => item.key === "notUrgentImportant")?.share || 0;
+
+  return `
+    <section class="review-allocation">
+      <div class="review-allocation__headline">
+        <div>
+          <span>直近7日</span>
+          <strong>${escapeHtml(formatReviewDuration(totalSeconds))}</strong>
+        </div>
+        <div class="review-allocation__future">
+          <span>育てる</span>
+          <strong>${futureShare}%</strong>
+        </div>
+      </div>
+      <div class="review-allocation__bar" aria-label="4象限別の実行時間">
+        ${segments.map((segment) => segment.seconds > 0
+          ? `<span style="width:${Math.max(2, segment.share)}%;background:${getQuadrantColor(segment.key)}" title="${escapeHtml(`${segment.concept} ${segment.share}%`)}"></span>`
+          : "").join("")}
+      </div>
+      <div class="review-allocation__legend">
+        ${segments.map((segment) => `
+          <div>
+            <i style="background:${getQuadrantColor(segment.key)}"></i>
+            <span>${escapeHtml(segment.concept)}</span>
+            <strong>${escapeHtml(formatReviewDuration(segment.seconds))}</strong>
+            <small>${segment.share}%</small>
+          </div>
+        `).join("")}
+      </div>
+      <div class="review-allocation__foot">
+        <span>${executedDays}日実行</span>
+        <span>予定 ${escapeHtml(formatReviewDuration(plannedSeconds))}</span>
+      </div>
+    </section>
+  `;
+}
+
+function formatReviewDuration(seconds) {
+  return Number(seconds) > 0 ? formatLoggedDuration(seconds) : "0分";
+}
+
+function renderRecentActivity(logs) {
+  const recent = logs.filter((entry) => getLoggedSeconds(entry) > 0).slice(0, 6);
+  if (!recent.length) return "";
+  return `
+    <section class="review-recent">
+      <div class="review-recent__head">
+        <h2>最近の実行</h2>
+      </div>
+      <div class="review-recent__list">
+        ${recent.map((entry) => {
+          const quadrant = getTaskQuadrantMeta(entry.quadrant);
+          return `
+            <article>
+              <i style="background:${getQuadrantColor(entry.quadrant)}"></i>
+              <div>
+                <strong>${escapeHtml(entry.itemTitle || entry.missionTitle || "実行")}</strong>
+                <span>${escapeHtml(`${formatReviewLogDate(entry.date)} · ${quadrant?.concept || "未整理"}`)}</span>
+              </div>
+              <b>${escapeHtml(formatLoggedDuration(getLoggedSeconds(entry)))}</b>
+            </article>
+          `;
+        }).join("")}
+      </div>
     </section>
   `;
 }
@@ -4839,6 +5460,9 @@ function renderSessionSheet() {
     ui.sessionOpen = false;
     return;
   }
+  const displayedSessionMinutes = state.activeSession
+    ? Math.max(1, Math.ceil(getSessionDurationMs(state.activeSession) / (60 * 1000)))
+    : plan.minutes;
   const remaining = state.activeSession ? getRemainingMs(state.activeSession.endsAt) : plan.minutes * 60 * 1000;
   const overtime = state.activeSession && remaining <= 0;
   const sessionProgress = state.activeSession ? getSessionProgressRatio(state.activeSession, remaining) : 0;
@@ -4914,7 +5538,7 @@ function renderSessionSheet() {
                   <div class="session-current-work">
                     <span class="session-current-work__label">${taskSession ? "Task" : "今やること"}</span>
                     <strong class="session-current-work__title">${escapeHtml(sessionTitle)}</strong>
-                    <span class="session-current-work__meta">${escapeHtml(`${plan.minutes}分`)}</span>
+                    <span class="session-current-work__meta">${escapeHtml(`${displayedSessionMinutes}分`)}</span>
                   </div>
                 ` : ""}
                 ${renderFocusTimerVisual(sessionProgress)}
@@ -4941,8 +5565,8 @@ function renderSessionSheet() {
                       <div class="abort-confirm${overtime ? " abort-confirm--finished" : ""}">
                         <p class="abort-confirm__message">${overtime
                           ? "予定時間は終了しています。今回はここで終了しますか？"
-                          : `残り ${escapeHtml(formatCountdown(remaining))}。続きはTaskに残せます。`}</p>
-                        ${overtime ? "" : `<button type="button" class="action-button action-button--primary" data-action="hold-session">残りを保留</button>`}
+                          : `残り ${escapeHtml(formatCountdown(remaining))}。同じ項目から再開できます。`}</p>
+                        ${overtime ? "" : `<button type="button" class="action-button action-button--primary" data-action="hold-session">残りを残す</button>`}
                         <button type="button" class="action-button action-button--danger" data-action="abort-session">今回は終了</button>
                         <button type="button" class="soft-button" data-action="cancel-abort-confirm">戻る</button>
                       </div>
@@ -5089,16 +5713,21 @@ function renderSessionSheet() {
 
 function openFinishDraft(planKey) {
   ui.selectedSessionPlan = planKey;
+  const accumulatedSeconds = Math.max(0, Number(state.activeSession?.accumulatedSeconds || 0));
   const rawElapsed = state.activeSession
-    ? Math.max(1, Math.round((Date.now() - state.activeSession.startedAt) / 1000))
+    ? Math.max(1, accumulatedSeconds + Math.round((Date.now() - state.activeSession.startedAt) / 1000))
     : state.plans[planKey].minutes * 60;
   const elapsedSeconds = Math.max(1, rawElapsed);
+  const plannedSeconds = Math.max(
+    1,
+    Number(state.activeSession?.plannedSeconds || state.plans[planKey].minutes * 60),
+  );
 
   ui.finishDraft = {
     outcome: planKey,
     elapsedSeconds,
     _originalElapsed: elapsedSeconds,
-    plannedSeconds: state.plans[planKey].minutes * 60,
+    plannedSeconds,
     progressText: "",
     reflection: "",
     milestoneId: "",
@@ -5139,62 +5768,95 @@ function holdActiveSession() {
   }
 
   const startedFromTask = isTaskSession(session);
+  const continuationGoalId = startedFromTask
+    ? String(session.sourceGoalId || "")
+    : String(session.goalId || state.meta.activeGoalId || "");
   const pausedAt = new Date().toISOString();
+  const elapsedThisRun = Math.max(0, Math.round((Date.now() - Number(session.startedAt || Date.now())) / 1000));
+  const accumulatedSeconds = Math.max(0, Number(session.accumulatedSeconds || 0)) + elapsedThisRun;
   let task = null;
-  if (startedFromTask) {
+  let continuation = null;
+  let continuationTitle = "";
+
+  if (continuationGoalId) {
+    const goal = (state.goals || []).find((item) => item.id === continuationGoalId);
+    if (goal) {
+      continuation = setGoalContinuation(continuationGoalId, {
+        remainingSeconds,
+        accumulatedSeconds,
+        plannedSeconds: Math.max(
+          1,
+          Number(session.plannedSeconds)
+            || Number(goal.plans?.[session.planKey]?.minutes || goal.setup?.normalMinutes || 1) * 60,
+        ),
+        planKey: session.sourceGoalPlanKey || session.planKey || "A",
+        pausedAt,
+      });
+      continuationTitle = goal.setup?.goal || goal.title || "習慣・目標";
+      if (startedFromTask && session.taskId) {
+        state.tasks = normalizeTasks(state.tasks).filter((item) => item.id !== session.taskId);
+      }
+    }
+  } else if (startedFromTask) {
     task = updateTask(session.taskId, () => ({
       status: "active",
       completedAt: null,
       shelvedAt: null,
       pausedRemainingSeconds: remainingSeconds,
       pausedAt,
+      plannedDate: toISODate(new Date()),
+      accumulatedSeconds,
     }));
-  } else {
-    task = normalizeTask({
-      id: createTaskId(),
-      title: String(state.setup?.goal || state.today?.missionTitle || "続き").trim(),
-      minutes: Math.max(1, Math.ceil(remainingSeconds / 60)),
-      status: "active",
-      quadrant: TASK_QUADRANT_DEFAULT,
-      pausedRemainingSeconds: remainingSeconds,
-      pausedAt,
-      createdAt: pausedAt,
-      updatedAt: pausedAt,
-    });
-    state.tasks = [task, ...normalizeTasks(state.tasks)];
   }
 
-  if (!task) {
-    showToast("Taskを保留できませんでした。");
+  if (!task && !continuation) {
+    showToast("残り時間を保存できませんでした。");
     return;
   }
 
   clearActiveSessionRuntime();
   closePiP();
-  ui.selectedTaskId = task.id;
-  state.meta.currentView = startedFromTask ? "tasks" : "today";
+  ui.selectedTaskId = task ? task.id : goalWorkId(continuationGoalId);
+  state.meta.currentView = "today";
+  ui.todayMode = task && session.originMode === "organize" ? "organize" : "execution";
   saveState();
   render();
   if (screenFrame) {
     screenFrame.scrollTop = 0;
   }
-  showToast(`残り ${formatTaskRemaining(remainingSeconds)} をTaskに保留しました。`);
+  showToast(continuation
+    ? `「${continuationTitle}」に残り ${formatTaskRemaining(remainingSeconds)} を残しました。`
+    : `残り ${formatTaskRemaining(remainingSeconds)} をこのTaskに残しました。`);
 }
 
 function beginSession(planKey) {
-  const plan = state.plans[planKey];
+  const goalId = state.meta.activeGoalId;
+  const continuation = getGoalContinuation(goalId);
+  const activePlanKey = continuation?.planKey && state.plans[continuation.planKey]
+    ? continuation.planKey
+    : planKey;
+  const plan = state.plans[activePlanKey];
   if (!plan) {
     showToast("プランが見つかりません。設定を確認してください。");
-    return;
+    return null;
   }
+  const durationSeconds = continuation?.remainingSeconds || plan.minutes * 60;
   const now = Date.now();
   state.activeSession = {
-    planKey,
+    type: "goal",
+    goalId,
+    goalTitle: state.setup?.goal || "",
+    planKey: activePlanKey,
+    durationSeconds,
+    plannedSeconds: continuation?.plannedSeconds || plan.minutes * 60,
+    accumulatedSeconds: continuation?.accumulatedSeconds || 0,
+    originMode: ui.todayMode || "execution",
     startedAt: now,
-    endsAt: now + plan.minutes * 60 * 1000,
+    endsAt: now + durationSeconds * 1000,
     departures: 0,
   };
-  ui.selectedSessionPlan = planKey;
+  clearGoalContinuation(goalId);
+  ui.selectedSessionPlan = activePlanKey;
   ui.finishDraft = null;
   ui.sessionOpen = true;
   requestNotificationPermission();
@@ -5203,6 +5865,7 @@ function beginSession(planKey) {
   syncDeviceAppLock();
   saveState();
   startSessionTicker();
+  return { isResume: Boolean(continuation), durationSeconds };
 }
 
 function beginTaskSession(taskId) {
@@ -5222,6 +5885,12 @@ function beginTaskSession(taskId) {
     taskTitle: task.title,
     minutes: Math.max(1, Math.ceil(durationSeconds / 60)),
     durationSeconds,
+    plannedSeconds: Math.max(1, Number(task.plannedSeconds) || minutes * 60),
+    accumulatedSeconds: Math.max(0, Number(task.accumulatedSeconds) || 0),
+    sourceGoalId: task.sourceGoalId || "",
+    sourceGoalPlanKey: task.sourceGoalPlanKey || "",
+    quadrant: task.quadrant,
+    originMode: ui.todayMode || "execution",
     startedAt: now,
     endsAt: now + durationSeconds * 1000,
     departures: 0,
@@ -5245,18 +5914,89 @@ function beginTaskSession(taskId) {
     : `${minutes}分Taskを開始しました。`);
 }
 
+function recordTaskExecution(task, session, elapsedSeconds) {
+  const date = toISODate(new Date());
+  const recordedAt = new Date().toISOString();
+  const plannedSeconds = Math.max(1, Number(session.plannedSeconds || task.plannedSeconds || task.minutes * 60));
+
+  if (task.sourceGoalId) {
+    syncActiveGoalRecord();
+    const goalIndex = state.goals.findIndex((goal) => goal.id === task.sourceGoalId);
+    if (goalIndex >= 0) {
+      const goal = state.goals[goalIndex];
+      const outcome = ["A", "B", "C"].includes(task.sourceGoalPlanKey) ? task.sourceGoalPlanKey : "A";
+      const entry = normalizeLogEntry({
+        logId: createLogId(),
+        date,
+        outcome,
+        reason: null,
+        missionTitle: goal.today?.missionTitle || goal.setup?.goal || task.title,
+        recordedAt,
+        elapsedSeconds,
+        plannedSeconds,
+        itemKind: "goal",
+        itemId: goal.id,
+        itemTitle: goal.setup?.goal || task.title,
+        goalId: goal.id,
+        quadrant: normalizeGoalQuadrant(task.quadrant || goal.setup?.quadrant),
+      });
+      const logs = normalizeLogs([...(goal.logs || []), entry]);
+      const today = {
+        ...goal.today,
+        lastOutcome: outcome,
+        lastRecordedAt: recordedAt,
+        lastElapsedSeconds: elapsedSeconds,
+      };
+      state.goals[goalIndex] = { ...goal, logs, today };
+      if (state.meta.activeGoalId === goal.id) {
+        state.logs = cloneData(logs);
+        state.today = cloneData(today);
+      }
+      return;
+    }
+  }
+
+  const entry = normalizeLogEntry({
+    logId: createLogId(),
+    date,
+    outcome: "task",
+    reason: null,
+    recordedAt,
+    elapsedSeconds,
+    plannedSeconds,
+    itemKind: "task",
+    itemId: task.id,
+    itemTitle: task.title,
+    goalId: "",
+    quadrant: normalizeTaskQuadrant(task.quadrant),
+  });
+  state.taskLogs = normalizeLogs([...(state.taskLogs || []), entry]);
+}
+
 function completeTaskSession() {
   const session = state.activeSession;
   if (!isTaskSession(session)) {
     return;
   }
 
-  updateTask(session.taskId, () => ({
-    status: "done",
-    completedAt: new Date().toISOString(),
-    pausedRemainingSeconds: null,
-    pausedAt: null,
-  }));
+  const task = getTaskById(session.taskId);
+  const elapsedThisRun = Math.max(1, Math.round((Date.now() - Number(session.startedAt || Date.now())) / 1000));
+  const elapsedSeconds = Math.max(1, Number(session.accumulatedSeconds || task?.accumulatedSeconds || 0) + elapsedThisRun);
+  if (task) {
+    recordTaskExecution(task, session, elapsedSeconds);
+  }
+
+  if (task?.sourceGoalId) {
+    state.tasks = normalizeTasks(state.tasks).filter((item) => item.id !== session.taskId);
+  } else {
+    updateTask(session.taskId, () => ({
+      status: "done",
+      completedAt: new Date().toISOString(),
+      pausedRemainingSeconds: null,
+      pausedAt: null,
+      accumulatedSeconds: 0,
+    }));
+  }
   state.activeSession = null;
   ui.sessionOpen = false;
   ui.finishDraft = null;
@@ -5305,6 +6045,11 @@ function recordLog(outcome, reason, details = {}) {
     milestoneLabel: selectedMilestone ? selectedMilestone.label : "",
     milestoneTarget: selectedMilestone ? selectedMilestone.target : null,
     milestoneStatus: selectedMilestone ? (details.milestoneStatus || "working") : "",
+    itemKind: "goal",
+    itemId: state.meta.activeGoalId,
+    itemTitle: state.setup.goal,
+    goalId: state.meta.activeGoalId,
+    quadrant: normalizeGoalQuadrant(state.setup.quadrant),
   };
 
   state.logs.push(nextEntry);
@@ -5746,6 +6491,9 @@ function buildSeedState() {
     activeSession: goalRecord.activeSession,
     goals: [goalRecord],
     tasks: [],
+    goalContinuations: {},
+    taskLogs: [],
+    dailyPlan: normalizeDailyPlan({ capacityMinutes: 60 }),
   };
 }
 
@@ -6111,6 +6859,8 @@ function expandSetup(setup) {
     studyDays: normalizeStudyDays(setup.studyDays),
     flowerType: normalizeFlowerType(setup.flowerType, setup),
     goalType: setup.goalType === "habit" ? "habit" : "goal",
+    quadrant: normalizeGoalQuadrant(setup.quadrant),
+    priority: setup.priority,
     bonsaiKey: BONSAI_LIBRARY[setup.bonsaiKey] ? setup.bonsaiKey : "pine",
     studyMode: setup.studyMode,
     primaryStart: primary.start,
@@ -6219,6 +6969,8 @@ function commitSetupDraft() {
     studyDays: normalizeStudyDays(draft.studyDays),
     flowerType: normalizeFlowerType(draft.flowerType, draft),
     goalType: draft.goalType === "habit" ? "habit" : "goal",
+    quadrant: normalizeGoalQuadrant(draft.quadrant),
+    priority: draft.priority,
     bonsaiKey: BONSAI_LIBRARY[draft.bonsaiKey] ? draft.bonsaiKey : "pine",
     studyMode: draft.studyMode || "flex",
     primaryWindow,
@@ -6475,11 +7227,28 @@ function mergeState(base, saved) {
     ...saved.today,
   };
   const nextPlans = buildPlans(nextSetup, nextToday.missionTitle);
+  const savedGoals = Array.isArray(saved.goals) ? saved.goals : [];
+  const goalCandidates = savedGoals.length
+    ? savedGoals
+    : [{
+        id: saved.meta?.activeGoalId || base.meta.activeGoalId,
+        setup: nextSetup,
+        plans: saved.plans || nextPlans,
+      }];
+  const migratedWork = migrateLegacyGoalContinuations(
+    saved.tasks || base.tasks,
+    goalCandidates,
+    saved.goalContinuations || base.goalContinuations,
+  );
 
   return {
     ...base,
     ...saved,
-    meta: { ...base.meta, ...saved.meta },
+    meta: {
+      ...base.meta,
+      ...saved.meta,
+      currentView: saved.meta?.currentView === "tasks" ? "today" : (saved.meta?.currentView || base.meta.currentView),
+    },
     setup: nextSetup,
     roadmap: nextRoadmap,
     today: nextToday,
@@ -6501,8 +7270,11 @@ function mergeState(base, saved) {
     },
     replan: { ...base.replan, ...(saved.replan || {}) },
     logs: Array.isArray(saved.logs) ? normalizeLogs(saved.logs) : base.logs,
-    goals: Array.isArray(saved.goals) ? saved.goals : [],
-    tasks: normalizeTasks(saved.tasks || base.tasks),
+    goals: savedGoals,
+    tasks: migratedWork.tasks,
+    goalContinuations: migratedWork.goalContinuations,
+    taskLogs: Array.isArray(saved.taskLogs) ? normalizeLogs(saved.taskLogs) : [],
+    dailyPlan: normalizeDailyPlan(saved.dailyPlan || base.dailyPlan),
   };
 }
 
@@ -7602,6 +8374,69 @@ sb.auth.onAuthStateChange(async (event, session) => {
 });
 
 // ── ログアウト ────────────────────────────────────────────
+
+let _accountDeletionInProgress = false;
+
+async function deleteAccount() {
+  if (_accountDeletionInProgress) return;
+
+  const { data: { user }, error: userError } = await sb.auth.getUser();
+  if (userError || !user) {
+    showToast("ログイン中のアカウントがありません。");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "アカウントとクラウド上の記録を完全に削除します。端末内の記録も消去され、元に戻せません。"
+  );
+  if (!confirmed) return;
+
+  const confirmationText = window.prompt("確認のため「削除」と入力してください。");
+  if (confirmationText !== "削除") {
+    if (confirmationText !== null) showToast("入力が一致しないため削除しませんでした。");
+    return;
+  }
+
+  _accountDeletionInProgress = true;
+  showToast("アカウントを削除しています…");
+
+  try {
+    const { error } = await sb.functions.invoke("delete-account", {
+      body: { confirmation: "delete" },
+    });
+    if (error) throw error;
+
+    clearTimeout(_syncTimer);
+    if (_realtimeChannel) {
+      sb.removeChannel(_realtimeChannel);
+      _realtimeChannel = null;
+    }
+    try {
+      await sb.auth.signOut({ scope: "local" });
+    } catch (_) {}
+
+    localStorage.removeItem("streakbonsai-auth-v1");
+    localStorage.removeItem(CURRENT_STORAGE_KEY);
+    LEGACY_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    localStorage.setItem(GUEST_MODE_KEY, "1");
+    localStorage.removeItem(GUEST_BANNER_KEY);
+
+    state = buildSeedState();
+    state.meta.currentView = "today";
+    localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
+    _supabaseLoadedSuccessfully = false;
+    _appInitialized = true;
+    hideAuthOverlay();
+    render();
+    updateGuestBanner();
+    showToast("アカウントとクラウド上の記録を削除しました。");
+  } catch (err) {
+    console.error("Account deletion failed:", err);
+    showToast("削除できませんでした。通信を確認して、もう一度お試しください。");
+  } finally {
+    _accountDeletionInProgress = false;
+  }
+}
 
 async function signOut() {
   clearTimeout(_syncTimer);
