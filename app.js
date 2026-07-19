@@ -6473,23 +6473,6 @@ function updateFocusTimerVisual(remainingMs = null) {
   const progress = getSessionProgressRatio(state.activeSession, remainingMs);
   const label = `集中の進み具合 ${Math.round(progress * 100)}%`;
 
-  const video = sessionSheet.querySelector(".focus-visual__video");
-  if (video) {
-    if (Number.isFinite(video.duration) && video.duration > 0 && video.readyState >= 1) {
-      const target = Math.min(Math.max(0, progress * video.duration), Math.max(0, video.duration - 0.05));
-      if (Math.abs((video.currentTime || 0) - target) > 0.02) {
-        try {
-          video.currentTime = target;
-        } catch (_err) {
-          /* メタデータ未読込などでシークできない時は次のtickで再試行 */
-        }
-      }
-    }
-    const figure = video.closest(".focus-visual");
-    if (figure) figure.setAttribute("aria-label", label);
-    return;
-  }
-
   const sand = sessionSheet.querySelector(".focus-sand");
   if (!sand) {
     return;

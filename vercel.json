@@ -1,4 +1,6 @@
 {
+  "buildCommand": "./scripts/build-static.sh",
+  "outputDirectory": "dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
   "headers": [
     {
