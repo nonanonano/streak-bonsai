@@ -5989,13 +5989,6 @@ select {
   overflow: visible;
 }
 
-.focus-visual__video {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 18px;
-}
-
 .focus-sand__shadow {
   fill: rgba(44, 40, 32, 0.07);
 }

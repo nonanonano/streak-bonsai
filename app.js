@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260719d 空き時間プレビュー";
+const APP_BUILD = "20260719g 元の灯砂時計";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -2009,7 +2009,6 @@ function init() {
     saveNavState();
   }
   syncSelectedSessionPlan(true);
-  probeTimerVideo();
   startClock();
   startSessionTicker();
   bindEvents();
@@ -6348,28 +6347,8 @@ function getSessionProgressRatio(session = state.activeSession, remainingMs = nu
 }
 
 // =========================================================
-// タイマー映像 — 水時計（既定） / 動画（timer.mp4 を置くと自動使用）
+// タイマー映像 — 元の「灯」砂時計
 // =========================================================
-
-// 動画モード: アプリと同じ場所に timer.mp4 を置くと、毎秒「進行度に対応する
-// 再生位置」へシークする。どの分数のセッションでも終了時にちょうど再生し終わる。
-let _timerVideoState = "unknown"; // unknown | available | missing
-
-function probeTimerVideo() {
-  if (_timerVideoState !== "unknown") return;
-  const probe = document.createElement("video");
-  probe.muted = true;
-  probe.preload = "metadata";
-  probe.addEventListener("loadedmetadata", () => {
-    _timerVideoState = "available";
-    if (ui.sessionOpen) render();
-  }, { once: true });
-  probe.addEventListener("error", () => {
-    _timerVideoState = "missing";
-    if (ui.sessionOpen) render();
-  }, { once: true });
-  probe.src = "./timer.mp4";
-}
 
 // 砂時計のジオメトリ。1秒ごとに再計算し、CSS transitionでなめらかに繋ぐ。
 // 上の砂は中央がすり鉢状にくぼみながら減り、下は安息角のついた山として積もる。
@@ -6482,19 +6461,8 @@ function renderFocusSandClock(progressRatio = 0) {
   `;
 }
 
-function renderFocusTimerVideo(progressRatio = 0) {
-  const progress = clamp(Number(progressRatio) || 0, 0, 1);
-  return `
-    <figure class="focus-visual focus-visual--video" aria-label="集中の進み具合 ${Math.round(progress * 100)}%">
-      <video class="focus-visual__video" src="./timer.mp4" muted playsinline preload="auto"></video>
-    </figure>
-  `;
-}
-
 function renderFocusTimerVisual(progressRatio = 0) {
-  return _timerVideoState === "missing"
-    ? renderFocusSandClock(progressRatio)
-    : renderFocusTimerVideo(progressRatio);
+  return renderFocusSandClock(progressRatio);
 }
 
 function updateFocusTimerVisual(remainingMs = null) {
