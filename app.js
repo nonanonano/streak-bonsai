@@ -51,11 +51,14 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260719g 元の灯砂時計";
+const APP_BUILD = "20260723b 時間調整を安定化";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
 const TASK_DEFAULT_MINUTES = 5;
+const TIME_SNAP_MINUTES = 5;
+const AVAILABILITY_DAY_MINUTES = 24 * 60;
+const INLINE_AVAILABILITY_DRAG_STEP_PX = 7;
 const MAX_AVAILABILITY_SLOTS = 8;
 const DEFAULT_AVAILABILITY_SLOTS = [
   { id: "availability-evening", start: "20:00", end: "21:00" },
@@ -237,6 +240,7 @@ let ui = {
   todayPlannerOpen: true,
   planPointerDrag: null,
   availabilityDraft: null,
+  availabilityPointerDrag: null,
   availabilityMode: "default",
   availabilityReturnView: "setup",
   focusLockHelp: null,
@@ -613,6 +617,39 @@ function normalizeGoalContinuations(continuations) {
   }, {});
 }
 
+function getGoalContinuationDate(continuation) {
+  const pausedAt = new Date(continuation?.pausedAt || "");
+  return Number.isNaN(pausedAt.getTime()) ? "" : toISODate(pausedAt);
+}
+
+function filterStaleHabitContinuations(continuations, goals, referenceDate = new Date()) {
+  const today = toISODate(referenceDate);
+  const habitGoalIds = new Set(
+    (Array.isArray(goals) ? goals : [])
+      .filter((goal) => goal?.setup?.goalType === "habit")
+      .map((goal) => goal.id)
+      .filter(Boolean),
+  );
+
+  return Object.entries(normalizeGoalContinuations(continuations)).reduce(
+    (result, [goalId, continuation]) => {
+      if (!habitGoalIds.has(goalId) || getGoalContinuationDate(continuation) === today) {
+        result[goalId] = continuation;
+      }
+      return result;
+    },
+    {},
+  );
+}
+
+function expireStaleHabitContinuations(referenceDate = new Date()) {
+  const previous = normalizeGoalContinuations(state.goalContinuations);
+  const current = filterStaleHabitContinuations(previous, state.goals, referenceDate);
+  const expiredCount = Object.keys(previous).length - Object.keys(current).length;
+  state.goalContinuations = current;
+  return expiredCount;
+}
+
 function migrateLegacyGoalContinuations(tasks, goals, continuations) {
   const candidates = Array.isArray(goals) ? goals : [];
   const goalIds = new Set(candidates.map((goal) => goal?.id).filter(Boolean));
@@ -648,7 +685,10 @@ function migrateLegacyGoalContinuations(tasks, goals, continuations) {
 }
 
 function ensureGoalContinuations() {
-  state.goalContinuations = normalizeGoalContinuations(state.goalContinuations);
+  state.goalContinuations = filterStaleHabitContinuations(
+    state.goalContinuations,
+    state.goals,
+  );
   return state.goalContinuations;
 }
 
@@ -785,6 +825,34 @@ function normalizePlanAllocations(allocations, slots) {
   }, []);
 }
 
+function normalizeWorkIdList(values) {
+  return [...new Set(
+    (Array.isArray(values) ? values : [])
+      .map((value) => String(value || ""))
+      .filter(Boolean)
+  )];
+}
+
+function snapScheduleMinute(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const minute = Number(value);
+  if (!Number.isFinite(minute)) return null;
+  return Math.max(0, Math.min(
+    1435,
+    Math.round(minute / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES,
+  ));
+}
+
+function normalizeScheduleStartTimes(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.entries(value).reduce((result, [workId, start]) => {
+    const minute = snapScheduleMinute(clockTimeToMinutes(start));
+    if (!workId || minute === null) return result;
+    result[String(workId)] = minutesToClockTime(minute);
+    return result;
+  }, {});
+}
+
 function normalizeDailyPlan(plan = {}) {
   const today = toISODate(new Date());
   const defaultSlots = normalizeAvailabilitySlots(
@@ -796,6 +864,7 @@ function normalizeDailyPlan(plan = {}) {
     isToday && Array.isArray(plan.slots) ? plan.slots : defaultSlots,
     getAvailabilityMinutes(defaultSlots),
   );
+  const defaultStartTimes = normalizeScheduleStartTimes(plan.defaultStartTimes);
 
   return {
     date: today,
@@ -803,11 +872,17 @@ function normalizeDailyPlan(plan = {}) {
     defaultSlots,
     slots,
     allocations: normalizePlanAllocations(isToday ? plan.allocations : [], slots),
+    includedWorkIds: isToday ? normalizeWorkIdList(plan.includedWorkIds) : [],
+    excludedWorkIds: isToday ? normalizeWorkIdList(plan.excludedWorkIds) : [],
+    workOrderIds: isToday ? normalizeWorkIdList(plan.workOrderIds) : [],
+    defaultStartTimes,
+    startTimes: isToday ? normalizeScheduleStartTimes(plan.startTimes) : cloneData(defaultStartTimes),
   };
 }
 
 function ensureDailyPlan() {
   state.dailyPlan = normalizeDailyPlan(state.dailyPlan);
+  reconcileDailyPlanSelections(state.dailyPlan);
   reconcileDailyPlanAllocations(state.dailyPlan);
   state.dailyPlan.capacityMinutes = getAvailabilityMinutes(state.dailyPlan.slots);
   return state.dailyPlan;
@@ -904,6 +979,65 @@ function getActiveWorkItems() {
   return [...goals, ...tasks].sort(compareWorkItems);
 }
 
+function isWorkItemDefaultedToToday(item) {
+  if (!item) return false;
+  if (item.kind === "task") {
+    return isTaskPlannedToday(item);
+  }
+  return isGoalScheduledForDate(item.goal);
+}
+
+function isWorkItemSelectedToday(item, plan = state.dailyPlan) {
+  if (!item) return false;
+  if (getTaskPausedSeconds(item) > 0) return true;
+  const workId = String(item.id || "");
+  if (normalizeWorkIdList(plan?.includedWorkIds).includes(workId)) return true;
+  if (normalizeWorkIdList(plan?.excludedWorkIds).includes(workId)) return false;
+  return isWorkItemDefaultedToToday(item);
+}
+
+function reconcileDailyPlanSelections(plan) {
+  if (!plan) return plan;
+  const activeItems = getActiveWorkItems();
+  const validIds = new Set(activeItems.map((item) => item.id));
+  plan.includedWorkIds = normalizeWorkIdList(plan.includedWorkIds)
+    .filter((workId) => validIds.has(workId));
+  plan.excludedWorkIds = normalizeWorkIdList(plan.excludedWorkIds)
+    .filter((workId) => validIds.has(workId) && !plan.includedWorkIds.includes(workId));
+
+  const selectedIds = new Set(
+    activeItems
+      .filter((item) => getWorkItemPlannableMinutes(item) > 0 && isWorkItemSelectedToday(item, plan))
+      .map((item) => item.id)
+  );
+  plan.defaultStartTimes = Object.fromEntries(
+    Object.entries(normalizeScheduleStartTimes(plan.defaultStartTimes))
+      .filter(([workId]) => validIds.has(workId))
+  );
+  const previousAllocationOrder = (plan.allocations || []).map((allocation) => allocation.workId);
+  const fallbackOrder = [...activeItems]
+    .filter((item) => selectedIds.has(item.id))
+    .sort((left, right) => {
+      const leftStart = clockTimeToMinutes(plan.startTimes?.[left.id]);
+      const rightStart = clockTimeToMinutes(plan.startTimes?.[right.id]);
+      if (leftStart !== null && rightStart !== null && leftStart !== rightStart) return leftStart - rightStart;
+      if (leftStart !== null && rightStart === null) return -1;
+      if (leftStart === null && rightStart !== null) return 1;
+      return compareWorkItems(left, right);
+    })
+    .map((item) => item.id);
+  plan.workOrderIds = normalizeWorkIdList([
+    ...normalizeWorkIdList(plan.workOrderIds),
+    ...previousAllocationOrder,
+    ...fallbackOrder,
+  ]).filter((workId) => selectedIds.has(workId));
+  plan.startTimes = Object.fromEntries(
+    Object.entries(normalizeScheduleStartTimes(plan.startTimes))
+      .filter(([workId]) => selectedIds.has(workId))
+  );
+  return plan;
+}
+
 function getTaskRemainingMinutes(task) {
   const normalized = normalizeTask(task);
   return Math.max(0, normalized.minutes - normalized.completedMinutes);
@@ -932,17 +1066,139 @@ function getWorkItemPlannableMinutes(item) {
     : Math.max(1, Number(item.minutes) || getGoalDurationMinutes(item.goal));
 }
 
-function getDailyPlanningItems() {
-  const goalsById = new Map();
-  listGoals().forEach((goal, index) => {
-    if (isGoalScheduledForDate(goal) || getGoalContinuation(goal.id)) {
-      goalsById.set(goal.id, goalToWorkItem(goal, index));
-    }
+function getDailyPlanningItems(plan = state.dailyPlan) {
+  return getActiveWorkItems()
+    .filter((item) => getWorkItemPlannableMinutes(item) > 0 && isWorkItemSelectedToday(item, plan))
+    .sort(compareWorkItems);
+}
+
+function getTodayOrderedWorkItems() {
+  const plan = ensureDailyPlan();
+  const order = new Map(plan.workOrderIds.map((workId, index) => [workId, index]));
+  return getDailyPlanningItems(plan).sort((left, right) => {
+    const orderGap = (order.get(left.id) ?? Number.MAX_SAFE_INTEGER)
+      - (order.get(right.id) ?? Number.MAX_SAFE_INTEGER);
+    return orderGap || compareWorkItems(left, right);
   });
-  const tasks = normalizeTasks(state.tasks)
-    .filter((task) => task.status !== "shelved" && isTaskPlannedToday(task))
-    .map(taskToWorkItem);
-  return [...goalsById.values(), ...tasks].sort(compareWorkItems);
+}
+
+function setWorkItemSelectedToday(workId, selected) {
+  const item = getWorkItemById(workId);
+  if (!item) return null;
+  if (!selected && getTaskPausedSeconds(item) > 0) {
+    return { item, selected: true, blockedByContinuation: true };
+  }
+
+  const plan = ensureDailyPlan();
+  const include = new Set(normalizeWorkIdList(plan.includedWorkIds));
+  const exclude = new Set(normalizeWorkIdList(plan.excludedWorkIds));
+  include.delete(item.id);
+  exclude.delete(item.id);
+
+  if (item.kind === "task") {
+    updateTask(item.sourceId, () => ({ plannedDate: selected ? toISODate(new Date()) : "" }));
+  } else if (selected !== isWorkItemDefaultedToToday(item)) {
+    (selected ? include : exclude).add(item.id);
+  }
+
+  plan.includedWorkIds = [...include];
+  plan.excludedWorkIds = [...exclude];
+  if (selected) {
+    plan.workOrderIds = normalizeWorkIdList([...plan.workOrderIds, item.id]);
+  } else {
+    plan.workOrderIds = plan.workOrderIds.filter((id) => id !== item.id);
+    delete plan.startTimes[item.id];
+    removePendingWorkAllocations(plan, item.id);
+  }
+  reconcileDailyPlanSelections(plan);
+  return { item: getWorkItemById(workId), selected };
+}
+
+function moveTodayWorkItem(workId, beforeWorkId = null) {
+  const plan = ensureDailyPlan();
+  const order = new Map(plan.workOrderIds.map((id, index) => [id, index]));
+  const selectedIds = getDailyPlanningItems(plan)
+    .sort((left, right) => {
+      const orderGap = (order.get(left.id) ?? Number.MAX_SAFE_INTEGER)
+        - (order.get(right.id) ?? Number.MAX_SAFE_INTEGER);
+      return orderGap || compareWorkItems(left, right);
+    })
+    .map((item) => item.id);
+  if (!selectedIds.includes(workId)) return null;
+  const nextOrder = selectedIds.filter((id) => id !== workId);
+  const beforeIndex = beforeWorkId ? nextOrder.indexOf(beforeWorkId) : -1;
+  nextOrder.splice(beforeIndex >= 0 ? beforeIndex : nextOrder.length, 0, workId);
+  plan.workOrderIds = nextOrder;
+  return nextOrder;
+}
+
+function setTodayWorkStartMinute(workId, minute, { reorder = false } = {}) {
+  let plan = ensureDailyPlan();
+  const snappedMinute = snapScheduleMinute(minute);
+  if (snappedMinute === null || !plan.workOrderIds.includes(workId)) return null;
+
+  if (reorder) {
+    const otherRows = buildTodayTimeRows(getTodayOrderedWorkItems(), plan)
+      .filter((row) => row.item.id !== workId);
+    const beforeWorkId = otherRows.find((row) => snappedMinute < row.endMinutes)?.item.id || null;
+    moveTodayWorkItem(workId, beforeWorkId);
+    plan = ensureDailyPlan();
+  }
+
+  plan.startTimes[workId] = minutesToClockTime(snappedMinute);
+  const row = buildTodayTimeRows(getTodayOrderedWorkItems(), plan)
+    .find((entry) => entry.item.id === workId);
+  return row || null;
+}
+
+function getTodayInsertionStartMinute(workId, beforeWorkId = null) {
+  const items = getTodayOrderedWorkItems().filter((item) => item.id !== workId);
+  const plan = ensureDailyPlan();
+  const rows = buildTodayTimeRows(items, plan);
+  if (beforeWorkId) {
+    const beforeRow = rows.find((row) => row.item.id === beforeWorkId);
+    if (beforeRow) return beforeRow.startMinutes;
+  }
+  return rows.at(-1)?.endMinutes
+    ?? getScheduleAvailabilityRanges(plan)[0]?.start
+    ?? 20 * 60;
+}
+
+function repackTodayWorkStartTimes({
+  firstStartMinute = null,
+  anchorWorkId = "",
+  anchorMinute = null,
+  keepAnchorGap = false,
+} = {}) {
+  const items = getTodayOrderedWorkItems();
+  const plan = ensureDailyPlan();
+  if (!items.length) {
+    plan.startTimes = {};
+    return null;
+  }
+
+  const firstWorkId = items[0].id;
+  const fallbackStart = getScheduleAvailabilityRanges(plan)[0]?.start ?? 20 * 60;
+  const snappedFirst = snapScheduleMinute(firstStartMinute);
+  const snappedAnchor = snapScheduleMinute(anchorMinute);
+  const baseStart = keepAnchorGap && anchorWorkId === firstWorkId && snappedAnchor !== null
+    ? snappedAnchor
+    : snappedFirst ?? snappedAnchor ?? fallbackStart;
+  plan.startTimes = {
+    [firstWorkId]: minutesToClockTime(baseStart),
+  };
+
+  const anchorIndex = items.findIndex((item) => item.id === anchorWorkId);
+  if (keepAnchorGap && anchorIndex > 0 && snappedAnchor !== null) {
+    const packedRows = buildTodayTimeRows(items, plan);
+    const previousEnd = packedRows[anchorIndex - 1]?.endMinutes;
+    if (Number.isFinite(previousEnd) && snappedAnchor - previousEnd > TIME_SNAP_MINUTES) {
+      plan.startTimes[anchorWorkId] = minutesToClockTime(snappedAnchor);
+    }
+  }
+
+  return buildTodayTimeRows(items, plan)
+    .find((row) => row.item.id === anchorWorkId) || null;
 }
 
 function getPlanAllocationsForWork(plan, workId, { includeCompleted = true } = {}) {
@@ -1050,30 +1306,17 @@ function removePendingWorkAllocations(plan, workId) {
 
 function reconcileDailyPlanAllocations(plan) {
   if (!plan || !Array.isArray(plan.slots)) return plan;
-  const planningItems = getDailyPlanningItems();
-  const itemById = new Map(planningItems.map((item) => [item.id, item]));
+  const activeItems = getActiveWorkItems();
+  const itemById = new Map(activeItems.map((item) => [item.id, item]));
   plan.allocations = normalizePlanAllocations(plan.allocations, plan.slots)
     .filter((allocation) => itemById.has(allocation.workId));
 
-  planningItems.forEach((item) => {
+  activeItems.forEach((item) => {
     const outstanding = getWorkItemPlannableMinutes(item);
     let pending = getPlanAllocationsForWork(plan, item.id, { includeCompleted: false });
-    const pausedSegmentMinutes = item.kind === "task" ? getTaskPausedSegmentMinutes(item) : 0;
-    if (pausedSegmentMinutes > 0 && pending.length && pending[0].minutes !== pausedSegmentMinutes) {
-      const resumeSlotId = pending[0].slotId;
-      removePendingWorkAllocations(plan, item.id);
-      allocateWorkItemIntoPlan(plan, item, outstanding, resumeSlotId);
-      pending = getPlanAllocationsForWork(plan, item.id, { includeCompleted: false });
-    }
     const pendingMinutes = pending.reduce((sum, allocation) => sum + allocation.minutes, 0);
     if (pendingMinutes > outstanding) {
       trimPendingWorkAllocations(plan, item.id, outstanding);
-    }
-    const nextPendingMinutes = getPlanAllocationsForWork(plan, item.id, { includeCompleted: false })
-      .reduce((sum, allocation) => sum + allocation.minutes, 0);
-    const missing = Math.max(0, outstanding - nextPendingMinutes);
-    if (missing > 0) {
-      allocateWorkItemIntoPlan(plan, item, missing);
     }
   });
 
@@ -1081,27 +1324,20 @@ function reconcileDailyPlanAllocations(plan) {
 }
 
 function planWorkItemToday(workId, startSlotId = "") {
-  const item = getWorkItemById(workId);
-  if (!item) return null;
-  if (item.kind === "task" && !isTaskPlannedToday(item)) {
-    updateTask(item.sourceId, () => ({ plannedDate: toISODate(new Date()) }));
-  }
-  const refreshedItem = getWorkItemById(workId);
-  const plan = ensureDailyPlan();
-  removePendingWorkAllocations(plan, workId);
-  const result = allocateWorkItemIntoPlan(
-    plan,
-    refreshedItem,
-    getWorkItemPlannableMinutes(refreshedItem),
+  const result = setWorkItemSelectedToday(workId, true);
+  if (!result) return null;
+  return {
+    item: result.item,
+    allocatedMinutes: getWorkItemPlannableMinutes(result.item),
+    remainingMinutes: 0,
     startSlotId,
-  );
-  plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
-  return { item: refreshedItem, ...result };
+  };
 }
 
 function removeWorkItemFromDailyPlan(workId) {
   const plan = ensureDailyPlan();
   plan.allocations = plan.allocations.filter((allocation) => allocation.workId !== workId);
+  delete plan.startTimes[workId];
 }
 
 function markPlanAllocationCompleted(allocationId) {
@@ -1116,22 +1352,20 @@ function markPlanAllocationCompleted(allocationId) {
 }
 
 function getTodayPlanningOverflow(plan = ensureDailyPlan()) {
-  return getDailyPlanningItems().map((item) => {
-    const pendingMinutes = getPlanAllocationsForWork(plan, item.id, { includeCompleted: false })
-      .reduce((sum, allocation) => sum + allocation.minutes, 0);
-    return {
-      item,
-      minutes: Math.max(0, getWorkItemPlannableMinutes(item) - pendingMinutes),
-    };
+  let remainingCapacity = getAvailabilityMinutes(plan.slots);
+  return getTodayOrderedWorkItems().map((item) => {
+    const minutes = getWorkItemPlannableMinutes(item);
+    const outsideMinutes = Math.max(0, minutes - Math.max(0, remainingCapacity));
+    remainingCapacity -= minutes;
+    return { item, minutes: outsideMinutes };
   }).filter((entry) => entry.minutes > 0);
 }
 
 function getTodayPlanStats(plan = ensureDailyPlan()) {
   const capacityMinutes = getAvailabilityMinutes(plan.slots);
-  const allocatedMinutes = (plan.allocations || [])
-    .reduce((sum, allocation) => sum + allocation.minutes, 0);
-  const overflowMinutes = getTodayPlanningOverflow(plan)
-    .reduce((sum, entry) => sum + entry.minutes, 0);
+  const allocatedMinutes = getDailyPlanningItems(plan)
+    .reduce((sum, item) => sum + getWorkItemPlannableMinutes(item), 0);
+  const overflowMinutes = Math.max(0, allocatedMinutes - capacityMinutes);
   return {
     capacityMinutes,
     allocatedMinutes,
@@ -1142,13 +1376,7 @@ function getTodayPlanStats(plan = ensureDailyPlan()) {
 
 function autoArrangeTodayPlan() {
   const plan = ensureDailyPlan();
-  plan.allocations = plan.allocations.filter((allocation) => allocation.completedAt);
-  getDailyPlanningItems().forEach((item) => {
-    const minutes = getWorkItemPlannableMinutes(item);
-    if (minutes > 0) {
-      allocateWorkItemIntoPlan(plan, item, minutes);
-    }
-  });
+  reconcileDailyPlanSelections(plan);
   plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
   return getTodayPlanStats(plan);
 }
@@ -1157,6 +1385,94 @@ function buildAvailabilityDraft(mode = "default") {
   const plan = ensureDailyPlan();
   const slots = mode === "today" ? plan.slots : plan.defaultSlots;
   return cloneData(normalizeAvailabilitySlots(slots, plan.capacityMinutes));
+}
+
+function getAvailabilitySlotEdgeBounds(slots, slotId, edge) {
+  const source = Array.isArray(slots) ? slots : [];
+  const index = source.findIndex((slot) => slot.id === slotId);
+  if (index < 0 || !["start", "end"].includes(edge)) return null;
+
+  const slot = source[index];
+  const start = clockTimeToMinutes(slot.start);
+  const end = clockTimeToMinutes(slot.end);
+  if (start === null || end === null) return null;
+  const previousEnd = index > 0
+    ? clockTimeToMinutes(source[index - 1]?.end)
+    : 0;
+  const nextStart = index < source.length - 1
+    ? clockTimeToMinutes(source[index + 1]?.start)
+    : AVAILABILITY_DAY_MINUTES - TIME_SNAP_MINUTES;
+
+  if (edge === "start") {
+    const min = Math.max(0, previousEnd ?? 0);
+    const max = Math.max(min, end - TIME_SNAP_MINUTES);
+    return { min, max, current: start };
+  }
+
+  const min = Math.min(
+    AVAILABILITY_DAY_MINUTES - TIME_SNAP_MINUTES,
+    start + TIME_SNAP_MINUTES,
+  );
+  const max = Math.max(min, nextStart ?? (AVAILABILITY_DAY_MINUTES - TIME_SNAP_MINUTES));
+  return { min, max, current: end };
+}
+
+function getAvailabilityDraftEdgeBounds(slotId, edge) {
+  return getAvailabilitySlotEdgeBounds(ui.availabilityDraft, slotId, edge);
+}
+
+function updateAvailabilityEdgeInSlots(slots, slotId, edge, minute) {
+  const bounds = getAvailabilitySlotEdgeBounds(slots, slotId, edge);
+  if (!bounds) return null;
+  const snapped = Math.round(Number(minute) / TIME_SNAP_MINUTES) * TIME_SNAP_MINUTES;
+  const bounded = Math.max(bounds.min, Math.min(bounds.max, snapped));
+  let updatedSlot = null;
+  const updatedSlots = slots.map((slot) => {
+    if (slot.id !== slotId) return slot;
+    updatedSlot = { ...slot, [edge]: minutesToClockTime(bounded) };
+    return updatedSlot;
+  });
+  return { slots: updatedSlots, slot: updatedSlot, minute: bounded };
+}
+
+function updateAvailabilityDraftEdge(slotId, edge, minute) {
+  const result = updateAvailabilityEdgeInSlots(ui.availabilityDraft, slotId, edge, minute);
+  if (!result) return null;
+  ui.availabilityDraft = result.slots;
+  return result.slot;
+}
+
+function getAvailabilityDraftTotalMinutes() {
+  const draft = Array.isArray(ui.availabilityDraft) ? ui.availabilityDraft : [];
+  return draft
+    .map(normalizeAvailabilitySlot)
+    .filter(Boolean)
+    .reduce((sum, slot) => sum + getAvailabilitySlotMinutes(slot), 0);
+}
+
+function refreshAvailabilityEditorDOM(slotId, slot, draggedEdge = "", offsetY = 0) {
+  const row = Array.from(document.querySelectorAll("[data-availability-slot-row]"))
+    .find((element) => element.dataset.availabilitySlotRow === slotId);
+  if (!row || !slot) return;
+  const start = clockTimeToMinutes(slot.start) ?? 0;
+  const end = clockTimeToMinutes(slot.end) ?? start + TIME_SNAP_MINUTES;
+  const duration = row.querySelector("[data-availability-range-duration]");
+  if (duration) duration.textContent = formatLoggedDuration(getAvailabilitySlotMinutes(slot) * 60);
+  ["start", "end"].forEach((edge) => {
+    const minute = edge === "start" ? start : end;
+    const handle = row.querySelector(`[data-availability-drag-handle="${edge}"]`);
+    const input = row.querySelector(`[data-availability-field="${edge}"]`);
+    const time = row.querySelector(`[data-availability-range-time="${edge}"]`);
+    if (handle) {
+      handle.setAttribute("aria-valuenow", String(minute));
+      handle.setAttribute("aria-valuetext", minutesToClockTime(minute));
+      handle.style.setProperty("--availability-drag-offset", edge === draggedEdge ? `${offsetY}px` : "0px");
+    }
+    if (input) input.value = minutesToClockTime(minute);
+    if (time) time.textContent = minutesToClockTime(minute);
+  });
+  const total = document.querySelector("[data-availability-total]");
+  if (total) total.textContent = formatLoggedDuration(getAvailabilityDraftTotalMinutes() * 60);
 }
 
 function createNextAvailabilitySlot(slots) {
@@ -2003,12 +2319,16 @@ function init() {
     state = buildSeedState();
   }
   ensureGoalCollection();
+  const expiredHabitContinuations = expireStaleHabitContinuations();
   ensureDailyPlan();
   if (state.meta.demoMode && state.meta.currentView === "setup") {
     state.meta.currentView = "today";
     saveNavState();
   }
   syncSelectedSessionPlan(true);
+  if (expiredHabitContinuations > 0) {
+    saveState();
+  }
   startClock();
   startSessionTicker();
   bindEvents();
@@ -2067,6 +2387,12 @@ function bindEvents() {
       scheduleFocusAlarm(state.activeSession);
       return;
     }
+    const expiredHabitContinuations = expireStaleHabitContinuations();
+    if (expiredHabitContinuations > 0) {
+      ensureDailyPlan();
+      saveState();
+      render();
+    }
     // タブに戻ったとき他のデバイスの変更を取得
     _resyncFromSupabase();
   });
@@ -2078,6 +2404,57 @@ function bindEvents() {
 }
 
 function handleKeydown(event) {
+  if (event.key === "Enter" && event.target.matches?.(".time-task-capture__title")) {
+    event.preventDefault();
+    event.target.closest(".time-task-capture")?.querySelector('[data-action="add-task"]')?.click();
+    return;
+  }
+  const inlineAvailabilityHandle = event.target.closest?.("[data-inline-availability-drag-handle]");
+  if (inlineAvailabilityHandle && ["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+    const slotId = inlineAvailabilityHandle.dataset.slotId || "";
+    const edge = inlineAvailabilityHandle.dataset.inlineAvailabilityDragHandle || "";
+    const plan = ensureDailyPlan();
+    const bounds = getAvailabilitySlotEdgeBounds(plan.slots, slotId, edge);
+    if (!bounds) return;
+    const minute = event.key === "Home"
+      ? bounds.min
+      : event.key === "End"
+        ? bounds.max
+        : bounds.current + (event.key === "ArrowDown" ? TIME_SNAP_MINUTES : -TIME_SNAP_MINUTES);
+    const result = updateAvailabilityEdgeInSlots(plan.slots, slotId, edge, minute);
+    if (result) {
+      plan.slots = result.slots;
+      finalizeTodayAvailability(plan);
+      saveState();
+      render();
+      Array.from(document.querySelectorAll("[data-inline-availability-drag-handle]"))
+        .find((handle) => handle.dataset.slotId === slotId && handle.dataset.inlineAvailabilityDragHandle === edge)
+        ?.focus();
+    }
+    event.preventDefault();
+    return;
+  }
+  const availabilityHandle = event.target.closest?.("[data-availability-drag-handle]");
+  if (availabilityHandle && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+    const slotId = availabilityHandle.dataset.slotId || "";
+    const edge = availabilityHandle.dataset.availabilityDragHandle || "";
+    const bounds = getAvailabilityDraftEdgeBounds(slotId, edge);
+    if (!bounds) return;
+    const minute = event.key === "Home"
+      ? bounds.min
+      : event.key === "End"
+        ? bounds.max
+        : bounds.current + (["ArrowDown", "ArrowRight"].includes(event.key) ? TIME_SNAP_MINUTES : -TIME_SNAP_MINUTES);
+    const slot = updateAvailabilityDraftEdge(slotId, edge, minute);
+    if (slot) {
+      render();
+      Array.from(document.querySelectorAll("[data-availability-drag-handle]"))
+        .find((handle) => handle.dataset.slotId === slotId && handle.dataset.availabilityDragHandle === edge)
+        ?.focus();
+    }
+    event.preventDefault();
+    return;
+  }
   if (event.target.matches("input, textarea, select")) {
     return;
   }
@@ -2225,10 +2602,41 @@ function handleClick(event) {
   }
 
   if (action === "set-today-mode") {
-    ui.todayMode = target.dataset.mode === "organize" ? "organize" : "execution";
+    ui.todayMode = ["time", "organize"].includes(target.dataset.mode)
+      ? target.dataset.mode
+      : "execution";
     ui.selectedTaskId = null;
     renderWithTransition();
     if (screenFrame) screenFrame.scrollTop = 0;
+    return;
+  }
+
+  if (action === "set-habit-default-time") {
+    const workId = target.dataset.workId || "";
+    const item = getWorkItemById(workId);
+    const items = getTodayOrderedWorkItems();
+    const plan = ensureDailyPlan();
+    const row = buildTodayTimeRows(items, plan)
+      .find((entry) => entry.item.id === workId);
+    if (!item?.isHabit || !row) return;
+
+    const duration = Math.max(TIME_SNAP_MINUTES, getGoalDurationMinutes(item.goal));
+    const requestedStart = Math.max(0, row.startMinutes % AVAILABILITY_DAY_MINUTES);
+    const endMinute = Math.min(AVAILABILITY_DAY_MINUTES - TIME_SNAP_MINUTES, requestedStart + duration);
+    const startMinute = Math.max(0, Math.min(requestedStart, endMinute - TIME_SNAP_MINUTES));
+    const window = `${minutesToClockTime(startMinute)}-${minutesToClockTime(endMinute)}`;
+    patchWorkItem(workId, {
+      primaryWindow: window,
+      backupWindow: window,
+      rescueWindow: window,
+    });
+    plan.defaultStartTimes = {
+      ...normalizeScheduleStartTimes(plan.defaultStartTimes),
+      [workId]: minutesToClockTime(startMinute),
+    };
+    saveState();
+    renderWithTransition();
+    showToast(`習慣の時間を ${window} にしました。`);
     return;
   }
 
@@ -2290,7 +2698,7 @@ function handleClick(event) {
 
   if (action === "open-availability-settings" || action === "open-today-availability" || action === "adjust-today-capacity") {
     ui.availabilityMode = action === "open-availability-settings" ? "default" : "today";
-    ui.availabilityReturnView = ui.availabilityMode === "today" ? "today" : "setup";
+    ui.availabilityReturnView = ui.availabilityMode === "today" ? "time" : "setup";
     ui.availabilityDraft = buildAvailabilityDraft(ui.availabilityMode);
     ui.setupSection = "availability";
     state.meta.currentView = "setup";
@@ -2324,10 +2732,9 @@ function handleClick(event) {
 
   if (action === "cancel-availability-settings") {
     ui.availabilityDraft = null;
-    if (ui.availabilityReturnView === "today") {
+    if (ui.availabilityReturnView === "time") {
       state.meta.currentView = "today";
-      ui.todayMode = "execution";
-      ui.todayPlannerOpen = true;
+      ui.todayMode = "time";
     } else {
       ui.setupSection = "home";
     }
@@ -2350,13 +2757,13 @@ function handleClick(event) {
     }
     plan.slots = cloneData(slots);
     plan.allocations = normalizePlanAllocations(completedAllocations, plan.slots);
+    reconcileDailyPlanSelections(plan);
     reconcileDailyPlanAllocations(plan);
     plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
     ui.availabilityDraft = null;
-    if (ui.availabilityReturnView === "today") {
+    if (ui.availabilityReturnView === "time") {
       state.meta.currentView = "today";
-      ui.todayMode = "execution";
-      ui.todayPlannerOpen = true;
+      ui.todayMode = "time";
     } else {
       ui.setupSection = "home";
     }
@@ -2392,20 +2799,24 @@ function handleClick(event) {
     return;
   }
 
-  if (action === "toggle-task-today") {
-    const taskId = target.dataset.taskId || "";
-    const task = getTaskById(taskId);
-    if (!task) return;
-    const addToToday = !isTaskPlannedToday(task);
-    if (addToToday) {
-      planWorkItemToday(taskId);
-    } else {
-      updateTask(taskId, () => ({ plannedDate: "" }));
-      removeWorkItemFromDailyPlan(taskId);
+  if (action === "toggle-task-today" || action === "toggle-work-today") {
+    const workId = target.dataset.workId || target.dataset.taskId || "";
+    const item = getWorkItemById(workId);
+    if (!item) return;
+    const addToToday = !isWorkItemSelectedToday(item, ensureDailyPlan());
+    const result = setWorkItemSelectedToday(workId, addToToday);
+    if (result?.blockedByContinuation) {
+      showToast("中断した続きは、完了するまで今日に残ります。");
+      return;
     }
+    const stats = getTodayPlanStats();
     saveState();
     renderWithTransition();
-    showToast(addToToday ? "今日に入れました。" : "今日から外しました。");
+    showToast(addToToday
+      ? stats.overflowMinutes > 0
+        ? `今日に入れました。${stats.overflowMinutes}分多めです。`
+        : "今日に入れました。"
+      : "今日やらないへ移しました。");
     return;
   }
 
@@ -3295,6 +3706,22 @@ function handleInput(event) {
 function handleChange(event) {
   const target = event.target;
 
+  if (target.matches("[data-time-start-field]")) {
+    const minute = clockTimeToMinutes(target.value);
+    const row = setTodayWorkStartMinute(target.dataset.timeStartField || "", minute, { reorder: true });
+    if (!row) {
+      showToast("開始時刻を確認してください。");
+      render();
+      return;
+    }
+    saveState();
+    renderWithTransition();
+    showToast(row.shiftedMinutes > 0
+      ? `${formatScheduleClock(row.startMinutes)}からに調整しました。`
+      : `${formatScheduleClock(row.startMinutes)}からにしました。`);
+    return;
+  }
+
   if (target.matches("[data-availability-field]")) {
     render();
     return;
@@ -3529,14 +3956,186 @@ function handleTaskDragEnd() {
   clearTaskDragState();
 }
 
+function getAvailabilitySlotBodyHeight(slot) {
+  return Math.min(128, Math.max(50, Math.round(getAvailabilitySlotMinutes(slot) * 0.72)));
+}
+
+function finalizeTodayAvailability(plan) {
+  const completedAllocations = plan.allocations.filter((allocation) => allocation.completedAt);
+  plan.slots = normalizeAvailabilitySlots(plan.slots, plan.capacityMinutes);
+  plan.allocations = normalizePlanAllocations(completedAllocations, plan.slots);
+  reconcileDailyPlanSelections(plan);
+  reconcileDailyPlanAllocations(plan);
+  plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
+}
+
+function refreshInlineAvailabilityDOM(plan, slotId, slot, draggedEdge = "", offsetY = 0) {
+  if (slot) {
+    Array.from(document.querySelectorAll("[data-inline-availability-drag-handle]"))
+      .filter((handle) => handle.dataset.slotId === slotId)
+      .forEach((handle) => {
+        const edge = handle.dataset.inlineAvailabilityDragHandle;
+        const row = handle.closest(".time-availability-handle");
+        const time = row?.querySelector(`[data-inline-availability-time="${edge}"]`);
+        const minute = clockTimeToMinutes(slot[edge]) ?? 0;
+        handle.setAttribute("aria-valuenow", String(minute));
+        handle.setAttribute("aria-valuetext", slot[edge]);
+        handle.style.setProperty("--availability-drag-offset", edge === draggedEdge ? `${offsetY}px` : "0px");
+        if (time) time.textContent = slot[edge];
+      });
+  }
+
+  const total = getAvailabilityMinutes(plan.slots);
+  document.querySelectorAll("[data-inline-availability-total]")
+    .forEach((element) => { element.textContent = `${total}分`; });
+}
+
+function startInlineAvailabilityPointerDrag(event) {
+  if (state.activeSession || !event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) return false;
+  const handle = event.target?.closest?.("[data-inline-availability-drag-handle]");
+  if (!handle) return false;
+  const slotId = handle.dataset.slotId || "";
+  const edge = handle.dataset.inlineAvailabilityDragHandle || "";
+  const plan = ensureDailyPlan();
+  const bounds = getAvailabilitySlotEdgeBounds(plan.slots, slotId, edge);
+  if (!bounds) return false;
+
+  event.preventDefault();
+  event.stopPropagation();
+  ui.availabilityPointerDrag = {
+    mode: "inline",
+    pointerId: event.pointerId,
+    slotId,
+    edge,
+    handleEl: handle,
+    rowEl: handle.closest(".time-availability-handle"),
+    startY: event.clientY,
+    originMinute: bounds.current,
+    originalSlots: cloneData(plan.slots),
+    hasChanged: false,
+  };
+  handle.setPointerCapture?.(event.pointerId);
+  handle.classList.add("is-dragging");
+  ui.availabilityPointerDrag.rowEl?.classList.add("is-dragging");
+  document.body.classList.add("is-availability-dragging", "is-inline-availability-dragging");
+  return true;
+}
+
+function moveInlineAvailabilityPointerDrag(event, drag) {
+  event.preventDefault();
+  const stepDelta = Math.round((event.clientY - drag.startY) / INLINE_AVAILABILITY_DRAG_STEP_PX);
+  const targetMinute = drag.originMinute + (stepDelta * TIME_SNAP_MINUTES);
+  const plan = ensureDailyPlan();
+  const result = updateAvailabilityEdgeInSlots(plan.slots, drag.slotId, drag.edge, targetMinute);
+  if (!result) return true;
+  plan.slots = result.slots;
+  plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
+  drag.hasChanged = drag.hasChanged || result.minute !== drag.originMinute;
+  const visualOffset = ((result.minute - drag.originMinute) / TIME_SNAP_MINUTES) * INLINE_AVAILABILITY_DRAG_STEP_PX;
+  refreshInlineAvailabilityDOM(plan, drag.slotId, result.slot, drag.edge, visualOffset);
+  return true;
+}
+
+function endInlineAvailabilityPointerDrag(event, drag) {
+  drag.handleEl?.releasePointerCapture?.(event.pointerId);
+  drag.handleEl?.classList.remove("is-dragging");
+  drag.rowEl?.classList.remove("is-dragging");
+  document.body.classList.remove("is-availability-dragging", "is-inline-availability-dragging");
+  ui.availabilityPointerDrag = null;
+  event.preventDefault();
+
+  const plan = ensureDailyPlan();
+  if (event.type === "pointercancel") {
+    plan.slots = drag.originalSlots;
+    plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
+    render();
+    return true;
+  }
+  if (!drag.hasChanged) return true;
+  finalizeTodayAvailability(plan);
+  saveState();
+  renderWithTransition();
+  showToast("今日の空き時間を更新しました。");
+  return true;
+}
+
+function startAvailabilityPointerDrag(event) {
+  if (startInlineAvailabilityPointerDrag(event)) return true;
+  if (!event.isPrimary || (event.pointerType === "mouse" && event.button !== 0)) return false;
+  const handle = event.target?.closest?.("[data-availability-drag-handle]");
+  const track = handle?.closest?.("[data-availability-range-rail]");
+  if (!handle || !track || !Array.isArray(ui.availabilityDraft)) return false;
+  const slotId = handle.dataset.slotId || track.dataset.slotId || "";
+  const edge = handle.dataset.availabilityDragHandle || "";
+  const bounds = getAvailabilityDraftEdgeBounds(slotId, edge);
+  if (!slotId || !bounds) return false;
+
+  event.preventDefault();
+  event.stopPropagation();
+  ui.availabilityPointerDrag = {
+    mode: "settings",
+    pointerId: event.pointerId,
+    slotId,
+    edge,
+    handleEl: handle,
+    trackEl: track,
+    startY: event.clientY,
+    originMinute: bounds.current,
+    originalDraft: cloneData(ui.availabilityDraft),
+    hasChanged: false,
+  };
+  handle.setPointerCapture?.(event.pointerId);
+  handle.classList.add("is-dragging");
+  document.body.classList.add("is-availability-dragging");
+  return true;
+}
+
+function moveAvailabilityPointerDrag(event) {
+  const drag = ui.availabilityPointerDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return false;
+  if (drag.mode === "inline") return moveInlineAvailabilityPointerDrag(event, drag);
+  event.preventDefault();
+  const stepDelta = Math.round((event.clientY - drag.startY) / INLINE_AVAILABILITY_DRAG_STEP_PX);
+  const slot = updateAvailabilityDraftEdge(
+    drag.slotId,
+    drag.edge,
+    drag.originMinute + (stepDelta * TIME_SNAP_MINUTES),
+  );
+  if (slot) {
+    const currentMinute = clockTimeToMinutes(slot[drag.edge]) ?? drag.originMinute;
+    const visualOffset = ((currentMinute - drag.originMinute) / TIME_SNAP_MINUTES) * INLINE_AVAILABILITY_DRAG_STEP_PX;
+    drag.hasChanged = drag.hasChanged || currentMinute !== drag.originMinute;
+    refreshAvailabilityEditorDOM(drag.slotId, slot, drag.edge, visualOffset);
+  }
+  return true;
+}
+
+function endAvailabilityPointerDrag(event) {
+  const drag = ui.availabilityPointerDrag;
+  if (!drag || drag.pointerId !== event.pointerId) return false;
+  if (drag.mode === "inline") return endInlineAvailabilityPointerDrag(event, drag);
+  drag.handleEl?.releasePointerCapture?.(event.pointerId);
+  drag.handleEl?.classList.remove("is-dragging");
+  document.body.classList.remove("is-availability-dragging");
+  ui.availabilityPointerDrag = null;
+  event.preventDefault();
+  if (event.type === "pointercancel") {
+    ui.availabilityDraft = drag.originalDraft;
+    render();
+    return true;
+  }
+  if (drag.hasChanged) render();
+  return true;
+}
+
 function getPlanPointerDragCard(target) {
   const handle = target?.closest?.("[data-plan-drag-handle]");
   return handle ? handle.closest("[data-plan-work-id]") : null;
 }
 
 function clearPlanPointerDragState() {
-  document.querySelectorAll(".day-plan-slot__track.is-drag-over, [data-plan-work-id].is-dragging")
-    .forEach((element) => element.classList.remove("is-drag-over", "is-dragging"));
+  document.querySelectorAll("[data-time-plan-zone].is-drag-over, [data-plan-work-id].is-dragging, .time-plan-item.is-drop-before, .time-plan-item.is-drop-after, .time-timeline-gap.is-drag-over")
+    .forEach((element) => element.classList.remove("is-drag-over", "is-dragging", "is-drop-before", "is-drop-after"));
   ui.planPointerDrag?.previewEl?.remove();
   document.querySelector(".day-plan-drag-preview")?.remove();
   document.body.classList.remove("is-day-plan-dragging");
@@ -3544,7 +4143,7 @@ function clearPlanPointerDragState() {
 
 function createPlanDragPreview(source, event) {
   const rect = source.getBoundingClientRect();
-  const title = source.querySelector(".day-plan-segment__title, strong")?.textContent?.trim() || "Task";
+  const title = source.querySelector(".time-plan-item__title, .time-candidate__title, .day-plan-segment__title, strong")?.textContent?.trim() || "Task";
   const preview = document.createElement("div");
   const width = Math.min(Math.max(rect.width, 156), 280);
   preview.className = "day-plan-drag-preview";
@@ -3552,12 +4151,23 @@ function createPlanDragPreview(source, event) {
   preview.innerHTML = `
     ${renderPlanDragGrip()}
     <strong>${escapeHtml(title)}</strong>
+    <span class="day-plan-drag-preview__time"></span>
   `;
   document.body.appendChild(preview);
   ui.planPointerDrag.previewEl = preview;
   ui.planPointerDrag.offsetX = Math.min(Math.max(event.clientX - rect.left, 18), width - 18);
   ui.planPointerDrag.offsetY = Math.min(Math.max(event.clientY - rect.top, 12), rect.height - 8);
   updatePlanDragPreview(event.clientX, event.clientY);
+}
+
+function updatePlanDragPreviewTime(minute = null, outsideAvailability = false) {
+  const label = ui.planPointerDrag?.previewEl?.querySelector(".day-plan-drag-preview__time");
+  if (!label) return;
+  label.textContent = Number.isFinite(minute)
+    ? `${formatScheduleClock(minute)}から${outsideAvailability ? " · 枠外" : ""}`
+    : "";
+  label.classList.toggle("is-visible", Number.isFinite(minute));
+  label.classList.toggle("is-outside", Number.isFinite(minute) && outsideAvailability);
 }
 
 function updatePlanDragPreview(clientX, clientY) {
@@ -3572,16 +4182,98 @@ function setPlanPointerDropZone(clientX, clientY) {
   const drag = ui.planPointerDrag;
   if (!drag) return null;
   const target = document.elementFromPoint(clientX, clientY);
-  const zone = target?.closest?.("[data-plan-slot-id]") || null;
-  document.querySelectorAll(".day-plan-slot__track.is-drag-over").forEach((element) => {
+  const zone = target?.closest?.("[data-time-plan-zone]") || null;
+  document.querySelectorAll("[data-time-plan-zone].is-drag-over").forEach((element) => {
     if (element !== zone) element.classList.remove("is-drag-over");
   });
+  document.querySelectorAll(".time-plan-item.is-drop-before, .time-plan-item.is-drop-after").forEach((element) => {
+    element.classList.remove("is-drop-before", "is-drop-after");
+  });
+  document.querySelectorAll(".time-timeline-gap.is-drag-over").forEach((element) => {
+    element.classList.remove("is-drag-over");
+  });
   if (!zone) {
-    drag.overSlotId = "";
+    drag.dropZone = "";
+    drag.beforeWorkId = null;
+    drag.targetStartMinute = null;
+    drag.targetIsGap = false;
+    drag.targetOutsideAvailability = false;
+    updatePlanDragPreviewTime();
     return null;
   }
   zone.classList.add("is-drag-over");
-  drag.overSlotId = zone.dataset.planSlotId || "";
+  drag.dropZone = zone.dataset.timePlanZone || "";
+  if (drag.dropZone !== "today") {
+    drag.beforeWorkId = null;
+    drag.targetStartMinute = null;
+    drag.targetIsGap = false;
+    drag.targetOutsideAvailability = false;
+    updatePlanDragPreviewTime();
+    return zone;
+  }
+
+  const availabilityRanges = getScheduleAvailabilityRanges(ensureDailyPlan());
+
+  const gap = target?.closest?.("[data-time-gap-start]") || null;
+  if (gap) {
+    const rect = gap.getBoundingClientRect();
+    const start = Number(gap.dataset.timeGapStart);
+    const end = Number(gap.dataset.timeGapEnd);
+    const ratio = rect.height > 0
+      ? Math.max(0, Math.min(1, (clientY - rect.top) / rect.height))
+      : 0;
+    drag.beforeWorkId = gap.dataset.timeDropBefore || null;
+    drag.targetStartMinute = snapScheduleMinute(start + ((end - start) * ratio));
+    drag.targetIsGap = true;
+    drag.targetOutsideAvailability = Number.isFinite(drag.targetStartMinute)
+      && !isMinuteInAvailability(drag.targetStartMinute, availabilityRanges);
+    gap.classList.add("is-drag-over");
+    updatePlanDragPreviewTime(drag.targetStartMinute, drag.targetOutsideAvailability);
+    return zone;
+  }
+
+  const items = Array.from(zone.querySelectorAll("[data-time-order-item]"))
+    .filter((element) => element.dataset.timeOrderItem !== drag.workId);
+  const item = target?.closest?.("[data-time-order-item]") || null;
+  drag.targetIsGap = false;
+  if (!item || item.dataset.timeOrderItem === drag.workId) {
+    const first = items[0];
+    if (first && clientY < first.getBoundingClientRect().top + first.getBoundingClientRect().height / 2) {
+      drag.beforeWorkId = first.dataset.timeOrderItem || null;
+      drag.targetStartMinute = Number(first.dataset.timeStartMinute);
+      first.classList.add("is-drop-before");
+    } else {
+      drag.beforeWorkId = null;
+      drag.targetStartMinute = Number(items.at(-1)?.dataset.timeEndMinute ?? zone.dataset.timeEmptyStart);
+    }
+    drag.targetIsGap = items.length === 0 && Number.isFinite(drag.targetStartMinute);
+    drag.targetOutsideAvailability = Number.isFinite(drag.targetStartMinute)
+      && !isMinuteInAvailability(drag.targetStartMinute, availabilityRanges);
+    updatePlanDragPreviewTime(drag.targetStartMinute, drag.targetOutsideAvailability);
+    return zone;
+  }
+
+  const rect = item.getBoundingClientRect();
+  const itemStart = Number(item.dataset.timeStartMinute);
+  const itemEnd = Number(item.dataset.timeEndMinute);
+  const insertBefore = clientY < rect.top + rect.height / 2;
+  drag.targetStartMinute = insertBefore ? itemStart : itemEnd;
+  drag.targetIsGap = false;
+  drag.targetOutsideAvailability = Number.isFinite(drag.targetStartMinute)
+    && !isMinuteInAvailability(drag.targetStartMinute, availabilityRanges);
+  if (insertBefore) {
+    drag.beforeWorkId = item.dataset.timeOrderItem || null;
+    item.classList.add("is-drop-before");
+    updatePlanDragPreviewTime(drag.targetStartMinute, drag.targetOutsideAvailability);
+    return zone;
+  }
+
+  const itemIndex = items.indexOf(item);
+  drag.beforeWorkId = items.slice(itemIndex + 1)
+    .find((candidate) => candidate.dataset.timeOrderItem !== item.dataset.timeOrderItem)
+    ?.dataset.timeOrderItem || null;
+  item.classList.add("is-drop-after");
+  updatePlanDragPreviewTime(drag.targetStartMinute, drag.targetOutsideAvailability);
   return zone;
 }
 
@@ -3591,16 +4283,24 @@ function startPlanPointerDrag(event) {
   }
   const source = getPlanPointerDragCard(event.target);
   if (!source) return false;
+  const workId = source.dataset.planWorkId || "";
+  const item = getWorkItemById(workId);
+  if (!item) return false;
 
   event.preventDefault();
   event.stopPropagation();
   ui.planPointerDrag = {
-    workId: source.dataset.planWorkId || "",
+    workId,
+    sourceSelected: isWorkItemSelectedToday(item, ensureDailyPlan()),
     pointerId: event.pointerId,
     startX: event.clientX,
     startY: event.clientY,
     hasMoved: false,
-    overSlotId: "",
+    dropZone: "",
+    beforeWorkId: null,
+    targetStartMinute: null,
+    targetIsGap: false,
+    targetOutsideAvailability: false,
     sourceEl: source,
     previewEl: null,
     offsetX: 18,
@@ -3634,28 +4334,78 @@ function endPlanPointerDrag(event) {
   const drag = ui.planPointerDrag;
   if (!drag || drag.pointerId !== event.pointerId) return false;
   const wasCancelled = event.type === "pointercancel";
-  const slotId = drag.hasMoved && !wasCancelled
-    ? drag.overSlotId || setPlanPointerDropZone(event.clientX, event.clientY)?.dataset.planSlotId || ""
-    : "";
+  if (drag.hasMoved && !wasCancelled && !drag.dropZone) {
+    setPlanPointerDropZone(event.clientX, event.clientY);
+  }
+  const dropZone = drag.dropZone;
+  const canDrop = drag.hasMoved && !wasCancelled && Boolean(dropZone);
+  const beforeWorkId = drag.beforeWorkId || null;
+  const targetStartMinute = drag.targetStartMinute;
+  const targetIsGap = drag.targetIsGap;
+  const targetOutsideAvailability = Boolean(drag.targetOutsideAvailability);
+  const existingFirstStartMinute = buildTodayTimeRows(getTodayOrderedWorkItems(), ensureDailyPlan())[0]?.startMinutes ?? null;
   drag.sourceEl?.releasePointerCapture?.(event.pointerId);
   ui.planPointerDrag = null;
   ui.taskSuppressClickUntil = Date.now() + 350;
   clearPlanPointerDragState();
   event.preventDefault();
-  if (wasCancelled || !drag.hasMoved || !slotId || state.activeSession) return true;
+  if (!canDrop || state.activeSession) return true;
 
-  const result = planWorkItemToday(drag.workId, slotId);
-  if (result) {
+  if (dropZone === "later") {
+    if (!drag.sourceSelected) return true;
+    const selection = setWorkItemSelectedToday(drag.workId, false);
+    if (selection?.blockedByContinuation) {
+      showToast("中断した続きは、完了するまで今日に残ります。");
+      return true;
+    }
+    if (selection) {
+      saveState();
+      renderWithTransition();
+      showToast("今日やらないへ移しました。");
+    }
+    return true;
+  }
+
+  if (dropZone === "today") {
+    if (!drag.sourceSelected) {
+      setWorkItemSelectedToday(drag.workId, true);
+    }
+    const result = moveTodayWorkItem(drag.workId, beforeWorkId);
+    if (!result) return true;
+    const resolvedStartMinute = Number.isFinite(targetStartMinute)
+      ? targetStartMinute
+      : getTodayInsertionStartMinute(drag.workId, beforeWorkId);
+    const scheduledRow = repackTodayWorkStartTimes({
+      firstStartMinute: existingFirstStartMinute,
+      anchorWorkId: drag.workId,
+      anchorMinute: resolvedStartMinute,
+      keepAnchorGap: targetIsGap,
+    });
+    const scheduledOutsideAvailability = scheduledRow
+      ? !isMinuteInAvailability(scheduledRow.startMinutes, getScheduleAvailabilityRanges(ensureDailyPlan()))
+      : targetOutsideAvailability;
+    const stats = getTodayPlanStats();
     saveState();
     renderWithTransition();
-    showToast(result.remainingMinutes > 0
-      ? `入る分だけ配置し、残り${result.remainingMinutes}分を残しました。`
-      : "空き時間に移しました。");
+    showToast(drag.sourceSelected
+      ? scheduledRow
+        ? scheduledOutsideAvailability
+          ? `${formatScheduleClock(scheduledRow.startMinutes)}から、空き時間の外に移しました。`
+          : `${formatScheduleClock(scheduledRow.startMinutes)}からに移しました。`
+        : "今日の順番を変更しました。"
+      : scheduledOutsideAvailability
+        ? `空き時間の外に入れました。${stats.overflowMinutes > 0 ? `${stats.overflowMinutes}分多めです。` : ""}`
+        : stats.overflowMinutes > 0
+          ? `今日に入れました。${stats.overflowMinutes}分多めです。`
+          : "今日に入れました。");
   }
   return true;
 }
 
 function handleTaskPointerDown(event) {
+  if (startAvailabilityPointerDrag(event)) {
+    return;
+  }
   if (startPlanPointerDrag(event)) {
     return;
   }
@@ -3727,6 +4477,9 @@ function autoScrollTaskDrag(clientY) {
 }
 
 function handleTaskPointerMove(event) {
+  if (moveAvailabilityPointerDrag(event)) {
+    return;
+  }
   if (movePlanPointerDrag(event)) {
     return;
   }
@@ -3753,6 +4506,9 @@ function handleTaskPointerMove(event) {
 }
 
 function handleTaskPointerEnd(event) {
+  if (endAvailabilityPointerDrag(event)) {
+    return;
+  }
   if (endPlanPointerDrag(event)) {
     return;
   }
@@ -4555,6 +5311,72 @@ function renderSettingsHome() {
   `;
 }
 
+function renderAvailabilityRangeEditor(slot, index) {
+  const start = clockTimeToMinutes(slot.start) ?? 0;
+  const end = clockTimeToMinutes(slot.end) ?? start + TIME_SNAP_MINUTES;
+  return `
+    <div
+      class="availability-range"
+      style="--availability-slot-height:${getAvailabilitySlotBodyHeight(slot)}px"
+      data-availability-range-rail
+      data-slot-id="${escapeHtml(slot.id)}"
+    >
+        <div class="availability-range__handle availability-range__handle--start">
+          <button
+            type="button"
+            class="availability-range__grip"
+            role="slider"
+            aria-orientation="vertical"
+            aria-label="${index + 1}番目の空き枠の開始"
+            aria-valuemin="0"
+            aria-valuemax="${AVAILABILITY_DAY_MINUTES - TIME_SNAP_MINUTES}"
+            aria-valuenow="${start}"
+            aria-valuetext="${escapeHtml(minutesToClockTime(start))}"
+            data-availability-drag-handle="start"
+            data-slot-id="${escapeHtml(slot.id)}"
+          >${renderInlineAvailabilityGrip()}</button>
+          <span>開始</span>
+          <input
+            type="time"
+            step="${TIME_SNAP_MINUTES * 60}"
+            value="${escapeHtml(slot.start)}"
+            data-availability-field="start"
+            data-slot-id="${escapeHtml(slot.id)}"
+            aria-label="${index + 1}番目の空き枠の開始時刻"
+          />
+        </div>
+        <div class="availability-range__body">
+          <span aria-hidden="true"></span>
+          <strong data-availability-range-duration>${escapeHtml(formatLoggedDuration(getAvailabilitySlotMinutes(slot) * 60))}</strong>
+        </div>
+        <div class="availability-range__handle availability-range__handle--end">
+          <button
+            type="button"
+            class="availability-range__grip"
+            role="slider"
+            aria-orientation="vertical"
+            aria-label="${index + 1}番目の空き枠の終了"
+            aria-valuemin="0"
+            aria-valuemax="${AVAILABILITY_DAY_MINUTES - TIME_SNAP_MINUTES}"
+            aria-valuenow="${end}"
+            aria-valuetext="${escapeHtml(minutesToClockTime(end))}"
+            data-availability-drag-handle="end"
+            data-slot-id="${escapeHtml(slot.id)}"
+          >${renderInlineAvailabilityGrip()}</button>
+          <span>終了</span>
+          <input
+            type="time"
+            step="${TIME_SNAP_MINUTES * 60}"
+            value="${escapeHtml(slot.end)}"
+            data-availability-field="end"
+            data-slot-id="${escapeHtml(slot.id)}"
+            aria-label="${index + 1}番目の空き枠の終了時刻"
+          />
+        </div>
+    </div>
+  `;
+}
+
 function renderAvailabilitySettings() {
   const mode = ui.availabilityMode === "today" ? "today" : "default";
   const draft = Array.isArray(ui.availabilityDraft)
@@ -4578,24 +5400,17 @@ function renderAvailabilitySettings() {
       <section class="availability-editor">
         <div class="availability-editor__summary">
           <span>${escapeHtml(`${draft.length}枠`)}</span>
-          <strong>${escapeHtml(formatLoggedDuration(totalMinutes * 60))}</strong>
+          <strong data-availability-total>${escapeHtml(formatLoggedDuration(totalMinutes * 60))}</strong>
         </div>
         <div class="availability-editor__slots">
           ${draft.map((slot, index) => `
-            <div class="availability-editor__slot">
+            <div class="availability-editor__slot" data-availability-slot-row="${escapeHtml(slot.id)}">
               <span class="availability-editor__index">${index + 1}</span>
-              <label>
-                <span class="sr-only">開始</span>
-                <input class="field__control" type="time" value="${escapeHtml(slot.start)}" data-availability-field="start" data-slot-id="${escapeHtml(slot.id)}" />
-              </label>
-              <span aria-hidden="true">–</span>
-              <label>
-                <span class="sr-only">終了</span>
-                <input class="field__control" type="time" value="${escapeHtml(slot.end)}" data-availability-field="end" data-slot-id="${escapeHtml(slot.id)}" />
-              </label>
+              <strong class="availability-editor__slot-title">空き枠</strong>
               <button type="button" data-action="remove-availability-slot" data-slot-id="${escapeHtml(slot.id)}" aria-label="${index + 1}番目の空き枠を削除">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"></path></svg>
               </button>
+              ${renderAvailabilityRangeEditor(slot, index)}
             </div>
           `).join("")}
         </div>
@@ -4705,13 +5520,20 @@ function renderSetupView() {
 }
 
 function renderTodayView() {
+  const mode = ["time", "organize"].includes(ui.todayMode) ? ui.todayMode : "execution";
+  ui.todayMode = mode;
   return `
     <section class="screen screen--today screen--today-unified">
       <div class="today-mode-switch" role="tablist" aria-label="Todayの表示">
-        <button type="button" role="tab" class="today-mode-switch__button ${ui.todayMode === "execution" ? "is-active" : ""}" data-action="set-today-mode" data-mode="execution" aria-selected="${ui.todayMode === "execution"}">今日</button>
-        <button type="button" role="tab" class="today-mode-switch__button ${ui.todayMode === "organize" ? "is-active" : ""}" data-action="set-today-mode" data-mode="organize" aria-selected="${ui.todayMode === "organize"}">整理</button>
+        <button type="button" role="tab" class="today-mode-switch__button ${mode === "execution" ? "is-active" : ""}" data-action="set-today-mode" data-mode="execution" aria-selected="${mode === "execution"}">今日</button>
+        <button type="button" role="tab" class="today-mode-switch__button ${mode === "time" ? "is-active" : ""}" data-action="set-today-mode" data-mode="time" aria-selected="${mode === "time"}">時間</button>
+        <button type="button" role="tab" class="today-mode-switch__button ${mode === "organize" ? "is-active" : ""}" data-action="set-today-mode" data-mode="organize" aria-selected="${mode === "organize"}">4象限</button>
       </div>
-      ${ui.todayMode === "organize" ? renderTodayOrganizeView() : renderTodayExecutionView()}
+      ${mode === "time"
+        ? renderTodayTimeView()
+        : mode === "organize"
+          ? renderTodayOrganizeView()
+          : renderTodayExecutionView()}
     </section>
   `;
 }
@@ -4725,66 +5547,18 @@ function getTaskResumeAllocationId(plan, task) {
 }
 
 function getTodayExecutionItems() {
-  const plan = ensureDailyPlan();
-  const slotOrder = new Map(plan.slots.map((slot, index) => [slot.id, index]));
-  const allocationOrder = new Map(plan.allocations.map((allocation, index) => [allocation.id, index]));
-  const represented = new Set();
-  const items = plan.allocations
-    .filter((allocation) => !allocation.completedAt)
-    .map((allocation) => {
-      const item = getWorkItemById(allocation.workId);
-      if (!item || getWorkItemPlannableMinutes(item) <= 0) return null;
-      represented.add(item.id);
-      const segments = getPlanAllocationsForWork(plan, item.id);
-      const pausedSeconds = item.kind === "task" ? getTaskPausedSeconds(item) : 0;
-      const resumeAllocationId = pausedSeconds ? getTaskResumeAllocationId(plan, item) : "";
-      if (pausedSeconds && resumeAllocationId && allocation.id !== resumeAllocationId) return null;
-      const segmentIndex = Math.max(0, segments.findIndex((segment) => segment.id === allocation.id));
-      return {
-        ...item,
-        minutes: allocation.minutes,
-        allocationId: allocation.id,
-        pausedAllocationId: resumeAllocationId,
-        pausedRemainingSeconds: pausedSeconds || null,
-        slotId: allocation.slotId,
-        segmentIndex,
-        segmentCount: segments.length,
-      };
-    })
-    .filter(Boolean);
-
-  normalizeTasks(state.tasks)
-    .filter((task) => task.status === "active" && getTaskPausedSeconds(task) > 0 && !represented.has(task.id))
-    .forEach((task) => {
-      items.push({
-        ...taskToWorkItem(task),
-        minutes: Math.max(1, Math.ceil(getTaskPausedSeconds(task) / 60)),
-        allocationId: task.pausedAllocationId || "",
-        slotId: "",
-        segmentIndex: 0,
-        segmentCount: 1,
-      });
-    });
-  listGoals().forEach((goal) => {
-    const continuation = getGoalContinuation(goal.id);
-    const workId = goalWorkId(goal.id);
-    if (!continuation || represented.has(workId)) return;
-    items.push({
-      ...goalToWorkItem(goal),
-      minutes: Math.max(1, Math.ceil(continuation.remainingSeconds / 60)),
+  return getTodayOrderedWorkItems().map((item) => {
+    const pausedSeconds = getTaskPausedSeconds(item);
+    return {
+      ...item,
+      minutes: pausedSeconds
+        ? Math.max(1, Math.ceil(pausedSeconds / 60))
+        : getWorkItemPlannableMinutes(item),
       allocationId: "",
-      slotId: "",
+      pausedRemainingSeconds: pausedSeconds || null,
       segmentIndex: 0,
       segmentCount: 1,
-    });
-  });
-
-  return items.sort((left, right) => {
-    const pausedGap = Number(getTaskPausedSeconds(right) > 0) - Number(getTaskPausedSeconds(left) > 0);
-    if (pausedGap !== 0) return pausedGap;
-    const slotGap = (slotOrder.get(left.slotId) ?? -1) - (slotOrder.get(right.slotId) ?? -1);
-    if (slotGap !== 0) return slotGap;
-    return (allocationOrder.get(left.allocationId) ?? -1) - (allocationOrder.get(right.allocationId) ?? -1);
+    };
   });
 }
 
@@ -4799,20 +5573,17 @@ function getUnplannedTasks() {
 }
 
 function getTodayPlannedMinutes() {
-  return ensureDailyPlan().allocations
-    .reduce((sum, allocation) => sum + allocation.minutes, 0);
+  return getTodayOrderedWorkItems()
+    .reduce((sum, item) => sum + getWorkItemPlannableMinutes(item), 0);
 }
 
 function renderTodayExecutionView() {
   const items = getTodayExecutionItems();
-  const unplannedTasks = getUnplannedTasks();
-  const plan = ensureDailyPlan();
-  const allDoneToday = !items.length && plan.allocations.some((allocation) => allocation.completedAt);
+  const today = toISODate(new Date());
+  const allDoneToday = !items.length && getAllExecutionLogs().some((entry) => entry.date === today);
 
   return `
     <div class="today-execution">
-      ${renderTodayPlanner(plan, unplannedTasks)}
-
       <div class="today-work-list">
         ${items.length
           ? items.map((item, index) => renderTodayWorkItem(item, index)).join("")
@@ -4823,15 +5594,6 @@ function renderTodayExecutionView() {
             </section>
           `}
       </div>
-
-      <section class="today-quick-add" aria-label="今日やることを追加">
-        <input class="field__control" data-task-draft-field="title" type="text" value="${escapeHtml(ensureTaskDraft().title || "")}" placeholder="今日やること" />
-        <label>
-          <input class="field__control" data-task-draft-field="minutes" type="number" min="1" max="240" inputmode="numeric" value="${escapeHtml(String(ensureTaskDraft().minutes || TASK_DEFAULT_MINUTES))}" aria-label="予定分数" />
-          <span>分</span>
-        </label>
-        <button type="button" data-action="add-today-task" aria-label="今日やることを追加">＋</button>
-      </section>
     </div>
   `;
 }
@@ -4952,7 +5714,7 @@ function renderTodayPlanner(plan, unplannedTasks) {
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9M5 12h14M5 17h11"></path><path d="m16 5 3 2-3 2"></path></svg>
               <span>整える</span>
             </button>
-            <button type="button" data-action="open-today-availability">
+            <button type="button" data-action="set-today-mode" data-mode="time">
               ${renderSettingsIcon("clock")}
               <span>時間</span>
             </button>
@@ -4966,16 +5728,12 @@ function renderTodayPlanner(plan, unplannedTasks) {
 function renderTodayWorkItem(item, index) {
   const quadrant = getTaskQuadrantMeta(item.quadrant) || getTaskQuadrantMeta("notUrgentImportant");
   const pausedSeconds = getTaskPausedSeconds(item);
-  const segmentLabel = item.segmentCount > 1 ? ` · ${item.segmentIndex + 1}/${item.segmentCount}` : "";
-  const minutesLabel = pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `${item.minutes}分${segmentLabel}`;
+  const minutesLabel = pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `${item.minutes}分`;
   const itemType = item.kind === "goal" ? (item.isHabit ? "習慣" : "目標") : quadrant.concept;
   const startAction = item.kind === "goal" ? "start-goal-session" : "start-task-session";
   const idAttribute = item.kind === "goal"
     ? `data-goal-id="${escapeHtml(item.sourceId)}"`
     : `data-task-id="${escapeHtml(item.sourceId)}"`;
-  const allocationAttribute = item.allocationId
-    ? `data-allocation-id="${escapeHtml(item.allocationId)}"`
-    : "";
 
   return `
     <article class="today-work-item ${index === 0 ? "is-next" : ""}" style="--work-accent:${getQuadrantColor(item.quadrant)}">
@@ -4988,14 +5746,450 @@ function renderTodayWorkItem(item, index) {
       </div>
       <div class="today-work-item__actions">
         <span>${escapeHtml(minutesLabel)}</span>
-        ${item.kind === "task" ? `<button type="button" class="today-work-item__remove" data-action="toggle-task-today" data-task-id="${escapeHtml(item.sourceId)}" aria-label="今日から外す">外す</button>` : ""}
-        <button type="button" class="today-work-item__start" data-action="${startAction}" ${idAttribute} ${allocationAttribute}>${pausedSeconds ? "再開" : "開始"}</button>
+        <button type="button" class="today-work-item__start" data-action="${startAction}" ${idAttribute}>${pausedSeconds ? "再開" : "開始"}</button>
       </div>
     </article>
   `;
 }
 
+function getWorkItemTypeLabel(item) {
+  if (item.kind === "goal") return item.isHabit ? "習慣" : "目標";
+  return getTaskQuadrantMeta(item.quadrant)?.concept || "Task";
+}
+
+function getWorkItemQuadrantLabel(item) {
+  return getTaskQuadrantMeta(item?.quadrant)?.concept || "未整理";
+}
+
+function getWorkItemPlanningLabel(item) {
+  return item.kind === "goal" ? getWorkItemTypeLabel(item) : "Task";
+}
+
+function getScheduleAvailabilityRanges(plan) {
+  return normalizeAvailabilitySlots(plan.slots, plan.capacityMinutes)
+    .map((slot) => ({
+      id: slot.id,
+      start: clockTimeToMinutes(slot.start),
+      end: clockTimeToMinutes(slot.end),
+    }))
+    .filter((slot) => slot.start !== null && slot.end !== null && slot.end > slot.start);
+}
+
+function formatScheduleClock(value) {
+  const total = Math.max(0, Math.round(Number(value) || 0));
+  const dayOffset = Math.floor(total / (24 * 60));
+  const minuteOfDay = total % (24 * 60);
+  const clock = `${String(Math.floor(minuteOfDay / 60)).padStart(2, "0")}:${String(minuteOfDay % 60).padStart(2, "0")}`;
+  return dayOffset > 0 ? `翌 ${clock}` : clock;
+}
+
+function isMinuteInAvailability(minute, ranges) {
+  return ranges.some((range) => minute >= range.start && minute < range.end);
+}
+
+function getNextAvailableMinute(minute, ranges) {
+  const cursor = Math.max(0, Number(minute) || 0);
+  for (const range of ranges) {
+    if (cursor < range.start) return range.start;
+    if (cursor < range.end) return cursor;
+  }
+  return cursor;
+}
+
+function buildContinuousScheduleSegments(startMinute, durationMinutes, ranges) {
+  const start = Math.max(0, Math.round(startMinute));
+  const end = start + Math.max(0, Math.round(durationMinutes));
+  const boundaries = [...new Set([
+    start,
+    end,
+    ...ranges.flatMap((range) => [range.start, range.end])
+      .filter((minute) => minute > start && minute < end),
+  ])].sort((left, right) => left - right);
+
+  return boundaries.slice(0, -1).map((segmentStart, index) => {
+    const segmentEnd = boundaries[index + 1];
+    return {
+      start: segmentStart,
+      end: segmentEnd,
+      minutes: segmentEnd - segmentStart,
+      inside: isMinuteInAvailability(segmentStart, ranges),
+    };
+  });
+}
+
+function buildPackedScheduleSegments(startMinute, durationMinutes, ranges) {
+  let cursor = getNextAvailableMinute(startMinute, ranges);
+  let remaining = Math.max(0, Math.round(durationMinutes));
+  const segments = [];
+
+  while (remaining > 0) {
+    const range = ranges.find((candidate) => cursor < candidate.end);
+    if (!range) {
+      segments.push({
+        start: cursor,
+        end: cursor + remaining,
+        minutes: remaining,
+        inside: false,
+      });
+      break;
+    }
+    cursor = Math.max(cursor, range.start);
+    const take = Math.min(remaining, range.end - cursor);
+    if (take > 0) {
+      segments.push({
+        start: cursor,
+        end: cursor + take,
+        minutes: take,
+        inside: true,
+      });
+      cursor += take;
+      remaining -= take;
+    }
+    if (remaining > 0 && cursor >= range.end) {
+      const nextRange = ranges.find((candidate) => candidate.start >= cursor && candidate.end > cursor);
+      cursor = nextRange?.start ?? cursor;
+    }
+  }
+
+  return segments;
+}
+
+function getAvailableMinutesBetween(startMinute, endMinute, ranges) {
+  if (endMinute <= startMinute) return 0;
+  return ranges.reduce((sum, range) => (
+    sum + Math.max(0, Math.min(endMinute, range.end) - Math.max(startMinute, range.start))
+  ), 0);
+}
+
+function buildTodayTimeRows(items, plan) {
+  const ranges = getScheduleAvailabilityRanges(plan);
+  const defaultStart = ranges[0]?.start ?? 20 * 60;
+  let cursor = null;
+
+  return items.map((item) => {
+    const minutes = getWorkItemPlannableMinutes(item);
+    const requestedStart = clockTimeToMinutes(plan.startTimes?.[item.id]);
+    const hasRequestedStart = requestedStart !== null;
+    const candidateStart = hasRequestedStart
+      ? cursor === null ? requestedStart : Math.max(cursor, requestedStart)
+      : cursor ?? defaultStart;
+    const startMinutes = hasRequestedStart
+      ? candidateStart
+      : getNextAvailableMinute(candidateStart, ranges);
+    const startsInsideAvailability = isMinuteInAvailability(startMinutes, ranges);
+    const segments = !hasRequestedStart || startsInsideAvailability
+      ? buildPackedScheduleSegments(startMinutes, minutes, ranges)
+      : buildContinuousScheduleSegments(startMinutes, minutes, ranges);
+    const endMinutes = segments.at(-1)?.end ?? startMinutes;
+    const insideMinutes = segments
+      .filter((segment) => segment.inside)
+      .reduce((sum, segment) => sum + segment.minutes, 0);
+    const outsideMinutes = Math.max(0, minutes - insideMinutes);
+    cursor = endMinutes;
+
+    return {
+      item,
+      minutes,
+      segments,
+      ranges: segments.map((segment) => `${formatScheduleClock(segment.start)}–${formatScheduleClock(segment.end)}`),
+      startMinutes,
+      endMinutes,
+      requestedStartMinutes: hasRequestedStart ? requestedStart : null,
+      shiftedMinutes: hasRequestedStart ? Math.max(0, startMinutes - requestedStart) : 0,
+      insideMinutes,
+      outsideMinutes,
+    };
+  });
+}
+
+function renderTodayTimeSegment(row, segment, segmentIndex) {
+  const pausedSeconds = getTaskPausedSeconds(row.item);
+  const isPrimary = segmentIndex === 0;
+  const isContinuation = !isPrimary;
+  const timeText = `${formatScheduleClock(segment.start)}–${formatScheduleClock(segment.end)}`;
+  const riskText = !segment.inside
+    ? `${segment.minutes}分は空き時間の外`
+    : isPrimary && row.shiftedMinutes > 0
+      ? `前の予定から${row.shiftedMinutes}分後ろへ調整`
+      : "";
+  const splitText = isPrimary && row.segments.length > 1
+    ? `${row.segments.length}つの時間枠に分けて予定`
+    : "";
+  const inputMinute = Math.max(0, row.startMinutes % (24 * 60));
+  const plan = ensureDailyPlan();
+  const savedHabitStart = row.item.isHabit
+    ? clockTimeToMinutes(plan.defaultStartTimes?.[row.item.id])
+      ?? clockTimeToMinutes(String(row.item.goal?.setup?.primaryWindow || "").split("-")[0])
+    : null;
+  const showHabitTimeAction = isPrimary
+    && row.item.isHabit
+    && savedHabitStart !== inputMinute;
+  return `
+    <article
+      class="time-plan-item${segment.inside ? "" : " is-over is-fully-over"}${isContinuation ? " is-continuation-segment" : ""}"
+      style="--time-block-height:${Math.min(118, Math.max(68, Math.round(segment.minutes * 1.2)))}px"
+      data-plan-work-id="${escapeHtml(row.item.id)}"
+      data-time-order-item="${escapeHtml(row.item.id)}"
+      data-time-start-minute="${segment.start}"
+      data-time-end-minute="${segment.end}"
+      data-time-outside="${segment.inside ? "false" : "true"}"
+    >
+      ${renderPlanDragGrip(`${row.item.title}の順番を移動`)}
+      ${isPrimary ? `
+        <label class="time-plan-item__clock" title="${escapeHtml(timeText)}">
+          <span>開始</span>
+          <input
+            type="time"
+            step="${TIME_SNAP_MINUTES * 60}"
+            value="${escapeHtml(minutesToClockTime(inputMinute))}"
+            data-time-start-field="${escapeHtml(row.item.id)}"
+            aria-label="${escapeHtml(`${row.item.title}の開始時刻`)}"
+          />
+          <small>– ${escapeHtml(formatScheduleClock(segment.end))}</small>
+        </label>
+      ` : `
+        <div class="time-plan-item__clock" title="${escapeHtml(timeText)}">
+          <span>続き</span>
+          <strong>${escapeHtml(formatScheduleClock(segment.start))}</strong>
+          <small>– ${escapeHtml(formatScheduleClock(segment.end))}</small>
+        </div>
+      `}
+      <div class="time-plan-item__copy">
+        <span>${escapeHtml(`${getWorkItemPlanningLabel(row.item)} · ${pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `${segment.minutes}分`}`)}</span>
+        <strong class="time-plan-item__title">${escapeHtml(row.item.title)}</strong>
+        ${splitText ? `<small class="time-plan-item__split">${escapeHtml(splitText)}</small>` : ""}
+        ${showHabitTimeAction ? `
+          <button
+            type="button"
+            class="time-plan-item__habit-time"
+            data-action="set-habit-default-time"
+            data-work-id="${escapeHtml(row.item.id)}"
+            aria-label="${escapeHtml(`${row.item.title}の習慣時間を${minutesToClockTime(inputMinute)}にする`)}"
+          >習慣もこの時間に</button>
+        ` : ""}
+      </div>
+      ${riskText ? `<small class="time-plan-item__risk">${escapeHtml(riskText)}</small>` : ""}
+      ${isContinuation
+        ? `<span class="time-plan-item__continuation">${segmentIndex + 1}/${row.segments.length}</span>`
+        : pausedSeconds
+          ? `<span class="time-plan-item__continuation">続き</span>`
+          : `<button type="button" class="time-plan-item__remove" data-action="toggle-work-today" data-work-id="${escapeHtml(row.item.id)}" aria-label="${escapeHtml(row.item.title)}を今日やらないへ移す" title="今日やらないへ移す">やらない</button>`}
+    </article>
+  `;
+}
+
+function renderTodayTimeGap(startMinute, endMinute, ranges, beforeWorkId = "", showStartTime = true) {
+  const minutes = Math.max(0, endMinute - startMinute);
+  if (minutes < TIME_SNAP_MINUTES) return "";
+  const availableMinutes = getAvailableMinutesBetween(startMinute, endMinute, ranges);
+  const outsideMinutes = Math.max(0, minutes - availableMinutes);
+  const availableLabel = formatLoggedDuration(availableMinutes * 60);
+  const outsideLabel = formatLoggedDuration(outsideMinutes * 60);
+  const label = outsideMinutes < 1
+    ? `空き ${availableLabel}`
+    : availableMinutes > 0
+      ? `空き ${availableLabel} · 枠外 ${outsideLabel}`
+      : `空き枠の外 ${outsideLabel}`;
+  const stateClass = outsideMinutes < 1
+    ? " is-available"
+    : availableMinutes > 0
+      ? " has-outside is-mixed"
+      : " has-outside is-outside";
+  const height = Math.min(76, Math.max(30, Math.round(minutes * 0.68)));
+  return `
+    <div
+      class="time-timeline-gap${stateClass}"
+      style="--timeline-gap-height:${height}px"
+      data-time-gap-start="${startMinute}"
+      data-time-gap-end="${endMinute}"
+      data-time-gap-outside="${outsideMinutes > 0 ? "true" : "false"}"
+      data-time-drop-before="${escapeHtml(beforeWorkId)}"
+    >
+      <time>${showStartTime ? escapeHtml(formatScheduleClock(startMinute)) : ""}</time>
+      <span class="time-timeline-gap__line"></span>
+      <strong>${escapeHtml(label)}</strong>
+    </div>
+  `;
+}
+
+function renderTodayTimeRows(rows, plan) {
+  const ranges = getScheduleAvailabilityRanges(plan);
+  const boundaryEvents = plan.slots.flatMap((slot, index) => ([
+    { type: "start", minute: clockTimeToMinutes(slot.start) ?? 0, slot, index },
+    { type: "end", minute: clockTimeToMinutes(slot.end) ?? 0, slot, index },
+  ]));
+  const segmentEvents = rows.flatMap((row) => row.segments.map((segment, segmentIndex) => ({
+    type: "segment",
+    minute: segment.start,
+    row,
+    segment,
+    segmentIndex,
+  })));
+  const eventOrder = { start: 0, segment: 1, end: 2 };
+  const events = [...boundaryEvents, ...segmentEvents].sort((left, right) => (
+    left.minute - right.minute || eventOrder[left.type] - eventOrder[right.type]
+  ));
+  let cursor = events[0]?.minute ?? ranges[0]?.start ?? 20 * 60;
+  const chunks = [];
+  let previousEventType = "";
+
+  events.forEach((event) => {
+    if (event.minute > cursor) {
+      const beforeWorkId = event.type === "segment" ? event.row.item.id : "";
+      chunks.push(renderTodayTimeGap(cursor, event.minute, ranges, beforeWorkId, previousEventType === "segment"));
+    }
+    if (event.type === "segment") {
+      chunks.push(renderTodayTimeSegment(event.row, event.segment, event.segmentIndex));
+      cursor = Math.max(cursor, event.segment.end);
+      previousEventType = event.type;
+      return;
+    }
+    chunks.push(renderInlineAvailabilityHandle(event.slot, event.index, event.type));
+    cursor = Math.max(cursor, event.minute);
+    previousEventType = event.type;
+  });
+
+  return chunks.join("");
+}
+
+function renderTodayTimeCandidate(item) {
+  return `
+    <article
+      class="time-candidate"
+      data-plan-work-id="${escapeHtml(item.id)}"
+      data-time-candidate-item="${escapeHtml(item.id)}"
+    >
+      ${renderPlanDragGrip(`${item.title}を今日へ移動`)}
+      <div class="time-candidate__copy">
+        <strong class="time-candidate__title">${escapeHtml(item.title)}</strong>
+      </div>
+      <span class="time-candidate__minutes">${escapeHtml(`${getWorkItemPlannableMinutes(item)}分`)}</span>
+      <button type="button" data-action="toggle-work-today" data-work-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.title)}を今日に入れる" title="今日に入れる">＋</button>
+    </article>
+  `;
+}
+
+function renderInlineAvailabilityGrip() {
+  return `
+    <svg viewBox="0 0 18 22" aria-hidden="true">
+      <path d="M9 2.5v17"></path>
+      <path d="m5.5 6 3.5-3.5L12.5 6"></path>
+      <path d="m5.5 16 3.5 3.5 3.5-3.5"></path>
+    </svg>
+  `;
+}
+
+function renderInlineAvailabilityHandle(slot, index, edge) {
+  const isStart = edge === "start";
+  const minute = clockTimeToMinutes(slot[edge]) ?? 0;
+  const label = isStart ? "開始" : "終了";
+  return `
+    <div
+      class="time-availability-handle time-availability-handle--${edge}"
+    >
+      <button
+        type="button"
+        class="time-availability-handle__grip"
+        role="slider"
+        aria-orientation="vertical"
+        aria-label="${index + 1}番目の空き時間の${label}"
+        aria-valuemin="0"
+        aria-valuemax="${AVAILABILITY_DAY_MINUTES - TIME_SNAP_MINUTES}"
+        aria-valuenow="${minute}"
+        aria-valuetext="${escapeHtml(slot[edge])}"
+        data-inline-availability-drag-handle="${edge}"
+        data-slot-id="${escapeHtml(slot.id)}"
+      >${renderInlineAvailabilityGrip()}</button>
+      <span>${label}</span>
+      <time data-inline-availability-time="${edge}">${escapeHtml(slot[edge])}</time>
+    </div>
+  `;
+}
+
+function renderTodayTimeView() {
+  const plan = ensureDailyPlan();
+  const draft = ensureTaskDraft();
+  const items = getTodayOrderedWorkItems();
+  const selectedIds = new Set(items.map((item) => item.id));
+  const candidates = getActiveWorkItems()
+    .filter((item) => getWorkItemPlannableMinutes(item) > 0 && !selectedIds.has(item.id))
+    .sort(compareWorkItems);
+  const rows = buildTodayTimeRows(items, plan);
+  const stats = getTodayPlanStats(plan);
+  const scheduledInsideMinutes = rows.reduce((sum, row) => sum + row.insideMinutes, 0);
+  const scheduledOutsideMinutes = rows.reduce((sum, row) => sum + row.outsideMinutes, 0);
+  const scheduledFreeMinutes = Math.max(0, stats.capacityMinutes - scheduledInsideMinutes);
+  return `
+    <div class="today-time">
+      <section class="time-budget${scheduledOutsideMinutes > 0 ? " is-over" : ""}">
+        <div class="time-budget__summary">
+          <div class="time-budget__main">
+            <span>今日の空き時間</span>
+            <strong data-inline-availability-total>${escapeHtml(`${stats.capacityMinutes}分`)}</strong>
+          </div>
+          <div class="time-budget__status">
+            <strong>${escapeHtml(scheduledOutsideMinutes > 0 ? `枠外 ${scheduledOutsideMinutes}分` : `あと${scheduledFreeMinutes}分`)}</strong>
+            <span>${escapeHtml(`${stats.allocatedMinutes}分を予定`)}</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="time-plan-section">
+        <div class="time-plan-section__head">
+          <h2>今日やる</h2>
+          <span>${escapeHtml(`${items.length}件 · ${stats.allocatedMinutes}分`)}</span>
+        </div>
+        <div
+          class="time-plan-list time-timeline"
+          data-time-order-zone
+          data-time-plan-zone="today"
+          data-time-empty-start="${getScheduleAvailabilityRanges(plan)[0]?.start ?? 20 * 60}"
+        >
+          ${renderTodayTimeRows(rows, plan)}
+        </div>
+      </section>
+
+      <section class="time-plan-section time-plan-section--candidates time-later-zone" data-time-plan-zone="later">
+        <div class="time-plan-section__head">
+          <h2>今日やらない</h2>
+          <span>${escapeHtml(`${candidates.length}件`)}</span>
+        </div>
+        <div class="time-task-capture">
+          <input
+            class="field__control time-task-capture__title"
+            data-task-draft-field="title"
+            type="text"
+            value="${escapeHtml(draft.title || "")}"
+            placeholder="Taskを追加"
+            aria-label="未予定のTask名"
+          />
+          <label class="task-minute-inline time-task-capture__minutes">
+            <input
+              class="field__control"
+              data-task-draft-field="minutes"
+              type="number"
+              min="1"
+              max="240"
+              inputmode="numeric"
+              value="${escapeHtml(String(draft.minutes || TASK_DEFAULT_MINUTES))}"
+              aria-label="予定分数"
+            />
+            <span>分</span>
+          </label>
+          <button type="button" data-action="add-task" aria-label="未予定のTaskを追加" title="Taskを追加">＋</button>
+        </div>
+        <div class="time-candidate-list">
+          ${candidates.length
+            ? candidates.map(renderTodayTimeCandidate).join("")
+            : '<div class="time-plan-empty">未予定のTaskはありません。</div>'}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
 function renderTodayOrganizeView() {
+  ensureDailyPlan();
   const draft = ensureTaskDraft();
   const tasks = normalizeTasks(state.tasks);
   const activeTasks = tasks.filter((task) => task.status === "active");
@@ -5155,11 +6349,15 @@ function renderTaskBoardItem(task) {
     : "";
   const resumeBadge = renderTaskResumeBadge(task, "task-board-item__resume");
   const completedToday = task.kind === "goal" && getGoalMissionStateForDate(task.goal).isClosed;
+  const selectedToday = isWorkItemSelectedToday(task, state.dailyPlan);
   const typeBadge = task.kind === "goal"
     ? `<span class="task-board-item__type${completedToday ? " is-complete" : ""}">${completedToday ? "今日完了" : (task.isHabit ? "習慣" : "目標")}</span>`
-    : (isTaskPlannedToday(task) ? `<span class="task-board-item__type is-today">今日</span>` : "");
-  const badges = resumeBadge || progressBadge || typeBadge
-    ? `<span class="task-board-item__badges">${typeBadge}${resumeBadge}${progressBadge}</span>`
+    : "";
+  const todayBadge = selectedToday && !completedToday
+    ? `<span class="task-board-item__type is-today">今日</span>`
+    : "";
+  const badges = resumeBadge || progressBadge || typeBadge || todayBadge
+    ? `<span class="task-board-item__badges">${todayBadge}${typeBadge}${resumeBadge}${progressBadge}</span>`
     : "";
   return `
     <button
@@ -5186,7 +6384,7 @@ function renderSelectedTaskPanel(tasks) {
     return renderSelectedGoalPanel(selectedTask);
   }
   const pausedSeconds = getTaskPausedSeconds(selectedTask);
-  const plannedToday = isTaskPlannedToday(selectedTask);
+  const plannedToday = isWorkItemSelectedToday(selectedTask, state.dailyPlan);
 
   return `
     <section class="task-selected-panel">
@@ -5207,10 +6405,9 @@ function renderSelectedTaskPanel(tasks) {
       </div>
       ${renderTaskBreakdown(selectedTask)}
       <div class="task-card__actions">
-        ${plannedToday
-          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">今日を見る</button>`
-          : `<button type="button" class="action-button action-button--primary" data-action="toggle-task-today" data-task-id="${escapeHtml(selectedTask.id)}">今日に入れる</button>`}
-        ${plannedToday ? `<button type="button" class="soft-button" data-action="toggle-task-today" data-task-id="${escapeHtml(selectedTask.id)}">今日から外す</button>` : ""}
+        ${pausedSeconds
+          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">続きは今日から</button>`
+          : `<button type="button" class="action-button action-button--primary" data-action="toggle-work-today" data-work-id="${escapeHtml(selectedTask.id)}">${plannedToday ? "今日から外す" : "今日に入れる"}</button>`}
         <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(selectedTask.id)}">完了</button>
         <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(selectedTask.id)}">あとで</button>
       </div>
@@ -5223,7 +6420,7 @@ function renderSelectedGoalPanel(item) {
   const timing = `${formatStudyDays(goal.setup.studyDays)} · ${goal.setup.primaryWindow}`;
   const pausedSeconds = getTaskPausedSeconds(item);
   const completedToday = getGoalMissionStateForDate(goal).isClosed;
-  const availableToday = isGoalScheduledForDate(goal) || pausedSeconds > 0;
+  const selectedToday = isWorkItemSelectedToday(item, state.dailyPlan);
   return `
     <section class="task-selected-panel task-selected-panel--goal">
       <div class="task-selected-panel__main">
@@ -5243,9 +6440,9 @@ function renderSelectedGoalPanel(item) {
         ${completedToday
           ? `<button type="button" class="action-button action-button--primary" disabled>今日完了</button>
              <button type="button" class="soft-button" data-action="open-review" data-goal-id="${escapeHtml(item.sourceId)}">Reviewを見る</button>`
-          : availableToday
-            ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">${pausedSeconds ? "続きは今日から" : "今日を見る"}</button>`
-            : `<button type="button" class="action-button action-button--primary" disabled>今日は予定なし</button>`}
+          : pausedSeconds
+            ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">続きは今日から</button>`
+            : `<button type="button" class="action-button action-button--primary" data-action="toggle-work-today" data-work-id="${escapeHtml(item.id)}">${selectedToday ? "今日から外す" : "今日に入れる"}</button>`}
         <button type="button" class="soft-button" data-action="open-goal-settings" data-goal-id="${escapeHtml(item.sourceId)}">設定</button>
       </div>
     </section>
@@ -5311,7 +6508,7 @@ function renderActiveTaskCard(task) {
     ? `<span class="task-card__breakdown">${escapeHtml(`${progress.done}/${progress.total}`)}</span>`
     : "";
   const isSelected = ui.selectedTaskId === task.id;
-  const plannedToday = isTaskPlannedToday(task);
+  const plannedToday = isWorkItemSelectedToday(taskToWorkItem(task), state.dailyPlan);
   return `
     <article class="task-card task-card--active${isSelected ? " is-selected" : ""}" data-action="select-task" data-task-id="${escapeHtml(task.id)}" data-task-draggable="true" data-task-drop-item="true">
       <div class="task-card__main">
@@ -5332,9 +6529,9 @@ function renderActiveTaskCard(task) {
         </div>
       </div>
       <div class="task-card__actions">
-        ${plannedToday
-          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">今日を見る</button>`
-          : `<button type="button" class="action-button action-button--primary" data-action="toggle-task-today" data-task-id="${escapeHtml(task.id)}">今日に入れる</button>`}
+        ${getTaskPausedSeconds(task)
+          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">続きは今日から</button>`
+          : `<button type="button" class="action-button action-button--primary" data-action="toggle-work-today" data-work-id="${escapeHtml(task.id)}">${plannedToday ? "今日から外す" : "今日に入れる"}</button>`}
         <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(task.id)}">完了</button>
         <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(task.id)}">棚上げ</button>
       </div>
@@ -6925,7 +8122,9 @@ function holdActiveSession() {
   closePiP();
   ui.selectedTaskId = task ? task.id : goalWorkId(continuationGoalId);
   state.meta.currentView = "today";
-  ui.todayMode = task && session.originMode === "organize" ? "organize" : "execution";
+  ui.todayMode = ["time", "organize"].includes(session.originMode)
+    ? session.originMode
+    : "execution";
   saveState();
   render();
   if (screenFrame) {
@@ -8427,7 +9626,10 @@ function mergeState(base, saved) {
     logs: Array.isArray(saved.logs) ? normalizeLogs(saved.logs) : base.logs,
     goals: savedGoals,
     tasks: migratedWork.tasks,
-    goalContinuations: migratedWork.goalContinuations,
+    goalContinuations: filterStaleHabitContinuations(
+      migratedWork.goalContinuations,
+      goalCandidates,
+    ),
     taskLogs: Array.isArray(saved.taskLogs) ? normalizeLogs(saved.taskLogs) : [],
     dailyPlan: normalizeDailyPlan(saved.dailyPlan || base.dailyPlan),
   };
@@ -8495,7 +9697,15 @@ function startClock() {
   }
 
   ui.clockTimer = window.setInterval(() => {
-    todayLabel.textContent = formatHeaderDate(new Date());
+    const now = new Date();
+    todayLabel.textContent = formatHeaderDate(now);
+    const expiredHabitContinuations = state.activeSession
+      ? 0
+      : expireStaleHabitContinuations(now);
+    if (expiredHabitContinuations > 0) {
+      ensureDailyPlan();
+      saveState();
+    }
     if (state.meta.currentView === "today" && !ui.sessionOpen && !state.activeSession && !ui.finishDraft) {
       render();
     }
