@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260724a 保留残り時間を当日限りに";
+const APP_BUILD = "20260724b 保留リセットとアプリ制限failクローズ";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -1883,6 +1883,7 @@ function buildFocusLockHelp(result = {}) {
   const shortcutButton = result.shortcutButton || fallbackButton;
 
   return {
+    mode: result.mode === "appShield" ? "appShield" : "guidedAccess",
     deviceModel: result.deviceModel || "このiPhone",
     deviceIdentifier: result.deviceIdentifier || "",
     shortcutButton,
@@ -7449,6 +7450,44 @@ function renderFocusLockHelpPanel() {
   const deviceLabel = help.deviceIdentifier
     ? `${help.deviceModel} (${help.deviceIdentifier})`
     : help.deviceModel;
+
+  if (help.mode === "appShield") {
+    return `
+    <div class="sheet__backdrop" data-action="dismiss-focus-lock-help"></div>
+    <section class="sheet__panel" role="dialog" aria-modal="true" aria-label="アプリ制限の許可">
+      <div class="sheet__grab"></div>
+      <div class="stack focus-lock-help">
+        <div class="focus-lock-help__head">
+          <span class="status-badge status-badge--accent">初回だけ</span>
+          <h2 class="section-title">アプリ制限の許可が必要です</h2>
+          <p class="section-copy">集中中に他のアプリを制限するには、iPhoneのスクリーンタイムへのアクセス許可が必要です。許可できるまでタイマーは始まりません。</p>
+        </div>
+
+        <ol class="focus-lock-steps">
+          <li>
+            <strong>もう一度開始する</strong>
+            <span>下のボタンを押すと、iPhoneが許可画面を表示します。</span>
+          </li>
+          <li>
+            <strong>「続ける」を選ぶ</strong>
+            <span>スクリーンタイムのアクセス確認で「続ける」を選びます。</span>
+          </li>
+          <li>
+            <strong>画面が出ないとき</strong>
+            <span>iPhoneの「設定」→「スクリーンタイム」で、砂時計のアクセスを許可してください。</span>
+          </li>
+        </ol>
+
+        <p class="focus-lock-note">アプリ制限を使わずに集中したいときは、設定の「集中中のアプリ」で「集中中にアプリを制限する」をオフにできます。</p>
+
+        <div class="sheet__actions">
+          <button type="button" class="action-button action-button--primary" data-action="retry-focus-lock">許可してもう一度開始</button>
+          <button type="button" class="soft-button" data-action="dismiss-focus-lock-help">あとで</button>
+        </div>
+      </div>
+    </section>
+  `;
+  }
 
   return `
     <div class="sheet__backdrop" data-action="dismiss-focus-lock-help"></div>
