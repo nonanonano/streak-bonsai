@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260723b 時間調整を安定化";
+const APP_BUILD = "20260724a 保留残り時間を当日限りに";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -622,18 +622,12 @@ function getGoalContinuationDate(continuation) {
   return Number.isNaN(pausedAt.getTime()) ? "" : toISODate(pausedAt);
 }
 
-function filterStaleHabitContinuations(continuations, goals, referenceDate = new Date()) {
+// 保留した残り時間は保留した当日だけ有効。日付が変わったら習慣・目標とも破棄する。
+function filterStaleContinuations(continuations, referenceDate = new Date()) {
   const today = toISODate(referenceDate);
-  const habitGoalIds = new Set(
-    (Array.isArray(goals) ? goals : [])
-      .filter((goal) => goal?.setup?.goalType === "habit")
-      .map((goal) => goal.id)
-      .filter(Boolean),
-  );
-
   return Object.entries(normalizeGoalContinuations(continuations)).reduce(
     (result, [goalId, continuation]) => {
-      if (!habitGoalIds.has(goalId) || getGoalContinuationDate(continuation) === today) {
+      if (getGoalContinuationDate(continuation) === today) {
         result[goalId] = continuation;
       }
       return result;
@@ -642,9 +636,9 @@ function filterStaleHabitContinuations(continuations, goals, referenceDate = new
   );
 }
 
-function expireStaleHabitContinuations(referenceDate = new Date()) {
+function expireStaleContinuations(referenceDate = new Date()) {
   const previous = normalizeGoalContinuations(state.goalContinuations);
-  const current = filterStaleHabitContinuations(previous, state.goals, referenceDate);
+  const current = filterStaleContinuations(previous, referenceDate);
   const expiredCount = Object.keys(previous).length - Object.keys(current).length;
   state.goalContinuations = current;
   return expiredCount;
@@ -685,10 +679,7 @@ function migrateLegacyGoalContinuations(tasks, goals, continuations) {
 }
 
 function ensureGoalContinuations() {
-  state.goalContinuations = filterStaleHabitContinuations(
-    state.goalContinuations,
-    state.goals,
-  );
+  state.goalContinuations = filterStaleContinuations(state.goalContinuations);
   return state.goalContinuations;
 }
 
@@ -2319,14 +2310,14 @@ function init() {
     state = buildSeedState();
   }
   ensureGoalCollection();
-  const expiredHabitContinuations = expireStaleHabitContinuations();
+  const expiredContinuations = expireStaleContinuations();
   ensureDailyPlan();
   if (state.meta.demoMode && state.meta.currentView === "setup") {
     state.meta.currentView = "today";
     saveNavState();
   }
   syncSelectedSessionPlan(true);
-  if (expiredHabitContinuations > 0) {
+  if (expiredContinuations > 0) {
     saveState();
   }
   startClock();
@@ -2387,8 +2378,8 @@ function bindEvents() {
       scheduleFocusAlarm(state.activeSession);
       return;
     }
-    const expiredHabitContinuations = expireStaleHabitContinuations();
-    if (expiredHabitContinuations > 0) {
+    const expiredContinuations = expireStaleContinuations();
+    if (expiredContinuations > 0) {
       ensureDailyPlan();
       saveState();
       render();
@@ -9626,10 +9617,7 @@ function mergeState(base, saved) {
     logs: Array.isArray(saved.logs) ? normalizeLogs(saved.logs) : base.logs,
     goals: savedGoals,
     tasks: migratedWork.tasks,
-    goalContinuations: filterStaleHabitContinuations(
-      migratedWork.goalContinuations,
-      goalCandidates,
-    ),
+    goalContinuations: filterStaleContinuations(migratedWork.goalContinuations),
     taskLogs: Array.isArray(saved.taskLogs) ? normalizeLogs(saved.taskLogs) : [],
     dailyPlan: normalizeDailyPlan(saved.dailyPlan || base.dailyPlan),
   };
@@ -9699,10 +9687,10 @@ function startClock() {
   ui.clockTimer = window.setInterval(() => {
     const now = new Date();
     todayLabel.textContent = formatHeaderDate(now);
-    const expiredHabitContinuations = state.activeSession
+    const expiredContinuations = state.activeSession
       ? 0
-      : expireStaleHabitContinuations(now);
-    if (expiredHabitContinuations > 0) {
+      : expireStaleContinuations(now);
+    if (expiredContinuations > 0) {
       ensureDailyPlan();
       saveState();
     }
