@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260724b 保留リセットとアプリ制限failクローズ";
+const APP_BUILD = "20260725a 通知とバイブを1回に";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -10348,7 +10348,7 @@ function triggerTimerHaptic() {
   } catch (e) {}
   try {
     if (navigator.vibrate) {
-      navigator.vibrate([400, 160, 400, 160, 600]);
+      navigator.vibrate(500); // 1回だけ震わせる（以前は3連パターン）
     }
   } catch (e) {}
 }
