@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260725a 通知とバイブを1回に";
+const APP_BUILD = "20260725b 再起動時に砂時計へ復帰";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -2320,6 +2320,12 @@ function init() {
   syncSelectedSessionPlan(true);
   if (expiredContinuations > 0) {
     saveState();
+  }
+  // 実行中セッションを抱えたまま再起動された場合は、砂時計を開いた状態で復帰する。
+  // uiはメモリ上のみでsessionOpenが既定false のため、これがないとタイマーとアプリ制限は
+  // 生きているのに完了・中断のボタンが出せず、操作不能になる。
+  if (state.activeSession && !ui.finishDraft) {
+    ui.sessionOpen = true;
   }
   startClock();
   startSessionTicker();
