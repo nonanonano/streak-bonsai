@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260725b 再起動時に砂時計へ復帰";
+const APP_BUILD = "20260725c 新規Taskは育てるへ";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -64,6 +64,9 @@ const DEFAULT_AVAILABILITY_SLOTS = [
   { id: "availability-evening", start: "20:00", end: "21:00" },
 ];
 const TASK_QUADRANT_DEFAULT = "inbox";
+// 新規Taskの初期象限。書き留めた時点で「やるつもりだが今すぐではない」＝重要・非緊急とみなす。
+// 未整理に入れると4象限ボードの最下部へ埋もれて見失うため、最初から育てるへ置く。
+const TASK_QUADRANT_NEW = "notUrgentImportant";
 const TASK_QUADRANTS = [
   {
     key: "urgentImportant",
@@ -2784,7 +2787,7 @@ function handleClick(event) {
       title,
       minutes: normalizeTaskMinutes(draft.minutes),
       status: "active",
-      quadrant: TASK_QUADRANT_DEFAULT,
+      quadrant: TASK_QUADRANT_NEW,
       plannedDate: toISODate(new Date()),
       createdAt: now,
       updatedAt: now,
@@ -3171,6 +3174,7 @@ function handleClick(event) {
       title,
       minutes: normalizeTaskMinutes(draft.minutes),
       status: "active",
+      quadrant: TASK_QUADRANT_NEW,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }));
