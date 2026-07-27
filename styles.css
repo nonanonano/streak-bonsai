@@ -8950,3 +8950,76 @@ body.is-task-pointer-dragging {
     background: rgba(201, 138, 67, 0.08);
   }
 }
+
+/* 象限ごとのTask追加（4象限ボード）。仕分けの手間をなくすため、置きたい場所から直接足す */
+.task-quadrant__add {
+  width: 100%;
+  min-height: 32px;
+  border: 1px dashed rgba(31, 42, 37, 0.22);
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(31, 42, 37, 0.55);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+
+.task-quadrant__add:hover {
+  border-color: var(--quadrant-color, rgba(31, 42, 37, 0.4));
+  color: var(--quadrant-color, rgba(31, 42, 37, 0.75));
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.task-quadrant__composer {
+  display: grid;
+  /* 象限は横幅が狭いので、名前を1段目に全幅で置き、分数と操作を2段目に並べる */
+  grid-template-columns: minmax(0, 1fr) 34px 34px;
+  align-items: center;
+  gap: 5px;
+}
+
+.task-quadrant__composer-title {
+  grid-column: 1 / -1;
+}
+
+.task-quadrant__composer .field__control {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding-inline: 8px;
+  font-size: 0.74rem;
+}
+
+.task-quadrant__composer .task-minute-inline {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.task-quadrant__composer .task-minute-inline .field__control {
+  padding-inline: 4px 16px;
+  text-align: center;
+}
+
+.task-quadrant__composer-add,
+.task-quadrant__composer-cancel {
+  width: 32px;
+  height: 34px;
+  border: 0;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.task-quadrant__composer-add {
+  background: var(--quadrant-color, #173f32);
+  color: #fff;
+}
+
+.task-quadrant__composer-cancel {
+  background: rgba(31, 42, 37, 0.08);
+  color: rgba(31, 42, 37, 0.6);
+}

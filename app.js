@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260725c 新規Taskは育てるへ";
+const APP_BUILD = "20260725d 時間タブ廃止とTask追加整理";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -64,9 +64,10 @@ const DEFAULT_AVAILABILITY_SLOTS = [
   { id: "availability-evening", start: "20:00", end: "21:00" },
 ];
 const TASK_QUADRANT_DEFAULT = "inbox";
-// 新規Taskの初期象限。書き留めた時点で「やるつもりだが今すぐではない」＝重要・非緊急とみなす。
-// 未整理に入れると4象限ボードの最下部へ埋もれて見失うため、最初から育てるへ置く。
-const TASK_QUADRANT_NEW = "notUrgentImportant";
+// 象限を指定せずに書き留めたTaskの初期象限。さっと足すのは基本「ちょっとした用事」なので
+// 軽くする(緊急・低重要)へ置く。腰を据えた仕事は4象限ボードの各象限の＋から直接足す。
+// 未整理へ入れるとボード最下部に埋もれて見失うため、既定では使わない。
+const TASK_QUADRANT_NEW = "urgentNotImportant";
 const TASK_QUADRANTS = [
   {
     key: "urgentImportant",
@@ -215,6 +216,7 @@ const toastEl = document.querySelector("#toast");
 let state = loadState();
 let ui = {
   todayMode: "execution",
+  taskComposerQuadrant: null, // 4象限ボードで入力欄を開いている象限のキー
   setupDraft: null,
   setupMode: "edit",
   setupSection: "home",
@@ -2603,9 +2605,7 @@ function handleClick(event) {
   }
 
   if (action === "set-today-mode") {
-    ui.todayMode = ["time", "organize"].includes(target.dataset.mode)
-      ? target.dataset.mode
-      : "execution";
+    ui.todayMode = target.dataset.mode === "organize" ? "organize" : "execution";
     ui.selectedTaskId = null;
     renderWithTransition();
     if (screenFrame) screenFrame.scrollTop = 0;
@@ -2699,7 +2699,7 @@ function handleClick(event) {
 
   if (action === "open-availability-settings" || action === "open-today-availability" || action === "adjust-today-capacity") {
     ui.availabilityMode = action === "open-availability-settings" ? "default" : "today";
-    ui.availabilityReturnView = ui.availabilityMode === "today" ? "time" : "setup";
+    ui.availabilityReturnView = ui.availabilityMode === "today" ? "today" : "setup";
     ui.availabilityDraft = buildAvailabilityDraft(ui.availabilityMode);
     ui.setupSection = "availability";
     state.meta.currentView = "setup";
@@ -2733,9 +2733,9 @@ function handleClick(event) {
 
   if (action === "cancel-availability-settings") {
     ui.availabilityDraft = null;
-    if (ui.availabilityReturnView === "time") {
+    if (ui.availabilityReturnView === "today") {
       state.meta.currentView = "today";
-      ui.todayMode = "time";
+      ui.todayMode = "execution";
     } else {
       ui.setupSection = "home";
     }
@@ -2762,9 +2762,9 @@ function handleClick(event) {
     reconcileDailyPlanAllocations(plan);
     plan.capacityMinutes = getAvailabilityMinutes(plan.slots);
     ui.availabilityDraft = null;
-    if (ui.availabilityReturnView === "time") {
+    if (ui.availabilityReturnView === "today") {
       state.meta.currentView = "today";
-      ui.todayMode = "time";
+      ui.todayMode = "execution";
     } else {
       ui.setupSection = "home";
     }
@@ -3169,19 +3169,36 @@ function handleClick(event) {
       return;
     }
     state.tasks = normalizeTasks(state.tasks);
+    // 象限の＋から開いた入力ならその象限へ、それ以外は既定(軽くする)へ入れる。
+    const quadrant = normalizeTaskQuadrant(ui.taskComposerQuadrant || TASK_QUADRANT_NEW);
     state.tasks.unshift(normalizeTask({
       id: createTaskId(),
       title,
       minutes: normalizeTaskMinutes(draft.minutes),
       status: "active",
-      quadrant: TASK_QUADRANT_NEW,
+      quadrant,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }));
     resetTaskDraft();
     saveState();
     render();
-    showToast("Taskに追加しました。");
+    showToast(`${getTaskQuadrantMeta(quadrant)?.concept || "Task"}に追加しました。`);
+    return;
+  }
+
+  if (action === "open-task-composer") {
+    ui.taskComposerQuadrant = normalizeTaskQuadrant(target.dataset.quadrant || TASK_QUADRANT_NEW);
+    resetTaskDraft();
+    render();
+    document.querySelector("[data-task-composer-input]")?.focus();
+    return;
+  }
+
+  if (action === "close-task-composer") {
+    ui.taskComposerQuadrant = null;
+    resetTaskDraft();
+    render();
     return;
   }
 
@@ -5522,20 +5539,17 @@ function renderSetupView() {
 }
 
 function renderTodayView() {
-  const mode = ["time", "organize"].includes(ui.todayMode) ? ui.todayMode : "execution";
+  // 表示は「今日」と「4象限」の2つ。開始時刻を割り当てる時間ページは廃止し、
+  // 空き時間の残量と今日やらない一覧は「今日」へ統合した。
+  const mode = ui.todayMode === "organize" ? "organize" : "execution";
   ui.todayMode = mode;
   return `
     <section class="screen screen--today screen--today-unified">
       <div class="today-mode-switch" role="tablist" aria-label="Todayの表示">
         <button type="button" role="tab" class="today-mode-switch__button ${mode === "execution" ? "is-active" : ""}" data-action="set-today-mode" data-mode="execution" aria-selected="${mode === "execution"}">今日</button>
-        <button type="button" role="tab" class="today-mode-switch__button ${mode === "time" ? "is-active" : ""}" data-action="set-today-mode" data-mode="time" aria-selected="${mode === "time"}">時間</button>
         <button type="button" role="tab" class="today-mode-switch__button ${mode === "organize" ? "is-active" : ""}" data-action="set-today-mode" data-mode="organize" aria-selected="${mode === "organize"}">4象限</button>
       </div>
-      ${mode === "time"
-        ? renderTodayTimeView()
-        : mode === "organize"
-          ? renderTodayOrganizeView()
-          : renderTodayExecutionView()}
+      ${mode === "organize" ? renderTodayOrganizeView() : renderTodayExecutionView()}
     </section>
   `;
 }
@@ -5580,12 +5594,37 @@ function getTodayPlannedMinutes() {
 }
 
 function renderTodayExecutionView() {
+  const plan = ensureDailyPlan();
+  const draft = ensureTaskDraft();
   const items = getTodayExecutionItems();
   const today = toISODate(new Date());
   const allDoneToday = !items.length && getAllExecutionLogs().some((entry) => entry.date === today);
 
+  const stats = getTodayPlanStats(plan);
+  const plannedMinutes = items.reduce((sum, item) => sum + (Number(item.minutes) || 0), 0);
+  const freeMinutes = Math.max(0, stats.capacityMinutes - plannedMinutes);
+  const overMinutes = Math.max(0, plannedMinutes - stats.capacityMinutes);
+
+  const selectedIds = new Set(items.map((item) => item.id));
+  const candidates = getActiveWorkItems()
+    .filter((item) => getWorkItemPlannableMinutes(item) > 0 && !selectedIds.has(item.id))
+    .sort(compareWorkItems);
+
   return `
     <div class="today-execution">
+      <section class="time-budget${overMinutes > 0 ? " is-over" : ""}">
+        <div class="time-budget__summary">
+          <div class="time-budget__main">
+            <span>今日の空き時間</span>
+            <strong data-inline-availability-total>${escapeHtml(`${stats.capacityMinutes}分`)}</strong>
+          </div>
+          <div class="time-budget__status">
+            <strong>${escapeHtml(overMinutes > 0 ? `${overMinutes}分オーバー` : `あと${freeMinutes}分`)}</strong>
+            <span>${escapeHtml(`${plannedMinutes}分を予定`)}</span>
+          </div>
+        </div>
+      </section>
+
       <div class="today-work-list">
         ${items.length
           ? items.map((item, index) => renderTodayWorkItem(item, index)).join("")
@@ -5596,6 +5635,42 @@ function renderTodayExecutionView() {
             </section>
           `}
       </div>
+
+      <section class="time-plan-section time-plan-section--candidates">
+        <div class="time-plan-section__head">
+          <h2>今日やらない</h2>
+          <span>${escapeHtml(`${candidates.length}件`)}</span>
+        </div>
+        <div class="time-task-capture">
+          <input
+            class="field__control time-task-capture__title"
+            data-task-draft-field="title"
+            type="text"
+            value="${escapeHtml(draft.title || "")}"
+            placeholder="Taskを追加"
+            aria-label="Task名"
+          />
+          <label class="task-minute-inline time-task-capture__minutes">
+            <input
+              class="field__control"
+              data-task-draft-field="minutes"
+              type="number"
+              min="1"
+              max="240"
+              inputmode="numeric"
+              value="${escapeHtml(String(draft.minutes || TASK_DEFAULT_MINUTES))}"
+              aria-label="予定分数"
+            />
+            <span>分</span>
+          </label>
+          <button type="button" data-action="add-task" aria-label="Taskを追加" title="Taskを追加">＋</button>
+        </div>
+        <div class="time-candidate-list">
+          ${candidates.length
+            ? candidates.map(renderTodayTimeCandidate).join("")
+            : '<div class="time-plan-empty">ほかにやることはありません。</div>'}
+        </div>
+      </section>
     </div>
   `;
 }
@@ -5716,9 +5791,9 @@ function renderTodayPlanner(plan, unplannedTasks) {
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h9M5 12h14M5 17h11"></path><path d="m16 5 3 2-3 2"></path></svg>
               <span>整える</span>
             </button>
-            <button type="button" data-action="set-today-mode" data-mode="time">
+            <button type="button" data-action="open-today-availability">
               ${renderSettingsIcon("clock")}
-              <span>時間</span>
+              <span>空き時間</span>
             </button>
           </div>
         </div>
@@ -6192,30 +6267,19 @@ function renderTodayTimeView() {
 
 function renderTodayOrganizeView() {
   ensureDailyPlan();
-  const draft = ensureTaskDraft();
   const tasks = normalizeTasks(state.tasks);
-  const activeTasks = tasks.filter((task) => task.status === "active");
   const workItems = getActiveWorkItems();
   const activeGroups = groupActiveWorkItemsByQuadrant(workItems);
   const shelvedTasks = tasks.filter((task) => task.status === "shelved");
   const doneTasks = tasks.filter((task) => task.status === "done").slice(0, 5);
 
+  const inboxTasks = activeGroups[TASK_QUADRANT_DEFAULT] || [];
+
   return `
     <div class="today-organize">
-      <section class="panel task-composer task-composer--simple">
-        <div class="task-add-row task-add-row--simple">
-          <input class="field__control task-title-input" data-task-draft-field="title" type="text" value="${escapeHtml(draft.title || "")}" placeholder="あとでやること" />
-          <label class="task-minute-inline">
-            <input class="field__control" data-task-draft-field="minutes" type="number" min="1" max="240" inputmode="numeric" value="${escapeHtml(String(draft.minutes || TASK_DEFAULT_MINUTES))}" aria-label="予定分数" />
-            <span>分</span>
-          </label>
-          <button type="button" class="action-button action-button--primary task-add-button" data-action="add-task" aria-label="Taskを追加">＋</button>
-        </div>
-      </section>
-
       ${renderTaskQuadrantBoard(activeGroups)}
       ${renderSelectedTaskPanel(workItems)}
-      ${renderTaskInbox(activeGroups[TASK_QUADRANT_DEFAULT])}
+      ${inboxTasks.length ? renderTaskInbox(inboxTasks) : ""}
 
       <section class="task-list-section">
         <button type="button" class="task-shelf-toggle" data-action="toggle-shelved-tasks">
@@ -6309,6 +6373,8 @@ function renderTaskQuadrantBoard(groups) {
 
 function renderTaskQuadrant(quadrant, tasks, boardTotalMinutes = 0) {
   const totalMinutes = tasks.reduce((sum, task) => sum + getWorkItemPlannableMinutes(task), 0);
+  const isComposing = ui.taskComposerQuadrant === quadrant.key;
+  const draft = isComposing ? ensureTaskDraft() : null;
 
   return `
     <section class="task-quadrant task-quadrant--${escapeHtml(quadrant.key)}" data-task-quadrant-zone="${escapeHtml(quadrant.key)}" style="--quadrant-color:${getQuadrantColor(quadrant.key)}">
@@ -6328,6 +6394,40 @@ function renderTaskQuadrant(quadrant, tasks, boardTotalMinutes = 0) {
           ? tasks.map(renderTaskBoardItem).join("")
           : `<div class="task-drop-empty">空</div>`}
       </div>
+      ${isComposing
+        ? `
+          <div class="task-quadrant__composer">
+            <input
+              class="field__control task-quadrant__composer-title"
+              data-task-draft-field="title"
+              data-task-composer-input
+              type="text"
+              value="${escapeHtml(draft.title || "")}"
+              placeholder="${escapeHtml(`${quadrant.concept}に追加`)}"
+              aria-label="${escapeHtml(`${quadrant.concept}に追加するTask名`)}"
+            />
+            <label class="task-minute-inline">
+              <input
+                class="field__control"
+                data-task-draft-field="minutes"
+                type="number"
+                min="1"
+                max="240"
+                inputmode="numeric"
+                value="${escapeHtml(String(draft.minutes || TASK_DEFAULT_MINUTES))}"
+                aria-label="予定分数"
+              />
+              <span>分</span>
+            </label>
+            <button type="button" class="task-quadrant__composer-add" data-action="add-task" aria-label="この象限に追加">＋</button>
+            <button type="button" class="task-quadrant__composer-cancel" data-action="close-task-composer" aria-label="やめる">✕</button>
+          </div>
+        `
+        : `
+          <button type="button" class="task-quadrant__add" data-action="open-task-composer" data-quadrant="${escapeHtml(quadrant.key)}">
+            ＋ ここに追加
+          </button>
+        `}
     </section>
   `;
 }
@@ -8162,9 +8262,7 @@ function holdActiveSession() {
   closePiP();
   ui.selectedTaskId = task ? task.id : goalWorkId(continuationGoalId);
   state.meta.currentView = "today";
-  ui.todayMode = ["time", "organize"].includes(session.originMode)
-    ? session.originMode
-    : "execution";
+  ui.todayMode = session.originMode === "organize" ? "organize" : "execution";
   saveState();
   render();
   if (screenFrame) {
