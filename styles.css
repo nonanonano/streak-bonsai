@@ -3985,7 +3985,9 @@ body.is-availability-dragging {
 .today-mode-switch {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* タブ本数に自動追従させる（3分割固定だと2タブのとき右に空枠が残る） */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 3px;
   padding: 3px;
   border: 1px solid rgba(31, 42, 37, 0.1);

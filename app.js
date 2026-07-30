@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260725d 時間タブ廃止とTask追加整理";
+const APP_BUILD = "20260725e タイマー消失の復帰強化";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -10821,7 +10821,19 @@ function resumeCachedAppImmediately() {
     .some((key) => Boolean(localStorage.getItem(key)));
   const hasCachedSession = Boolean(localStorage.getItem("streakbonsai-auth-v1"));
 
-  if (!hasLocalState || (!hasCachedSession && !isGuestMode())) {
+  // 実行中セッションを抱えていれば、認証トークンの有無に関わらず即座に復帰する。
+  // ログイン確認を待つ間ログイン画面が前面に出ると、タイマーが動いているのに
+  // 砂時計が見えず完了も中断もできなくなる。
+  const hasRunningSession = (() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CURRENT_STORAGE_KEY) || "null");
+      return Boolean(saved?.activeSession);
+    } catch (_) {
+      return false;
+    }
+  })();
+
+  if (!hasLocalState || (!hasCachedSession && !isGuestMode() && !hasRunningSession)) {
     return false;
   }
 
@@ -10875,8 +10887,21 @@ sb.auth.onAuthStateChange(async (event, session) => {
       startGuestApp();
       return;
     }
-    _appInitialized = false;
     if (_realtimeChannel) { sb.removeChannel(_realtimeChannel); _realtimeChannel = null; }
+    // 実行中セッションがあるときはログイン画面で覆わない。オフラインやトークン更新の
+    // 失敗で一時的に未ログイン扱いになることがあり、そこで画面を奪うとタイマーが
+    // 動いたまま完了も中断もできなくなる。記録が終わるまではアプリを触らせる。
+    if (state?.activeSession) {
+      hideAuthOverlay();
+      if (!_appInitialized) {
+        _appInitialized = true;
+        init();
+      } else {
+        render();
+      }
+      return;
+    }
+    _appInitialized = false;
     showAuthReady();
   }
 });

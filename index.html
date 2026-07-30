@@ -7,16 +7,21 @@
     <title>砂時計</title>
     <script>
       try {
-        const hasLocalState = localStorage.getItem("streakgarden-state-v1") || localStorage.getItem("tomosu-state-v1");
+        const rawState = localStorage.getItem("streakgarden-state-v1");
+        const hasLocalState = rawState || localStorage.getItem("tomosu-state-v1");
         const hasCachedSession = localStorage.getItem("streakbonsai-auth-v1");
         const isGuest = localStorage.getItem("sb-guest-v1") === "1";
-        if (hasLocalState && (hasCachedSession || isGuest)) {
+        // 実行中セッションがあるときは認証チェックの画面で覆わない。
+        // タイマーが動いているのに砂時計が見えない状態を作らないため。
+        let hasRunningSession = false;
+        try { hasRunningSession = Boolean(JSON.parse(rawState || "null")?.activeSession); } catch (_) {}
+        if (hasLocalState && (hasCachedSession || isGuest || hasRunningSession)) {
           document.documentElement.classList.add("resume-cached");
         }
       } catch (_) {}
     </script>
     <link rel="icon" type="image/svg+xml" href="./hourglass-favicon.svg" />
-    <link rel="stylesheet" href="./styles.css?v=20260725d" />
+    <link rel="stylesheet" href="./styles.css?v=20260725e" />
     <style>
       .auth-overlay {
         position: fixed !important;
@@ -187,6 +192,6 @@
 </div>
 
     <script src="./supabase.js"></script>
-    <script src="./app.js?v=20260725d"></script>
+    <script src="./app.js?v=20260725e"></script>
   </body>
 </html>
