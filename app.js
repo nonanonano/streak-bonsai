@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260725e タイマー消失の復帰強化";
+const APP_BUILD = "20260725f 開始をブロックしない";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -1946,21 +1946,23 @@ async function requireDeviceAppLockBeforeStart(startCallback, pending = null) {
     return true;
   }
 
-  showToast("iPhoneを固定しています...");
-  const result = await requestDeviceAppLock(true);
-  if (result.success && result.isEnabled) {
-    ui.focusLockHelp = null;
-    startCallback();
-    ui.pendingFocusStart = null;
-    return true;
-  }
+  // 制限の適用を待ってから開始すると、スクリーンタイムの許可ダイアログが出ている間に
+  // ブリッジ応答が5秒のタイムアウトを超え、「開始を押したのに砂時計が出ない」事故になる。
+  // 集中を始められないことのほうが害が大きいので、タイマーは必ず先に動かし、
+  // アプリ制限は背後で適用する。かけられなかったときは黙らずに知らせる。
+  ui.focusLockHelp = null;
+  startCallback();
+  ui.pendingFocusStart = null;
 
-  ui.focusLockHelp = buildFocusLockHelp(result);
-  ui.sessionOpen = true;
-  ui.showAbortConfirm = false;
-  render();
-  showToast("iPhone固定の準備が必要です。案内を開きました。");
-  return false;
+  requestDeviceAppLock(true).then((result) => {
+    if (result.success && result.isEnabled) return;
+    if (!state.activeSession) return;
+    showToast(result.timeout
+      ? "アプリ制限の確認に時間がかかったため、制限なしで開始しました。"
+      : "アプリ制限をかけられませんでした。設定の「集中中のアプリ」から許可できます。");
+  });
+
+  return true;
 }
 
 function handleGuidedAccessResult(event) {
