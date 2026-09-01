@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260725f 開始をブロックしない";
+const APP_BUILD = "20260809a 目標を直接削除できるように";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -5514,9 +5514,20 @@ function renderGoalSettingsDetail(draft) {
 
       <button type="button" class="action-button action-button--primary goal-settings-save" data-action="save-setup">${isNewGoal ? "追加する" : "保存する"}</button>
 
-      ${canArchive ? `
-        <button type="button" class="goal-settings-archive" data-action="archive-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">この目標を非表示にする</button>
-      ` : ""}
+      ${canArchive ? (
+        ui.deleteConfirmGoalId === state.meta.activeGoalId
+          ? `
+            <p class="goal-settings-delete-warn">⚠️ この目標を完全に削除しますか？記録も一緒に消え、元に戻せません。</p>
+            <div class="goal-settings-delete-actions">
+              <button type="button" class="goal-settings-delete goal-settings-delete--confirm" data-action="delete-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">削除する</button>
+              <button type="button" class="goal-settings-archive" data-action="cancel-delete-goal">やめる</button>
+            </div>
+          `
+          : `
+            <button type="button" class="goal-settings-archive" data-action="archive-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">この目標を非表示にする</button>
+            <button type="button" class="goal-settings-delete" data-action="confirm-delete-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">この目標を削除する</button>
+          `
+      ) : ""}
     </div>
   `;
 }

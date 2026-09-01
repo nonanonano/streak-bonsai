@@ -9025,3 +9025,37 @@ body.is-task-pointer-dragging {
   background: rgba(31, 42, 37, 0.08);
   color: rgba(31, 42, 37, 0.6);
 }
+
+/* 目標詳細の削除。非表示(=記録を残して今日の候補から外す)と並べつつ、
+   取り返しがつかない操作なので赤系で区別する */
+.goal-settings-delete {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid rgba(176, 64, 64, 0.35);
+  border-radius: 12px;
+  background: transparent;
+  color: #b04040;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.goal-settings-delete--confirm {
+  border-color: transparent;
+  background: #b04040;
+  color: #fff;
+}
+
+.goal-settings-delete-warn {
+  margin: 14px 0 8px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #b04040;
+}
+
+.goal-settings-delete-actions {
+  display: grid;
+  gap: 8px;
+}
