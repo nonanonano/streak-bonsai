@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260906a 今日への追加・削除・時間配分を改善";
+const APP_BUILD = "20260906b 砂の流れと残り時間が見える砂時計";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -2453,6 +2453,7 @@ function bindEvents() {
   window.addEventListener("app-shield-status", handleAppShieldStatus);
   window.addEventListener("focus-alarm-status", handleFocusAlarmStatus);
   document.addEventListener("visibilitychange", () => {
+    sessionSheet?.querySelector(".focus-sand")?.classList.toggle("is-background", document.hidden);
     if (document.hidden) return;
     if (state.activeSession && !ui.finishDraft) {
       // 復帰時は保存済みの終了時刻を正として画面を組み直す。
@@ -7797,120 +7798,163 @@ function getSessionProgressRatio(session = state.activeSession, remainingMs = nu
   }
 
   const duration = getSessionDurationMs(session);
+  // 保留から再開しても、すでに積み上げた砂を残す。計時そのものは変更しない。
+  const accumulated = Math.max(0, Number(session.accumulatedSeconds) || 0) * 1000;
   const remaining = remainingMs === null ? getRemainingMs(session.endsAt) : Number(remainingMs);
-  return clamp((duration - Math.max(0, remaining)) / duration, 0, 1);
+  return clamp((duration + accumulated - Math.max(0, remaining)) / (duration + accumulated), 0, 1);
 }
 
 // =========================================================
-// タイマー映像 — 元の「灯」砂時計
+// 砂時計「砂の軌跡」 — 残量と積み上がりが分かるガラスと砂粒
 // =========================================================
 
-// 砂時計のジオメトリ。1秒ごとに再計算し、CSS transitionでなめらかに繋ぐ。
-// 上の砂は中央がすり鉢状にくぼみながら減り、下は安息角のついた山として積もる。
+// 上下の容器は鏡像。面積表を一度だけ作り、毎秒の更新は二分探索だけにする。
+// 高さの平方根だけで砂山を伸ばすと、下の砂が実際の進捗より先に満杯になる。
+function getSandClockModel() {
+  if (getSandClockModel.cache) return getSandClockModel.cache;
+  const chamberHeight = 108;
+  const halfWidth = (distance) => 5 + 62 * Math.sin(clamp(distance / chamberHeight, 0, 1) * Math.PI / 2);
+  const step = 0.5;
+  const top = [{ height: 0, area: 0 }];
+  let area = 0;
+  for (let h = step; h <= chamberHeight; h += step) {
+    area += 2 * halfWidth(h - step / 2) * step;
+    top.push({ height: h, area });
+  }
+  const bottom = [{ height: 0, area: 0 }];
+  const maxPileHeight = chamberHeight + 5 * 0.65;
+  for (let i = 1; i <= 224; i += 1) {
+    const height = maxPileHeight * i / 224;
+    let pileArea = 0;
+    for (let y = step / 2; y < chamberHeight; y += step) {
+      const pileHalfWidth = Math.max(0, (height - (chamberHeight - y)) / 0.65);
+      pileArea += 2 * Math.min(halfWidth(y), pileHalfWidth) * step;
+    }
+    bottom.push({ height, area: pileArea });
+  }
+  const path = (lower) => {
+    const points = [];
+    for (let i = 0; i <= 48; i += 1) {
+      const d = chamberHeight * i / 48;
+      points.push([120 - halfWidth(d), lower ? 156 + d : 151 - d]);
+    }
+    for (let i = 48; i >= 0; i -= 1) {
+      const d = chamberHeight * i / 48;
+      points.push([120 + halfWidth(d), lower ? 156 + d : 151 - d]);
+    }
+    return points.map(([x, y], i) => `${i ? "L" : "M"} ${x.toFixed(2)} ${y.toFixed(2)}`).join(" ") + " Z";
+  };
+  getSandClockModel.cache = { top, bottom, area, halfWidth, topClip: path(false), bottomClip: path(true) };
+  return getSandClockModel.cache;
+}
+
+function sandHeightForArea(table, area) {
+  let low = 0;
+  let high = table.length - 1;
+  while (high - low > 1) {
+    const mid = (low + high) >> 1;
+    if (table[mid].area < area) low = mid;
+    else high = mid;
+  }
+  const a = table[low];
+  const b = table[high];
+  const ratio = clamp((area - a.area) / Math.max(0.0001, b.area - a.area), 0, 1);
+  return a.height + (b.height - a.height) * ratio;
+}
+
 function buildSandClockGeometry(progressRatio = 0) {
   const progress = clamp(Number(progressRatio) || 0, 0, 1);
-  const remaining = 1 - progress;
-  const n = (value) => Number(value).toFixed(1);
-
-  // 上室: 表面全体が中心へゆるやかに傾く漏斗状
-  const surfaceY = 150 - 92 * Math.sqrt(Math.max(0, remaining));
-  const dipY = Math.min(surfaceY + 2 + 9 * progress, 149);
-  const topD = [
-    `M 60 ${n(surfaceY)}`,
-    `Q 102 ${n(dipY)} 110 ${n(dipY)}`,
-    `Q 118 ${n(dipY)} 160 ${n(surfaceY)}`,
-    "L 160 152 L 60 152 Z",
-  ].join(" ");
-
-  // 下室: 安息角のついた砂の山
-  const pileHeight = 90 * Math.sqrt(Math.max(0, progress));
-  const apexY = 245 - pileHeight;
-  const baseHalf = Math.min(50, 10 + pileHeight * 0.85);
-  const slopeY = apexY + pileHeight * 0.24;
-  const pileD = [
-    `M ${n(110 - baseHalf)} 247`,
-    `Q ${n(110 - baseHalf * 0.5)} ${n(slopeY)} 110 ${n(apexY)}`,
-    `Q ${n(110 + baseHalf * 0.5)} ${n(slopeY)} ${n(110 + baseHalf)} 247`,
-    "Z",
-  ].join(" ");
-
-  const streamD = `M 110 151.5 L 110 ${n(Math.max(156, apexY - 2))}`;
-
+  const model = getSandClockModel();
+  const topHeight = sandHeightForArea(model.top, model.area * (1 - progress));
+  const pileHeight = sandHeightForArea(model.bottom, model.area * progress);
+  const surfaceY = 151 - topHeight;
+  const apexY = 264 - pileHeight;
+  const pileHalfWidth = pileHeight / 0.65;
+  const surfaceHalfWidth = model.halfWidth(topHeight);
+  const fallDistance = Math.max(0, apexY - 154);
+  const n = (value) => Number(value).toFixed(2);
   return {
-    topD,
-    pileD,
-    streamD,
-    topOpacity: remaining <= 0.003 ? "0" : "1",
-    // 灯: 上のほむらは残りに応じて弱まり、下は積もるほど灯る
-    haloTopOpacity: 0.25 + 0.75 * remaining,
-    haloTopCy: 95 + 30 * progress,
-    haloBottomOpacity: 0.12 + 0.8 * progress,
-    haloBottomRy: 24 + 30 * progress,
+    topD: `M 40 ${n(surfaceY)} H 200 V 153 H 40 Z`,
+    pileD: `M ${n(120 - pileHalfWidth)} 264 L 120 ${n(apexY)} L ${n(120 + pileHalfWidth)} 264 Z`,
+    surfaceD: `M ${n(120 - surfaceHalfWidth)} ${n(surfaceY)} Q 120 ${n(surfaceY + 4)} ${n(120 + surfaceHalfWidth)} ${n(surfaceY)}`,
+    streamD: `M 120 154 V ${n(Math.max(154, apexY))}`,
+    topOpacity: progress < 1 ? "1" : "0",
+    pileOpacity: progress > 0 ? "1" : "0",
+    apexY,
+    fallDistance,
+    fallDuration: 0.34 + fallDistance * 0.0035,
+    topHeight,
+    pileHeight,
   };
 }
 
-// 案「灯」: 暗い画面の中で砂だけが行灯のように光る。
-// ガラスは光の輪郭だけ。すべてCSSアニメーション + 毎秒1回のパス更新。
+// CSSで砂粒だけを動かす。動画のループではなく、実際の終了時刻と砂量が同期する。
 function renderFocusSandClock(progressRatio = 0) {
   const progress = clamp(Number(progressRatio) || 0, 0, 1);
   const g = buildSandClockGeometry(progress);
-  const flowing = Boolean(state.activeSession) && !ui.finishDraft && progress < 0.995;
-
+  const model = getSandClockModel();
+  const flowing = Boolean(state.activeSession) && !ui.finishDraft && progress < 1;
+  const grains = [
+    [-0.7, 1.25, 0], [0.6, 0.85, 0.13], [0, 1.5, 0.26], [-1, 0.8, 0.38],
+    [0.9, 1.05, 0.51], [-0.3, 1.45, 0.64], [0.7, 0.8, 0.78], [-0.8, 1.05, 0.91],
+  ];
   return `
-    <figure
-      class="focus-visual focus-sand${progress >= 0.995 ? " is-complete" : ""}${flowing ? "" : " is-idle"}"
+    <figure class="focus-visual focus-sand${progress >= 1 ? " is-complete" : ""}${flowing ? "" : " is-idle"}${document.hidden ? " is-background" : ""}"
       aria-label="集中の進み具合 ${Math.round(progress * 100)}%"
-    >
-      <svg class="focus-visual__svg" viewBox="0 0 220 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      style="--sand-fall:${g.fallDistance.toFixed(2)}px;--sand-duration:${g.fallDuration.toFixed(3)}s">
+      <svg class="focus-visual__svg" viewBox="0 0 240 304" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <defs>
-          <clipPath id="sandTopClip">
-            <path d="M 77.5 55 C 77.5 100 104 130 108.6 150 L 111.4 150 C 116 130 142.5 100 142.5 55 Z" />
-          </clipPath>
-          <clipPath id="sandBottomClip">
-            <path d="M 108.6 150 C 104 170 77.5 200 77.5 245 L 142.5 245 C 142.5 200 116 170 111.4 150 Z" />
-          </clipPath>
-          <linearGradient id="hgSandLumen" gradientUnits="userSpaceOnUse" x1="110" y1="50" x2="110" y2="250">
-            <stop offset="0" stop-color="#ffe9a8" />
-            <stop offset="1" stop-color="#d29e3e" />
+          <clipPath id="sandTopClip"><path d="${model.topClip}" /></clipPath>
+          <clipPath id="sandBottomClip"><path d="${model.bottomClip}" /></clipPath>
+          <clipPath id="sandFallClip"><path class="focus-sand__fall-clip" d="M 113 154 H 127 V ${Math.max(154, g.apexY).toFixed(2)} H 113 Z" /></clipPath>
+          <linearGradient id="hgSandLumen" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#ba813c" /><stop offset=".36" stop-color="#f0c675" />
+            <stop offset=".7" stop-color="#dfae59" /><stop offset="1" stop-color="#a46a2e" />
           </linearGradient>
-          <linearGradient id="hgStreamLumen" gradientUnits="userSpaceOnUse" x1="110" y1="150" x2="110" y2="250">
-            <stop offset="0" stop-color="#ffefb5" />
-            <stop offset="1" stop-color="#dfa94e" />
+          <linearGradient id="hgGlass" x1="0" y1="0" x2="1" y2=".4">
+            <stop offset="0" stop-color="#f5e9cd" stop-opacity=".10" /><stop offset=".25" stop-color="#f5e9cd" stop-opacity=".015" />
+            <stop offset=".8" stop-color="#f5e9cd" stop-opacity=".025" /><stop offset="1" stop-color="#f5e9cd" stop-opacity=".14" />
           </linearGradient>
-          <radialGradient id="hgHalo" cx="50%" cy="50%" r="50%">
-            <stop offset="0" stop-color="rgba(255, 212, 116, 0.5)" />
-            <stop offset="0.6" stop-color="rgba(255, 200, 100, 0.16)" />
-            <stop offset="1" stop-color="rgba(255, 200, 100, 0)" />
+          <linearGradient id="hgRim" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#8a704d" /><stop offset=".25" stop-color="#e3c597" />
+            <stop offset=".5" stop-color="#ae8955" /><stop offset=".8" stop-color="#d9ba86" /><stop offset="1" stop-color="#806544" />
+          </linearGradient>
+          <pattern id="hgGrains" width="7" height="9" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="2" r=".65" fill="#fff0bf" opacity=".5" />
+            <circle cx="5" cy="6" r=".55" fill="#714914" opacity=".28" />
+            <circle cx="2" cy="8" r=".4" fill="#fff1c8" opacity=".4" />
+          </pattern>
+          <radialGradient id="hgHalo">
+            <stop offset="0" stop-color="#e6bb71" stop-opacity=".10" /><stop offset="1" stop-color="#e6bb71" stop-opacity="0" />
           </radialGradient>
         </defs>
-
-        <ellipse class="focus-sand__shadow" cx="110" cy="254" rx="36" ry="3.5" fill="rgba(44,40,32,0.07)" />
-
-        <ellipse class="focus-sand__halo focus-sand__halo--top" fill="url(#hgHalo)" cx="110" cy="${g.haloTopCy.toFixed(1)}" rx="72" ry="60" style="opacity:${g.haloTopOpacity.toFixed(3)}" />
-        <ellipse class="focus-sand__halo focus-sand__halo--bottom" fill="url(#hgHalo)" cx="110" cy="225" rx="80" ry="${g.haloBottomRy.toFixed(1)}" style="opacity:${g.haloBottomOpacity.toFixed(3)}" />
-
-        <g clip-path="url(#sandTopClip)">
-          <path class="focus-sand__mass" fill="url(#hgSandLumen)" d="${g.topD}" opacity="${g.topOpacity}" />
+        <ellipse class="focus-sand__halo" cx="120" cy="190" rx="114" ry="113" fill="url(#hgHalo)" />
+        <ellipse class="focus-sand__shadow" cx="120" cy="282" rx="69" ry="4" />
+        <path class="focus-sand__glass-fill" d="${model.topClip} ${model.bottomClip}" fill="url(#hgGlass)" />
+        <g clip-path="url(#sandTopClip)" opacity="${g.topOpacity}" class="focus-sand__upper">
+          <path data-sand-top class="focus-sand__mass" d="${g.topD}" />
+          <path data-sand-top class="focus-sand__texture" fill="url(#hgGrains)" d="${g.topD}" />
+          <path class="focus-sand__surface" d="${g.surfaceD}" />
         </g>
-        <g clip-path="url(#sandBottomClip)">
-          <path class="focus-sand__mass focus-sand__mass--pile" fill="url(#hgSandLumen)" d="${g.pileD}" />
+        <g clip-path="url(#sandBottomClip)" opacity="${g.pileOpacity}" class="focus-sand__lower">
+          <path data-sand-pile class="focus-sand__mass focus-sand__mass--pile" d="${g.pileD}" />
+          <path data-sand-pile class="focus-sand__texture" fill="url(#hgGrains)" d="${g.pileD}" />
         </g>
-
-        <path class="focus-sand__stream focus-sand__stream--glow" fill="none" stroke="rgba(255,222,140,0.22)" stroke-width="5.5" stroke-linecap="round" d="${g.streamD}" />
-        <path class="focus-sand__stream focus-sand__stream--core" fill="none" stroke="url(#hgStreamLumen)" stroke-width="1.7" stroke-linecap="round" d="${g.streamD}" />
-        <path class="focus-sand__stream focus-sand__stream--spark" fill="none" stroke="#fff3c8" stroke-width="0.9" stroke-linecap="round" stroke-dasharray="1.2 5.2" d="${g.streamD}" />
-
+        <path class="focus-sand__stream" d="${g.streamD}" />
+        <g clip-path="url(#sandFallClip)" class="focus-sand__fall">
+          ${grains.map(([x, r, phase]) => `<circle class="focus-sand__grain" cx="${120 + x}" cy="154" r="${r}" style="--grain-phase:${phase}" />`).join("")}
+        </g>
+        <g class="focus-sand__impact-position" transform="translate(120 ${Math.max(156, g.apexY).toFixed(2)})">
+          <ellipse class="focus-sand__impact" cx="0" cy="0" rx="4" ry="1.15" />
+        </g>
         <g class="focus-sand__glass">
-          <path class="focus-sand__lip" fill="none" stroke="rgba(44,40,32,0.5)" stroke-width="2.2" stroke-linecap="round" d="M 74 52 H 146" />
-          <path class="focus-sand__lip" fill="none" stroke="rgba(44,40,32,0.5)" stroke-width="2.2" stroke-linecap="round" d="M 74 248 H 146" />
-          <path class="focus-sand__wall" fill="none" stroke="rgba(44,40,32,0.32)" stroke-width="1.6" stroke-linecap="round" d="M 74 52 C 74 100 102 132 106.5 150 C 102 168 74 200 74 248" />
-          <path class="focus-sand__wall" fill="none" stroke="rgba(44,40,32,0.32)" stroke-width="1.6" stroke-linecap="round" d="M 146 52 C 146 100 118 132 113.5 150 C 118 168 146 200 146 248" />
-          <path class="focus-sand__shine" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="2.4" stroke-linecap="round" d="M 80 62 C 79 92 94 116 101 132" />
+          <path class="focus-sand__wall" d="M 49 38 C 49 98 105 129 114 153 C 105 177 49 208 49 269 M 191 38 C 191 98 135 129 126 153 C 135 177 191 208 191 269" />
+          <path class="focus-sand__shine" d="M 56 49 C 59 91 92 120 104 136 M 56 258 C 57 218 83 186 102 169" />
+          <path class="focus-sand__shine focus-sand__shine--fine" d="M 184 51 C 181 92 149 122 137 139 M 184 257 C 181 218 157 187 138 171" />
+          <rect class="focus-sand__rim" x="43" y="31" width="154" height="8" rx="4" fill="url(#hgRim)" />
+          <rect class="focus-sand__rim" x="43" y="269" width="154" height="8" rx="4" fill="url(#hgRim)" />
+          <path class="focus-sand__rim-light" d="M 48 33 H 192 M 48 271 H 192" />
         </g>
-
-        <circle class="focus-sand__mote" fill="#ffe9ad" cx="63" cy="120" r="1" style="--dx:5px; --dy:-9px; animation-duration:7s" />
-        <circle class="focus-sand__mote" fill="#ffe9ad" cx="160" cy="180" r="0.8" style="--dx:-6px; --dy:-7px; animation-duration:9s; opacity:0.28" />
-        <circle class="focus-sand__mote" fill="#ffe9ad" cx="145" cy="70" r="0.7" style="--dx:4px; --dy:6px; animation-duration:8s; opacity:0.25" />
       </svg>
     </figure>
   `;
@@ -7921,44 +7965,27 @@ function renderFocusTimerVisual(progressRatio = 0) {
 }
 
 function updateFocusTimerVisual(remainingMs = null) {
-  if (!state.activeSession) {
-    return;
-  }
-
-  const progress = getSessionProgressRatio(state.activeSession, remainingMs);
-  const label = `集中の進み具合 ${Math.round(progress * 100)}%`;
-
+  if (!state.activeSession) return;
   const sand = sessionSheet.querySelector(".focus-sand");
-  if (!sand) {
-    return;
-  }
+  if (!sand) return;
+  const progress = getSessionProgressRatio(state.activeSession, remainingMs);
   const g = buildSandClockGeometry(progress);
-  const topMass = sand.querySelector(".focus-sand__mass:not(.focus-sand__mass--pile)");
-  const pileMass = sand.querySelector(".focus-sand__mass--pile");
-  const haloTop = sand.querySelector(".focus-sand__halo--top");
-  const haloBottom = sand.querySelector(".focus-sand__halo--bottom");
-  if (topMass) {
-    topMass.setAttribute("d", g.topD);
-    topMass.style.opacity = g.topOpacity;
-  }
-  if (pileMass) {
-    pileMass.setAttribute("d", g.pileD);
-  }
-  if (haloTop) {
-    haloTop.setAttribute("cy", g.haloTopCy.toFixed(1));
-    haloTop.style.opacity = g.haloTopOpacity.toFixed(3);
-  }
-  if (haloBottom) {
-    haloBottom.setAttribute("ry", g.haloBottomRy.toFixed(1));
-    haloBottom.style.opacity = g.haloBottomOpacity.toFixed(3);
-  }
-  sand.querySelectorAll(".focus-sand__stream").forEach((stream) => {
-    stream.setAttribute("d", g.streamD);
-  });
-  sand.setAttribute("aria-label", label);
-  sand.classList.toggle("is-complete", progress >= 0.995);
-  sand.classList.toggle("is-idle", !(state.activeSession && !ui.finishDraft && progress < 0.995));
+  sand.querySelectorAll("[data-sand-top]").forEach(node => node.setAttribute("d", g.topD));
+  sand.querySelectorAll("[data-sand-pile]").forEach(node => node.setAttribute("d", g.pileD));
+  sand.querySelector(".focus-sand__upper")?.setAttribute("opacity", g.topOpacity);
+  sand.querySelector(".focus-sand__lower")?.setAttribute("opacity", g.pileOpacity);
+  sand.querySelector(".focus-sand__surface")?.setAttribute("d", g.surfaceD);
+  sand.querySelector(".focus-sand__stream")?.setAttribute("d", g.streamD);
+  sand.querySelector(".focus-sand__fall-clip")?.setAttribute("d", `M 113 154 H 127 V ${Math.max(154, g.apexY).toFixed(2)} H 113 Z`);
+  sand.querySelector(".focus-sand__impact-position")?.setAttribute("transform", `translate(120 ${Math.max(156, g.apexY).toFixed(2)})`);
+  sand.style.setProperty("--sand-fall", `${g.fallDistance.toFixed(2)}px`);
+  sand.style.setProperty("--sand-duration", `${g.fallDuration.toFixed(3)}s`);
+  sand.setAttribute("aria-label", `集中の進み具合 ${Math.round(progress * 100)}%`);
+  sand.classList.toggle("is-complete", progress >= 1);
+  sand.classList.toggle("is-idle", Boolean(ui.finishDraft) || progress >= 1);
+  sand.classList.toggle("is-background", document.hidden);
 }
+
 
 
 function renderSessionSheet() {

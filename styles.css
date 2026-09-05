@@ -6692,7 +6692,7 @@ select {
 
 .sheet--running .session-focus-panel {
   min-height: 0;
-  align-content: start;
+  align-content: center;
   align-self: stretch;
   gap: 12px;
   padding: 18px 12px 12px;
@@ -6717,7 +6717,7 @@ select {
 }
 
 .sheet--running .focus-visual {
-  width: min(66vw, 260px, 42vh);
+  width: min(76vw, 300px, 47vh);
 }
 
 .sheet--running .sheet__time-readout {
@@ -6725,7 +6725,7 @@ select {
 }
 
 .sheet--running .sheet__time-readout span {
-  font-size: 1.25rem;
+  font-size: 1.65rem;
 }
 
 .sheet--running .sheet__actions {
@@ -6785,106 +6785,121 @@ select {
 }
 
 .focus-sand__shadow {
-  fill: rgba(44, 40, 32, 0.07);
-}
-
-/* ── 通常時（開始前の明るいシート）: 墨線のガラス ── */
-.focus-sand__lip {
-  fill: none;
-  stroke: var(--ink);
-  stroke-opacity: 0.5;
-  stroke-width: 2.2;
-  stroke-linecap: round;
+  fill: rgba(32, 29, 23, 0.09);
 }
 
 .focus-sand__wall {
   fill: none;
-  stroke: var(--ink);
-  stroke-opacity: 0.32;
-  stroke-width: 1.6;
+  stroke: #746850;
+  stroke-opacity: 0.5;
+  stroke-width: 1.25;
   stroke-linecap: round;
 }
 
 .focus-sand__shine {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.22);
-  stroke-width: 2.4;
+  stroke: #fff3d9;
+  stroke-opacity: 0.64;
+  stroke-width: 1.6;
   stroke-linecap: round;
-  display: none;
+}
+
+.focus-sand__shine--fine {
+  stroke-width: 0.7;
+  stroke-opacity: 0.38;
+}
+
+.focus-sand__rim-light {
+  fill: none;
+  stroke: #fff0ce;
+  stroke-width: 0.7;
+  stroke-opacity: 0.65;
+  stroke-linecap: round;
 }
 
 .focus-sand__mass {
   fill: url("#hgSandLumen");
-  opacity: 0.96;
-  transition: d 0.5s linear, opacity 0.3s ease;
+}
+
+.focus-sand__mass,
+.focus-sand__texture,
+.focus-sand__surface,
+.focus-sand__fall-clip {
+  transition: d 0.8s linear;
+}
+
+.focus-sand__surface {
+  fill: none;
+  stroke: #fff0bc;
+  stroke-width: 0.9;
+  opacity: 0.65;
 }
 
 .focus-sand__halo {
-  fill: url("#hgHalo");
   display: none;
 }
 
 .focus-sand__stream {
   fill: none;
+  stroke: #dbb36d;
+  stroke-opacity: 0.27;
+  stroke-width: 1.2;
   stroke-linecap: round;
-  transition: d 0.5s linear;
+  transition: d 0.8s linear;
 }
 
-.focus-sand__stream--glow {
-  stroke: rgba(255, 222, 140, 0.22);
-  stroke-width: 5.5;
-  display: none;
-}
-
-.focus-sand__stream--core {
-  stroke: url("#hgStreamLumen");
-  stroke-width: 1.7;
-}
-
-.focus-sand__stream--spark {
-  stroke: #fff3c8;
-  stroke-width: 0.9;
-  stroke-dasharray: 1.2 5.2;
-  animation: sand-flow 0.42s linear infinite;
-}
-
-.focus-sand__mote {
-  fill: #ffe9ad;
-  opacity: 0.35;
+.focus-sand__grain {
+  fill: #a76f28;
   transform-box: view-box;
-  animation: sand-mote-drift 7s ease-in-out infinite;
-  display: none;
+  animation: sand-grain-fall var(--sand-duration, 0.7s) cubic-bezier(.35, 0, .72, .45) infinite;
+  animation-delay: calc(-1 * var(--grain-phase) * var(--sand-duration, 0.7s));
+}
+
+.focus-sand__impact {
+  fill: #efd092;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sand-impact 0.85s ease-out infinite;
 }
 
 .focus-sand.is-idle .focus-sand__stream,
-.focus-sand.is-complete .focus-sand__stream {
-  animation: none;
+.focus-sand.is-idle .focus-sand__fall,
+.focus-sand.is-idle .focus-sand__impact,
+.focus-sand.is-complete .focus-sand__stream,
+.focus-sand.is-complete .focus-sand__fall,
+.focus-sand.is-complete .focus-sand__impact {
   opacity: 0;
 }
 
-@keyframes sand-flow {
-  to {
-    stroke-dashoffset: -6.4;
-  }
+.focus-sand.is-idle .focus-sand__grain,
+.focus-sand.is-idle .focus-sand__impact,
+.focus-sand.is-complete .focus-sand__grain,
+.focus-sand.is-complete .focus-sand__impact,
+.focus-sand.is-background .focus-sand__grain,
+.focus-sand.is-background .focus-sand__impact {
+  animation-play-state: paused;
 }
 
-@keyframes sand-mote-drift {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(var(--dx, 4px), var(--dy, -6px));
-  }
+@keyframes sand-grain-fall {
+  0% { opacity: 0; transform: translateY(0); }
+  10% { opacity: 1; }
+  85% { opacity: 0.95; }
+  100% { opacity: 0; transform: translateY(var(--sand-fall, 100px)); }
 }
 
-/* ── 灯: タイマー起動中は画面が闇に沈み、砂だけが光る ── */
+@keyframes sand-impact {
+  0% { opacity: 0.65; transform: scaleX(0.3); }
+  100% { opacity: 0; transform: scaleX(1.7); }
+}
+
+
+/* ── 集中中: 深い墨色に、真鍮の縁と明るい砂粒 ── */
 .sheet--running .sheet__backdrop {
-  background: #0c0a07;
+  background: #101715;
 }
 
 .sheet--running .sheet__panel {
-  background: radial-gradient(120% 90% at 50% 12%, #211c13 0%, #15120c 55%, #0c0a07 100%);
+  background: radial-gradient(110% 85% at 50% 36%, #24332d 0%, #16221d 48%, #0d1411 100%);
   border-color: transparent;
   box-shadow: none;
   color: #e9dcbd;
@@ -6918,21 +6933,17 @@ select {
   display: none;
 }
 
-.sheet--running .focus-sand__halo,
-.sheet--running .focus-sand__mote,
-.sheet--running .focus-sand__shine,
-.sheet--running .focus-sand__stream--glow {
+.sheet--running .focus-sand__halo {
   display: block;
 }
 
-.sheet--running .focus-sand__lip {
-  stroke: rgba(255, 246, 224, 0.34);
-  stroke-opacity: 1;
+.sheet--running .focus-sand__wall {
+  stroke: #e5dec8;
+  stroke-opacity: 0.43;
 }
 
-.sheet--running .focus-sand__wall {
-  stroke: rgba(255, 246, 224, 0.17);
-  stroke-opacity: 1;
+.sheet--running .focus-sand__grain {
+  fill: #fff2c5;
 }
 
 /* 闇の中のボタン */
@@ -8354,10 +8365,15 @@ body.is-task-pointer-dragging {
     transition-duration: 0.01ms !important;
   }
 
-  .focus-sand__stream--spark,
-  .focus-sand__mote,
+  .focus-sand__grain,
+  .focus-sand__impact,
   .auth-spinner {
     animation: none !important;
+  }
+
+  .focus-sand__fall,
+  .focus-sand__impact {
+    opacity: 0;
   }
 }
 
