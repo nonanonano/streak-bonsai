@@ -4269,6 +4269,51 @@ body.is-availability-dragging {
   display: none;
 }
 
+.task-allocation-intro {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.65;
+}
+
+.task-quadrant__guide {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(31, 42, 37, 0.08);
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.45;
+}
+
+.task-quadrant__guide strong {
+  color: var(--quadrant-color, var(--ink));
+  font-size: 0.7rem;
+}
+
+.task-allocation-guide {
+  padding: 11px 12px;
+  border-radius: 9px;
+  background: rgba(31, 42, 37, 0.035);
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.7;
+}
+
+.task-allocation-guide summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.task-allocation-guide p {
+  margin: 10px 0 0;
+}
+
+.today-capture-section .time-plan-section__head {
+  flex-wrap: wrap;
+}
+
 .today-organize .task-quadrant {
   min-height: 118px;
   box-shadow: none;

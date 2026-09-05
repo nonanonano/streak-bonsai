@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260809a 目標を直接削除できるように";
+const APP_BUILD = "20260906a 今日への追加・削除・時間配分を改善";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -73,7 +73,7 @@ const TASK_QUADRANTS = [
     key: "urgentImportant",
     title: "緊急×重要",
     concept: "今やる",
-    frameworkLabel: "ビッグロック",
+    frameworkLabel: "期限への対応",
     axis: "緊急度 高 / 重要度 高",
     target: 30,
     defaultMinutes: 30,
@@ -93,7 +93,7 @@ const TASK_QUADRANTS = [
     key: "urgentNotImportant",
     title: "緊急・低重要",
     concept: "軽くする",
-    frameworkLabel: "小石",
+    frameworkLabel: "短く済ませる",
     axis: "緊急度 高 / 重要度 低",
     target: 20,
     defaultMinutes: 10,
@@ -103,7 +103,7 @@ const TASK_QUADRANTS = [
     key: "notUrgentNotImportant",
     title: "低重要・非緊急",
     concept: "手放す",
-    frameworkLabel: "砂・水",
+    frameworkLabel: "見直す時間",
     axis: "緊急度 低 / 重要度 低",
     target: 0,
     defaultMinutes: 5,
@@ -2187,12 +2187,34 @@ function captureActiveGoalRecord(goalId = state.meta.activeGoalId) {
   });
 }
 
+// 0件も保存可能な状態にする。画面が参照する設定の形は保ち、削除した内容は残さない。
+function clearActiveGoalRecord() {
+  const taskSession = isTaskSession() ? state.activeSession : null;
+  state.setup = {
+    ...state.setup,
+    goal: "",
+    deadline: "",
+    currentLevel: "",
+    minimumExample: "",
+  };
+  state.programStartDate = toISODate(new Date());
+  state.roadmap = [];
+  state.today = { missionTitle: "", missionNote: "", recommendedPlan: "A", lastOutcome: null, lastRecordedAt: null };
+  state.plans = buildPlans(state.setup, "");
+  state.planTuning = buildInitialPlanTuning();
+  state.replan = buildInitialReplan();
+  state.logs = [];
+  state.activeSession = taskSession;
+  state.meta.activeGoalId = null;
+}
+
 function ensureGoalCollection() {
   if (!state.meta) {
     state.meta = {};
   }
 
-  const hasSavedGoals = Array.isArray(state.goals) && state.goals.length;
+  // 配列がない旧形式だけ移行する。明示的な [] は全削除済みなので復元しない。
+  const hasSavedGoals = Array.isArray(state.goals);
   state.goals = hasSavedGoals
     ? state.goals.map((goal) => createGoalRecord(goal))
     : [createGoalRecord({
@@ -2208,6 +2230,14 @@ function ensureGoalCollection() {
       activeSession: state.activeSession,
     })];
 
+  if (!state.goals.length) {
+    if (state.meta.activeGoalId || state.setup?.goal || state.logs?.length || state.roadmap?.length) {
+      clearActiveGoalRecord();
+    }
+    state.meta.activeGoalId = null;
+    return;
+  }
+
   if (!state.meta.activeGoalId || !state.goals.some((goal) => goal.id === state.meta.activeGoalId)) {
     state.meta.activeGoalId = state.goals[0].id;
   }
@@ -2221,16 +2251,21 @@ function syncActiveGoalRecord() {
     state.meta = {};
   }
 
-  if (!Array.isArray(state.goals) || !state.goals.length) {
+  if (!Array.isArray(state.goals)) {
     const goalId = state.meta.activeGoalId || createGoalId();
     state.meta.activeGoalId = goalId;
     state.goals = [captureActiveGoalRecord(goalId)];
     return;
   }
 
+  if (!state.goals.length) {
+    ensureGoalCollection();
+    return;
+  }
+
   state.goals = state.goals.map((goal) => createGoalRecord(goal));
   if (!state.meta.activeGoalId || !state.goals.some((goal) => goal.id === state.meta.activeGoalId)) {
-    state.meta.activeGoalId = state.goals[0].id;
+    applyGoalRecord(state.goals.find((goal) => !goal.archived) || state.goals[0]);
   }
 
   const activeGoal = captureActiveGoalRecord(state.meta.activeGoalId);
@@ -2242,6 +2277,42 @@ function syncActiveGoalRecord() {
   }
 
   state.goals = state.goals.map((goal, index) => (index === activeIndex ? activeGoal : goal));
+}
+
+function deleteGoalRecord(goalId) {
+  if (!goalId || state.activeSession) return false;
+  syncActiveGoalRecord();
+  if (!state.goals.some((goal) => goal.id === goalId)) return false;
+
+  const removedWorkIds = new Set([
+    goalWorkId(goalId),
+    ...(state.tasks || []).filter((task) => task.sourceGoalId === goalId).map((task) => task.id),
+  ]);
+  state.goals = state.goals.filter((goal) => goal.id !== goalId);
+  state.tasks = (state.tasks || []).filter((task) => task.sourceGoalId !== goalId);
+  delete (state.goalContinuations || {})[goalId];
+  state.taskLogs = (state.taskLogs || []).filter((entry) => (
+    entry.goalId !== goalId && entry.sourceGoalId !== goalId && !removedWorkIds.has(entry.itemId)
+  ));
+  if (state.dailyPlan) {
+    for (const key of ["includedWorkIds", "excludedWorkIds", "workOrderIds"]) {
+      state.dailyPlan[key] = (state.dailyPlan[key] || []).filter((id) => !removedWorkIds.has(id));
+    }
+    for (const key of ["startTimes", "defaultStartTimes"]) {
+      state.dailyPlan[key] = Object.fromEntries(
+        Object.entries(state.dailyPlan[key] || {}).filter(([id]) => !removedWorkIds.has(id)),
+      );
+    }
+    state.dailyPlan.allocations = (state.dailyPlan.allocations || []).filter((allocation) => !removedWorkIds.has(allocation.workId));
+  }
+
+  if (state.meta.activeGoalId === goalId) {
+    const nextGoal = state.goals.find((goal) => !goal.archived) || state.goals[0];
+    if (nextGoal) applyGoalRecord(nextGoal);
+    else clearActiveGoalRecord();
+  }
+  state.meta.demoMode = false;
+  return true;
 }
 
 function listGoals() {
@@ -2409,9 +2480,11 @@ function bindEvents() {
 }
 
 function handleKeydown(event) {
-  if (event.key === "Enter" && event.target.matches?.(".time-task-capture__title")) {
+  // 日本語変換の確定では追加しない。4象限の入力欄も同じ操作に揃える。
+  if (event.isComposing || event.keyCode === 229) return;
+  if (event.key === "Enter" && event.target.matches?.("[data-task-draft-field=\"title\"]")) {
     event.preventDefault();
-    event.target.closest(".time-task-capture")?.querySelector('[data-action="add-task"]')?.click();
+    event.target.closest(".time-task-capture, .task-quadrant__composer")?.querySelector('[data-action="add-task"]')?.click();
     return;
   }
   const inlineAvailabilityHandle = event.target.closest?.("[data-inline-availability-drag-handle]");
@@ -2608,6 +2681,7 @@ function handleClick(event) {
 
   if (action === "set-today-mode") {
     ui.todayMode = target.dataset.mode === "organize" ? "organize" : "execution";
+    ui.taskComposerQuadrant = null;
     ui.selectedTaskId = null;
     renderWithTransition();
     if (screenFrame) screenFrame.scrollTop = 0;
@@ -2887,6 +2961,7 @@ function handleClick(event) {
     ui.roadmapDraft = null;
     ui.reviewLogDraft = null;
     ui.reviewLogExpanded = false;
+    ui.deleteConfirmGoalId = null;
     ui.setupSection = "detail";
     state.meta.currentView = "setup";
     render();
@@ -2902,6 +2977,7 @@ function handleClick(event) {
     ui.setupDraft = expandSetup(state.setup);
     ui.setupSection = "detail";
     ui.deleteConfirmGoalId = null;
+    state.meta.currentView = "setup";
     render();
     if (screenFrame) screenFrame.scrollTop = 0;
     return;
@@ -2954,10 +3030,6 @@ function handleClick(event) {
     ensureGoalCollection();
     const goal = state.goals.find(g => g.id === goalId);
     if (!goal) return;
-    if (listGoals().length <= 1) {
-      showToast("最後の目標は非表示にできません。");
-      return;
-    }
     goal.archived = true;
     goal.archivedAt = toISODate(new Date());
     // アーカイブ対象がアクティブ目標なら別の目標へ切り替え
@@ -2974,9 +3046,24 @@ function handleClick(event) {
     return;
   }
 
+  if (action === "restore-goal") {
+    ensureGoalCollection();
+    const goal = state.goals.find((item) => item.id === target.dataset.goalId && item.archived);
+    if (!goal) return;
+    goal.archived = false;
+    goal.archivedAt = null;
+    ui.deleteConfirmGoalId = null;
+    saveState();
+    render();
+    showToast("習慣・目標を再表示しました。");
+    return;
+  }
+
   // 完全消去の確認ステップ
   if (action === "confirm-delete-goal") {
-    ui.deleteConfirmGoalId = target.dataset.goalId;
+    const goalId = target.dataset.goalId;
+    if (!(state.goals || []).some((goal) => goal.id === goalId)) return;
+    ui.deleteConfirmGoalId = goalId;
     render();
     return;
   }
@@ -2988,36 +3075,21 @@ function handleClick(event) {
   }
 
   // 完全消去（確認後）
-  if (action === "delete-goal") {
+  if (action === "delete-goal" || action === "purge-archived-goal") {
     const goalId = target.dataset.goalId;
-    ensureGoalCollection();
-    if (state.goals.length <= 1) {
-      showToast("最後の目標は削除できません。");
-      return;
-    }
-    if (goalId === state.meta.activeGoalId) {
-      const next = state.goals.find(g => !g.archived && g.id !== goalId);
-      if (next) { applyGoalRecord(next); state.meta.activeGoalId = next.id; }
-    }
-    state.goals = state.goals.filter(g => g.id !== goalId);
+    if (ui.deleteConfirmGoalId !== goalId || !deleteGoalRecord(goalId)) return;
     ui.goalLibraryDraft = null;
+    ui.setupDraft = expandSetup(state.setup);
+    ui.roadmapDraft = null;
+    ui.reviewLogDraft = null;
+    ui.reviewLogExpanded = false;
     ui.deleteConfirmGoalId = null;
+    ui.setupMode = "edit";
     ui.setupSection = "home";
+    syncSelectedSessionPlan(true);
     saveState();
     render();
-    showToast("目標を完全に削除しました。");
-    return;
-  }
-
-  // 非表示リストから完全消去
-  if (action === "purge-archived-goal") {
-    const goalId = target.dataset.goalId;
-    ensureGoalCollection();
-    state.goals = state.goals.filter(g => g.id !== goalId);
-    ui.deleteConfirmGoalId = null;
-    saveState();
-    render();
-    showToast("非表示の目標を削除しました。");
+    showToast("習慣・目標を削除しました。");
     return;
   }
 
@@ -3172,20 +3244,23 @@ function handleClick(event) {
     }
     state.tasks = normalizeTasks(state.tasks);
     // 象限の＋から開いた入力ならその象限へ、それ以外は既定(軽くする)へ入れる。
-    const quadrant = normalizeTaskQuadrant(ui.taskComposerQuadrant || TASK_QUADRANT_NEW);
+    const quadrant = normalizeTaskQuadrant(
+      (ui.todayMode === "organize" && ui.taskComposerQuadrant) || TASK_QUADRANT_NEW,
+    );
     state.tasks.unshift(normalizeTask({
       id: createTaskId(),
       title,
       minutes: normalizeTaskMinutes(draft.minutes),
       status: "active",
       quadrant,
+      plannedDate: toISODate(new Date()),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }));
     resetTaskDraft();
     saveState();
     render();
-    showToast(`${getTaskQuadrantMeta(quadrant)?.concept || "Task"}に追加しました。`);
+    showToast("今日に追加しました。");
     return;
   }
 
@@ -5280,6 +5355,7 @@ function renderSettingsHome() {
           <button type="button" class="settings-add-button" data-action="start-new-goal" aria-label="習慣・目標を追加">＋</button>
         </div>
         <div class="settings-goal-list">
+          ${goals.length ? "" : `<p class="section-copy">習慣・目標はまだありません。右上の＋から追加できます。Taskだけでも使えます。</p>`}
           ${goals.map((goal) => {
             const isHabit = goal.setup?.goalType === "habit";
             const deadline = isHabit ? "習慣" : formatDeadlineBadge(goal.setup.deadline);
@@ -5449,7 +5525,8 @@ function renderAvailabilitySettings() {
 function renderGoalSettingsDetail(draft) {
   const isNewGoal = ui.setupMode === "new_goal";
   const isHabit = draft.goalType === "habit";
-  const canArchive = !isNewGoal && listGoals().length > 1;
+  const itemLabel = isHabit ? "習慣" : "目標";
+  const canDelete = !isNewGoal && Boolean(state.meta.activeGoalId);
 
   return `
     <div class="goal-settings-detail">
@@ -5514,18 +5591,18 @@ function renderGoalSettingsDetail(draft) {
 
       <button type="button" class="action-button action-button--primary goal-settings-save" data-action="save-setup">${isNewGoal ? "追加する" : "保存する"}</button>
 
-      ${canArchive ? (
+      ${canDelete ? (
         ui.deleteConfirmGoalId === state.meta.activeGoalId
           ? `
-            <p class="goal-settings-delete-warn">⚠️ この目標を完全に削除しますか？記録も一緒に消え、元に戻せません。</p>
+            <p class="goal-settings-delete-warn">「${escapeHtml(state.setup.goal)}」を削除しますか？この${itemLabel}の記録・保留中の時間・今日の予定も削除され、元に戻せません。記録を残す場合は「やめる」を押して非表示にできます。</p>
             <div class="goal-settings-delete-actions">
               <button type="button" class="goal-settings-delete goal-settings-delete--confirm" data-action="delete-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">削除する</button>
               <button type="button" class="goal-settings-archive" data-action="cancel-delete-goal">やめる</button>
             </div>
           `
           : `
-            <button type="button" class="goal-settings-archive" data-action="archive-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">この目標を非表示にする</button>
-            <button type="button" class="goal-settings-delete" data-action="confirm-delete-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">この目標を削除する</button>
+            <button type="button" class="goal-settings-archive" data-action="archive-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">記録を残して非表示にする</button>
+            <button type="button" class="goal-settings-delete" data-action="confirm-delete-goal" data-goal-id="${escapeHtml(state.meta.activeGoalId)}">この${itemLabel}を削除する</button>
           `
       ) : ""}
     </div>
@@ -5542,11 +5619,12 @@ function renderSetupView() {
     `;
   }
   const showHome = ui.setupSection === "home" && ui.setupMode !== "new_goal";
-  ui.setupSection = showHome ? "home" : "detail";
+  const hasNoGoal = !state.meta.activeGoalId && ui.setupMode !== "new_goal";
+  ui.setupSection = showHome || hasNoGoal ? "home" : "detail";
 
   return `
     <section class="screen screen--setup screen--settings">
-      ${showHome ? renderSettingsHome() : renderGoalSettingsDetail(ui.setupDraft)}
+      ${showHome || hasNoGoal ? renderSettingsHome() : renderGoalSettingsDetail(ui.setupDraft)}
     </section>
   `;
 }
@@ -5649,10 +5727,10 @@ function renderTodayExecutionView() {
           `}
       </div>
 
-      <section class="time-plan-section time-plan-section--candidates">
+      <section class="time-plan-section today-capture-section">
         <div class="time-plan-section__head">
-          <h2>今日やらない</h2>
-          <span>${escapeHtml(`${candidates.length}件`)}</span>
+          <h2>今日に追加</h2>
+          <span>追加したら、すぐ始められます</span>
         </div>
         <div class="time-task-capture">
           <input
@@ -5660,7 +5738,7 @@ function renderTodayExecutionView() {
             data-task-draft-field="title"
             type="text"
             value="${escapeHtml(draft.title || "")}"
-            placeholder="Taskを追加"
+            placeholder="今日やるTaskを入力"
             aria-label="Task名"
           />
           <label class="task-minute-inline time-task-capture__minutes">
@@ -5676,7 +5754,14 @@ function renderTodayExecutionView() {
             />
             <span>分</span>
           </label>
-          <button type="button" data-action="add-task" aria-label="Taskを追加" title="Taskを追加">＋</button>
+          <button type="button" data-action="add-task" aria-label="今日にTaskを追加" title="今日に追加">＋</button>
+        </div>
+      </section>
+
+      <section class="time-plan-section time-plan-section--candidates">
+        <div class="time-plan-section__head">
+          <h2>今日やらない</h2>
+          <span>${escapeHtml(`${candidates.length}件`)}</span>
         </div>
         <div class="time-candidate-list">
           ${candidates.length
@@ -5837,6 +5922,7 @@ function renderTodayWorkItem(item, index) {
       <div class="today-work-item__actions">
         <span>${escapeHtml(minutesLabel)}</span>
         <button type="button" class="today-work-item__start" data-action="${startAction}" ${idAttribute}>${pausedSeconds ? "再開" : "開始"}</button>
+        ${!pausedSeconds ? `<button type="button" class="today-work-item__remove" data-action="toggle-work-today" data-work-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.title)}を今日から外す">今日から外す</button>` : ""}
       </div>
     </article>
   `;
@@ -6368,6 +6454,7 @@ function renderTaskInbox(tasks) {
 function renderTaskQuadrantBoard(groups) {
   const assignedTasks = TASK_QUADRANTS.flatMap((quadrant) => groups[quadrant.key] || []);
   const totalMinutes = assignedTasks.reduce((sum, task) => sum + getWorkItemPlannableMinutes(task), 0);
+  const capacityMinutes = ensureDailyPlan().capacityMinutes;
 
   return `
     <section class="task-quadrant-board">
@@ -6375,17 +6462,28 @@ function renderTaskQuadrantBoard(groups) {
         <div>
           <h3 class="section-title section-title--small">優先順位</h3>
         </div>
-        <span class="status-badge">${escapeHtml(`${assignedTasks.length}件 / ${totalMinutes}分`)}</span>
+        <span class="status-badge">${escapeHtml(`${assignedTasks.length}件 / 残り${totalMinutes}分`)}</span>
       </div>
+      <p class="task-allocation-intro">先に「育てる」時間を確保。<br>今日の空き${capacityMinutes}分をもとに、目安を表示しています。</p>
       <div class="task-quadrant-grid">
-        ${TASK_QUADRANTS.map((quadrant) => renderTaskQuadrant(quadrant, groups[quadrant.key] || [], totalMinutes)).join("")}
+        ${TASK_QUADRANTS.map((quadrant) => renderTaskQuadrant(quadrant, groups[quadrant.key] || [], capacityMinutes)).join("")}
       </div>
+      <details class="task-allocation-guide">
+        <summary>4象限と時間配分の考え方</summary>
+        <p>「重要」は自分の目標や暮らしに役立つこと。「緊急」は期限が近く、今対応が必要なことです。</p>
+        <p>30%・50%・20%・0%は砂時計の目安です。正解の比率やノルマではありません。予定に合わせて調整してください。</p>
+        <p>休息・運動・人との時間も、大切なら「育てる」へ。「手放す」は目的のない浪費を見直す場所です。</p>
+        <p>考え方の参考：スティーブン・R・コヴィー『7つの習慣』の第3の習慣。配分の数値は書籍の指定ではありません。</p>
+      </details>
     </section>
   `;
 }
 
-function renderTaskQuadrant(quadrant, tasks, boardTotalMinutes = 0) {
+function renderTaskQuadrant(quadrant, tasks, capacityMinutes = 0) {
   const totalMinutes = tasks.reduce((sum, task) => sum + getWorkItemPlannableMinutes(task), 0);
+  const todayMinutes = tasks.filter((task) => isWorkItemSelectedToday(task))
+    .reduce((sum, task) => sum + getWorkItemPlannableMinutes(task), 0);
+  const targetMinutes = Math.round(capacityMinutes * quadrant.target / 100);
   const isComposing = ui.taskComposerQuadrant === quadrant.key;
   const draft = isComposing ? ensureTaskDraft() : null;
 
@@ -6401,6 +6499,11 @@ function renderTaskQuadrant(quadrant, tasks, boardTotalMinutes = 0) {
           <strong>${escapeHtml(String(totalMinutes))}</strong>
           <span>分</span>
         </div>
+      </div>
+      <div class="task-quadrant__guide">
+        <strong>目安 ${quadrant.target}% · 約${targetMinutes}分</strong>
+        <span>今日の予定 ${todayMinutes}分</span>
+        <span>${escapeHtml(quadrant.note)}</span>
       </div>
       <div class="task-quadrant__list">
         ${tasks.length
@@ -6438,7 +6541,7 @@ function renderTaskQuadrant(quadrant, tasks, boardTotalMinutes = 0) {
         `
         : `
           <button type="button" class="task-quadrant__add" data-action="open-task-composer" data-quadrant="${escapeHtml(quadrant.key)}">
-            ＋ ここに追加
+            ＋ 今日に追加
           </button>
         `}
     </section>
@@ -7078,7 +7181,7 @@ function renderAllocationReview(logs) {
           <strong>${escapeHtml(`${executedDays}日`)}</strong>
         </div>
         <div class="review-allocation__future">
-          <span>育てる</span>
+          <span>育てる · 目安50%</span>
           <strong>${futureShare}%</strong>
         </div>
       </div>
@@ -7097,6 +7200,7 @@ function renderAllocationReview(logs) {
           </div>
         `).join("")}
       </div>
+      <p class="task-allocation-intro">配分の目安：今やる30% / 育てる50% / 軽くする20% / 手放す0%。状況に合わせて調整できます。</p>
       <div class="review-allocation__foot">
         <span>${executedDays}日実行</span>
         <span>予定 ${escapeHtml(formatReviewDuration(plannedSeconds))}</span>
@@ -7322,12 +7426,13 @@ function renderAlbumSection() {
           <p class="album-card__sub">${escapeHtml(subtitle)}</p>
           ${archivedDate ? `<p class="album-card__date">${archivedDate} 保存</p>` : ""}
           ${isConfirm
-            ? `<p class="album-card__warn">⚠️ 完全消去しますか？元に戻せません。</p>
+            ? `<p class="album-card__warn">この項目と記録を削除しますか？元に戻せません。</p>
                <div class="album-card__actions">
                  <button class="soft-button" data-action="purge-archived-goal" data-goal-id="${goal.id}">消去する</button>
                  <button class="soft-button" data-action="cancel-delete-goal">やめる</button>
                </div>`
             : `<div class="album-card__actions">
+                 <button class="soft-button" data-action="restore-goal" data-goal-id="${escapeHtml(goal.id)}">再表示する</button>
                  <button class="soft-button album-card__delete" data-action="confirm-delete-goal" data-goal-id="${goal.id}">完全消去</button>
                </div>`}
         </div>
@@ -7337,8 +7442,8 @@ function renderAlbumSection() {
   return `
     <section class="panel stack garden-album">
       <div>
-        <h2 class="section-title">非表示の目標</h2>
-        <p class="section-copy">Today から外した目標です。記録はここで見返せます。</p>
+        <h2 class="section-title">非表示の習慣・目標</h2>
+        <p class="section-copy">今日と4象限から外した項目です。記録は残り、いつでも再表示できます。</p>
       </div>
       <div class="album-list">${cards}</div>
     </section>
@@ -9002,6 +9107,19 @@ function buildSeedState() {
   };
 }
 
+function buildFreshState() {
+  const fresh = buildSeedState();
+  fresh.meta = { currentView: "today", demoMode: false, activeGoalId: null };
+  fresh.programStartDate = toISODate(new Date());
+  fresh.setup = { ...fresh.setup, goal: "", deadline: "", currentLevel: "", minimumExample: "" };
+  fresh.roadmap = [];
+  fresh.today = { missionTitle: "", missionNote: "", recommendedPlan: "A", lastOutcome: null, lastRecordedAt: null };
+  fresh.plans = buildPlans(fresh.setup, "");
+  fresh.logs = [];
+  fresh.goals = [];
+  return fresh;
+}
+
 function buildSeedLogs(today) {
   const patterns = [
     { outcome: "A", reason: null },
@@ -9450,6 +9568,11 @@ function stripRoadmapPrefix(value, prefix) {
 
 function commitSetupDraft() {
   const draft = ui.setupDraft;
+  const nextGoalName = String(draft.goal || "").trim();
+  if (!nextGoalName) {
+    showToast("習慣・目標の名前を入力してください。");
+    return null;
+  }
   const minutes = resolvePlanMinuteValues(draft, state.setup);
   const primaryStart = normalizeTimeValue(draft.primaryStart);
   const primaryEnd = normalizeTimeValue(draft.primaryEnd);
@@ -9468,7 +9591,7 @@ function commitSetupDraft() {
   draft.primaryEnd = primaryEnd;
   const primaryWindow = `${primaryStart}-${primaryEnd}`;
   const nextSetup = {
-    goal: draft.goal.trim() || state.setup.goal,
+    goal: nextGoalName,
     deadline: normalizeOptionalDate(draft.deadline),
     currentLevel: "",
     studyDays: normalizeStudyDays(draft.studyDays),
@@ -9703,7 +9826,7 @@ function loadState() {
       .map((key) => localStorage.getItem(key))
       .find((value) => Boolean(value));
     if (!raw) {
-      return buildSeedState();
+      return buildFreshState();
     }
 
     const parsed = JSON.parse(raw);
@@ -9732,10 +9855,8 @@ function mergeState(base, saved) {
     ...saved.today,
   };
   const nextPlans = buildPlans(nextSetup, nextToday.missionTitle);
-  const savedGoals = Array.isArray(saved.goals) ? saved.goals : [];
-  const goalCandidates = savedGoals.length
-    ? savedGoals
-    : [{
+  const savedGoals = Array.isArray(saved.goals) ? saved.goals : undefined;
+  const goalCandidates = savedGoals ?? [{
         id: saved.meta?.activeGoalId || base.meta.activeGoalId,
         setup: nextSetup,
         plans: saved.plans || nextPlans,
@@ -9818,16 +9939,28 @@ function importData(file) {
   if (!file) {
     return;
   }
+  if (state.activeSession) {
+    showToast("タイマーを終了してからデータを復元してください。");
+    return;
+  }
   const reader = new FileReader();
   reader.onload = (e) => {
+    const previousState = state;
     try {
       const parsed = JSON.parse(e.target.result);
-      state = mergeState(parsed);
+      if (!parsed || Array.isArray(parsed) || typeof parsed.setup !== "object" || !parsed.setup || Array.isArray(parsed.setup)) {
+        throw new Error("Invalid backup");
+      }
+      state = mergeState(buildSeedState(), parsed);
       ensureGoalCollection();
       saveState();
+      ui.setupDraft = null;
+      ui.goalLibraryDraft = null;
+      ui.selectedTaskId = null;
       render();
       showToast("データを復元しました。");
     } catch (_err) {
+      state = previousState;
       showToast("ファイルの読み込みに失敗しました。");
     }
   };
@@ -10967,7 +11100,7 @@ async function deleteAccount() {
     localStorage.setItem(GUEST_MODE_KEY, "1");
     localStorage.removeItem(GUEST_BANNER_KEY);
 
-    state = buildSeedState();
+    state = buildFreshState();
     state.meta.currentView = "today";
     localStorage.setItem(CURRENT_STORAGE_KEY, JSON.stringify(state));
     _supabaseLoadedSuccessfully = false;
@@ -10989,7 +11122,7 @@ async function signOut() {
   await sb.auth.signOut();
   localStorage.removeItem(GUEST_MODE_KEY);
   localStorage.removeItem(CURRENT_STORAGE_KEY);
-  state = buildSeedState();
+  state = buildFreshState();
   _appInitialized = false;
   showAuthReady();
 }
