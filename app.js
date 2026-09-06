@@ -51,7 +51,7 @@ const sb = (() => {
   }
 })();
 
-const APP_BUILD = "20260906b 砂の流れと残り時間が見える砂時計";
+const APP_BUILD = "20260906c 未完了Taskを翌日へ引き継ぐ";
 const STORAGE_KEY = "tomosu-state-v1";
 const CURRENT_STORAGE_KEY = "streakgarden-state-v1";
 const LEGACY_STORAGE_KEYS = [STORAGE_KEY];
@@ -885,7 +885,12 @@ function ensureDailyPlan() {
 }
 
 function isTaskPlannedToday(task, date = new Date()) {
-  return String(task?.plannedDate || "") === toISODate(date);
+  const plannedDate = String(task?.plannedDate || "");
+  // 「今日に入れる」は完了・棚上げまで継続する。日付を書き換えないので、
+  // 数日ぶりの起動や別端末との同期でも、未完了Taskを見落とさない。
+  return (!task?.status || task.status === "active")
+    && /^\d{4}-\d{2}-\d{2}$/.test(plannedDate)
+    && plannedDate <= toISODate(date);
 }
 
 function getTaskQuadrantMeta(quadrantKey) {
@@ -3400,11 +3405,12 @@ function handleClick(event) {
     const task = updateTask(target.dataset.taskId || "", () => ({
       status: "active",
       shelvedAt: null,
+      plannedDate: toISODate(new Date()),
     }));
     if (task) {
       saveState();
       render();
-      showToast("Taskを戻しました。");
+      showToast("Taskを今日に戻しました。");
     }
     return;
   }
@@ -5731,7 +5737,7 @@ function renderTodayExecutionView() {
       <section class="time-plan-section today-capture-section">
         <div class="time-plan-section__head">
           <h2>今日に追加</h2>
-          <span>追加したら、すぐ始められます</span>
+          <span>未完了のTaskは翌日も残ります</span>
         </div>
         <div class="time-task-capture">
           <input
@@ -5770,6 +5776,7 @@ function renderTodayExecutionView() {
             : '<div class="time-plan-empty">ほかにやることはありません。</div>'}
         </div>
       </section>
+      ${normalizeTasks(state.tasks).some((task) => task.status === "shelved") ? renderShelvedTasksSection() : ""}
     </div>
   `;
 }
@@ -5923,7 +5930,9 @@ function renderTodayWorkItem(item, index) {
       <div class="today-work-item__actions">
         <span>${escapeHtml(minutesLabel)}</span>
         <button type="button" class="today-work-item__start" data-action="${startAction}" ${idAttribute}>${pausedSeconds ? "再開" : "開始"}</button>
-        ${!pausedSeconds ? `<button type="button" class="today-work-item__remove" data-action="toggle-work-today" data-work-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.title)}を今日から外す">今日から外す</button>` : ""}
+        ${item.kind === "task"
+          ? `<button type="button" class="today-work-item__remove" data-action="shelve-task" data-task-id="${escapeHtml(item.sourceId)}" aria-label="${escapeHtml(item.title)}を棚上げ">棚上げ</button>`
+          : !pausedSeconds ? `<button type="button" class="today-work-item__remove" data-action="toggle-work-today" data-work-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(item.title)}を今日から外す">今日から外す</button>` : ""}
       </div>
     </article>
   `;
@@ -6365,6 +6374,25 @@ function renderTodayTimeView() {
   `;
 }
 
+function renderShelvedTasksSection(tasks = normalizeTasks(state.tasks).filter((task) => task.status === "shelved")) {
+  const shelvedTasks = tasks;
+  return `
+      <section class="task-list-section">
+        <button type="button" class="task-shelf-toggle" data-action="toggle-shelved-tasks" aria-expanded="${Boolean(ui.taskShowShelved)}">
+          <span>棚上げ中</span>
+          <span>${escapeHtml(`${shelvedTasks.length}件`)}</span>
+        </button>
+        ${ui.taskShowShelved
+          ? `<div class="task-list task-list--shelved">
+              ${shelvedTasks.length
+                ? shelvedTasks.map(renderShelvedTaskCard).join("")
+                : `<section class="panel panel--warm task-empty"><p>棚上げ中のTaskはありません。</p></section>`}
+            </div>`
+          : ""}
+      </section>
+  `;
+}
+
 function renderTodayOrganizeView() {
   ensureDailyPlan();
   const tasks = normalizeTasks(state.tasks);
@@ -6381,19 +6409,7 @@ function renderTodayOrganizeView() {
       ${renderSelectedTaskPanel(workItems)}
       ${inboxTasks.length ? renderTaskInbox(inboxTasks) : ""}
 
-      <section class="task-list-section">
-        <button type="button" class="task-shelf-toggle" data-action="toggle-shelved-tasks">
-          <span>棚上げ中</span>
-          <span>${escapeHtml(`${shelvedTasks.length}件`)}</span>
-        </button>
-        ${ui.taskShowShelved
-          ? `<div class="task-list task-list--shelved">
-              ${shelvedTasks.length
-                ? shelvedTasks.map(renderShelvedTaskCard).join("")
-                : `<section class="panel panel--warm task-empty"><p>棚上げ中のTaskはありません。</p></section>`}
-            </div>`
-          : ""}
-      </section>
+      ${renderShelvedTasksSection(shelvedTasks)}
 
       ${doneTasks.length
         ? `<details class="task-history">
@@ -6624,11 +6640,11 @@ function renderSelectedTaskPanel(tasks) {
       </div>
       ${renderTaskBreakdown(selectedTask)}
       <div class="task-card__actions">
-        ${pausedSeconds
-          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">続きは今日から</button>`
-          : `<button type="button" class="action-button action-button--primary" data-action="toggle-work-today" data-work-id="${escapeHtml(selectedTask.id)}">${plannedToday ? "今日から外す" : "今日に入れる"}</button>`}
+        ${pausedSeconds || plannedToday
+          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">${pausedSeconds ? "続きは今日から" : "今日で始める"}</button>`
+          : `<button type="button" class="action-button action-button--primary" data-action="toggle-work-today" data-work-id="${escapeHtml(selectedTask.id)}">今日に入れる</button>`}
         <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(selectedTask.id)}">完了</button>
-        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(selectedTask.id)}">あとで</button>
+        <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(selectedTask.id)}">棚上げ</button>
       </div>
     </section>
   `;
@@ -6748,9 +6764,9 @@ function renderActiveTaskCard(task) {
         </div>
       </div>
       <div class="task-card__actions">
-        ${getTaskPausedSeconds(task)
-          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">続きは今日から</button>`
-          : `<button type="button" class="action-button action-button--primary" data-action="toggle-work-today" data-work-id="${escapeHtml(task.id)}">${plannedToday ? "今日から外す" : "今日に入れる"}</button>`}
+        ${getTaskPausedSeconds(task) || plannedToday
+          ? `<button type="button" class="action-button action-button--primary" data-action="go-to-today">${getTaskPausedSeconds(task) ? "続きは今日から" : "今日で始める"}</button>`
+          : `<button type="button" class="action-button action-button--primary" data-action="toggle-work-today" data-work-id="${escapeHtml(task.id)}">今日に入れる</button>`}
         <button type="button" class="soft-button" data-action="complete-task" data-task-id="${escapeHtml(task.id)}">完了</button>
         <button type="button" class="soft-button" data-action="shelve-task" data-task-id="${escapeHtml(task.id)}">棚上げ</button>
       </div>
@@ -6767,7 +6783,7 @@ function renderShelvedTaskCard(task) {
         <span>${escapeHtml(pausedSeconds ? `残り ${formatTaskRemaining(pausedSeconds)}` : `残り ${getTaskRemainingMinutes(task)}分`)}</span>
       </div>
       <div class="task-card__actions">
-        <button type="button" class="soft-button" data-action="restore-task" data-task-id="${escapeHtml(task.id)}">戻す</button>
+        <button type="button" class="soft-button" data-action="restore-task" data-task-id="${escapeHtml(task.id)}">今日に戻す</button>
         <button type="button" class="soft-button soft-button--danger" data-action="delete-task" data-task-id="${escapeHtml(task.id)}">削除</button>
       </div>
     </article>

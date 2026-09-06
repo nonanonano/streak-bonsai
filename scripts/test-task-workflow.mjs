@@ -74,6 +74,7 @@ run(`
     ui.todayMode = "execution";
     ui.taskComposerQuadrant = null;
     ui.selectedTaskId = null;
+    ui.taskShowShelved = false;
     ui.taskSuppressClickUntil = 0;
     ui.reviewGoalFilter = "all";
     resetTaskDraft();
@@ -189,7 +190,8 @@ test("JST深夜とUTC午前0時をまたいでも、日本の同じ今日に追�
   now = Date.parse("2026-09-06T15:05:00.000Z"); // JST 翌日00:05
   draft("日本の翌日");
   click("add-task");
-  assert.deepEqual(plain("getTodayOrderedWorkItems().map((item) => item.title)"), ["日本の翌日"]);
+  assert.deepEqual(plain("getTodayOrderedWorkItems().map((item) => item.title)").sort(), ["日本の翌日", "日本の朝", "日本の深夜"].sort());
+  assert.deepEqual(snapshot().tasks.map((task) => task.plannedDate).sort(), ["2026-09-06", "2026-09-06", "2026-09-07"]);
 });
 
 test("手動で今日から外したTaskは、保存・再描画・再読込でも戻らない", () => {
@@ -206,18 +208,174 @@ test("手動で今日から外したTaskは、保存・再描画・再読込で�
   assert.deepEqual(todayIds(), [id]);
 });
 
-test("既存の未予定・昨日予定・棚上げTaskは勝手に今日へ移行しない", () => {
+test("昨日予定の未完了Taskは今日に残り、未予定・未来予定・棚上げ・完了Taskは入らない", () => {
   run(`state.tasks = normalizeTasks([
     { id: "unscheduled", title: "未予定", quadrant: "notUrgentImportant" },
     { id: "yesterday", title: "昨日", plannedDate: "2026-09-05" },
-    { id: "shelved", title: "棚上げ", status: "shelved", plannedDate: "2026-09-06" }
+    { id: "future", title: "未来", plannedDate: "2026-09-08" },
+    { id: "shelved", title: "棚上げ", status: "shelved", plannedDate: "2026-09-05" },
+    { id: "done", title: "完了", status: "done", plannedDate: "2026-09-05" }
   ]); saveState()`);
   reload();
   draft("新しいTask");
   click("add-task");
-  assert.deepEqual(plain("getTodayOrderedWorkItems().map((item) => item.title)"), ["新しいTask"]);
+  assert.deepEqual(plain("getTodayOrderedWorkItems().map((item) => item.title)").sort(), ["新しいTask", "昨日"].sort());
   assert.equal(snapshot().tasks.find((task) => task.id === "unscheduled").plannedDate, "");
   assert.equal(snapshot().tasks.find((task) => task.id === "yesterday").plannedDate, "2026-09-05");
+  assert.equal(snapshot().tasks.find((task) => task.id === "future").plannedDate, "2026-09-08");
+});
+
+test("開いたまま日本時間の午前0時をまたいでも未完了Taskが今日から消えない", () => {
+  now = Date.parse("2026-09-06T14:59:00.000Z");
+  draft("日付をまたぐTask");
+  click("add-task");
+  const before = snapshot().tasks[0];
+  assert.deepEqual(todayIds(), [before.id]);
+  now += 120_000;
+  assert.equal(run("toISODate(new Date())"), "2026-09-07");
+  assert.deepEqual(todayIds(), [before.id]);
+  assert.equal(snapshot().dailyPlan.date, "2026-09-07");
+  assert.deepEqual(snapshot().tasks[0], before);
+});
+
+test("数日後の再読込でも未完了Taskと元の予定日・進捗・小Taskを保持する", () => {
+  run(`state.tasks = normalizeTasks([{ id: "carryover", title: "週をまたぐTask",
+    minutes: 40, completedMinutes: 12, quadrant: "notUrgentImportant", priority: 2,
+    plannedDate: "2026-09-04", accumulatedSeconds: 45,
+    subtasks: [{ id: "part-1", title: "済んだ準備", done: true }, { id: "part-2", title: "残り" }]
+  }]); ensureDailyPlan(); saveState()`);
+  const before = snapshot().tasks[0];
+  now = Date.parse("2026-09-13T16:00:00.000Z");
+  reload();
+  assert.deepEqual(todayIds(), ["carryover"]);
+  assert.deepEqual(snapshot().tasks[0], before);
+  assert.equal(run("getWorkItemPlannableMinutes(getTodayOrderedWorkItems()[0])"), 28);
+  run("saveState()");
+  reload();
+  assert.deepEqual(todayIds(), ["carryover"]);
+  assert.deepEqual(snapshot().tasks[0], before);
+});
+
+test("未来予定はその日まで今日に入らず、予定日を過ぎると今日に残る", () => {
+  run(`state.tasks = normalizeTasks([{ id: "future", title: "指定日から開始", plannedDate: "2026-09-08" }]); saveState()`);
+  assert.deepEqual(todayIds(), []);
+  now = Date.parse("2026-09-07T14:59:00.000Z"); // JST 9月7日23:59
+  reload();
+  assert.deepEqual(todayIds(), []);
+  now += 120_000;
+  assert.deepEqual(todayIds(), ["future"]);
+  now = Date.parse("2026-09-10T15:05:00.000Z");
+  reload();
+  assert.deepEqual(todayIds(), ["future"]);
+  assert.equal(snapshot().tasks[0].plannedDate, "2026-09-08");
+});
+
+test("今日に残ったTaskを完了すると翌日以降に再表示せず、完了データは保持する", () => {
+  run(`state.tasks = normalizeTasks([{ id: "finished", title: "片づけた用事", plannedDate: "2026-09-05", minutes: 15 }]); saveState()`);
+  assert.deepEqual(todayIds(), ["finished"]);
+  click("complete-task", { taskId: "finished" });
+  assert.deepEqual(todayIds(), []);
+  const completed = snapshot().tasks[0];
+  assert.equal(completed.status, "done");
+  assert.equal(completed.completedMinutes, 15);
+  now = Date.parse("2026-09-09T15:05:00.000Z");
+  reload();
+  assert.deepEqual(todayIds(), []);
+  assert.deepEqual(snapshot().tasks[0], completed);
+});
+
+test("棚上げした未着手Taskは翌日も今日に戻らず、戻すとその日の今日へ復帰する", () => {
+  draft("いったん棚上げする用事", "33");
+  click("add-task");
+  const before = snapshot().tasks[0];
+  click("shelve-task", { taskId: before.id });
+  assert.deepEqual(todayIds(), []);
+  assert.equal(snapshot().tasks[0].status, "shelved");
+  assert.equal(snapshot().tasks[0].title, before.title);
+  assert.equal(snapshot().tasks[0].minutes, before.minutes);
+  assert.ok(!snapshot().dailyPlan.workOrderIds.includes(before.id));
+  now = Date.parse("2026-09-08T15:05:00.000Z");
+  reload();
+  assert.deepEqual(todayIds(), []);
+  assert.equal(snapshot().tasks.length, 1);
+  click("restore-task", { taskId: before.id });
+  assert.deepEqual(todayIds(), [before.id]);
+  assert.equal(snapshot().tasks[0].status, "active");
+  assert.equal(snapshot().tasks[0].plannedDate, "2026-09-09");
+  assert.equal(snapshot().tasks[0].shelvedAt, null);
+  reload();
+  assert.deepEqual(todayIds(), [before.id]);
+});
+
+test("残りを残したTaskも棚上げでき、翌日以降の復帰で残り秒数・進捗・小Taskを失わない", () => {
+  run(`state.tasks = normalizeTasks([{ id: "paused", title: "途中の学習", plannedDate: "2026-09-05",
+    minutes: 30, completedMinutes: 10, accumulatedSeconds: 95, pausedRemainingSeconds: 505,
+    pausedSegmentMinutes: 10, pausedAt: "2026-09-05T12:00:00.000Z", pausedAllocationId: "segment-a",
+    subtasks: [{ id: "step", title: "途中の問題", done: false }]
+  }]); ensureDailyPlan(); saveState()`);
+  const before = snapshot().tasks[0];
+  assert.deepEqual(todayIds(), ["paused"]);
+  click("shelve-task", { taskId: "paused" });
+  assert.deepEqual(todayIds(), []);
+  now = Date.parse("2026-09-10T15:05:00.000Z");
+  reload();
+  assert.deepEqual(todayIds(), []);
+  click("restore-task", { taskId: "paused" });
+  reload();
+  assert.deepEqual(todayIds(), ["paused"]);
+  const restored = snapshot().tasks[0];
+  for (const field of ["id", "title", "minutes", "completedMinutes", "accumulatedSeconds", "pausedRemainingSeconds", "pausedSegmentMinutes", "pausedAt", "pausedAllocationId", "subtasks"]) {
+    assert.deepEqual(restored[field], before[field], field);
+  }
+  assert.equal(restored.plannedDate, "2026-09-11");
+  assert.equal(run("getTaskPausedSeconds(getTodayOrderedWorkItems()[0])"), 505);
+});
+
+test("未予定のまま棚上げされた古いTaskも、戻すと今日に入り翌日へ残る", () => {
+  run(`state.tasks = normalizeTasks([{ id: "old-shelf", title: "古い棚上げ", status: "shelved" }]); saveState()`);
+  click("restore-task", { taskId: "old-shelf" });
+  assert.deepEqual(todayIds(), ["old-shelf"]);
+  assert.equal(snapshot().tasks[0].plannedDate, "2026-09-06");
+  now = Date.parse("2026-09-06T15:05:00.000Z");
+  reload();
+  assert.deepEqual(todayIds(), ["old-shelf"]);
+});
+
+for (const pausedRemainingSeconds of [null, 505]) {
+  test(`今日の${pausedRemainingSeconds ? "中断中" : "未着手"}Taskに棚上げボタンを表示する`, () => {
+    run(`state.tasks = normalizeTasks([{ id: "card", title: "今日のカード", plannedDate: "2026-09-05", pausedRemainingSeconds: ${pausedRemainingSeconds} }])`);
+    const html = run("renderTodayWorkItem(getTodayOrderedWorkItems()[0], 0)");
+    assert.match(html, /data-action="shelve-task"/);
+    assert.match(html, /data-task-id="card"/);
+    assert.match(html, />棚上げ<\/button>/);
+    assert.doesNotMatch(html, /data-action="toggle-work-today"/);
+  });
+}
+
+test("今日の習慣には引き続き今日から外す操作を表示する", () => {
+  const html = run(`renderTodayWorkItem({ id: "goal:habit", sourceId: "habit", kind: "goal", title: "毎日の習慣", minutes: 10, quadrant: "notUrgentImportant", isHabit: true }, 0)`);
+  assert.match(html, /data-action="toggle-work-today"/);
+  assert.match(html, />今日から外す<\/button>/);
+  assert.doesNotMatch(html, /data-action="shelve-task"/);
+});
+
+test("今日の棚上げ一覧から残り時間を確認して今日に戻せる", () => {
+  assert.doesNotMatch(run("renderTodayView()"), /data-action="toggle-shelved-tasks"/);
+  draft("棚から戻す用事", "18");
+  click("add-task");
+  const id = snapshot().tasks[0].id;
+  click("shelve-task", { taskId: id });
+  assert.match(run("renderTodayView()"), /data-action="toggle-shelved-tasks"/);
+  assert.doesNotMatch(run("renderTodayView()"), /data-action="restore-task"/);
+  click("toggle-shelved-tasks");
+  const html = run("renderTodayView()");
+  assert.match(html, /棚から戻す用事/);
+  assert.match(html, /残り 18分/);
+  assert.match(html, /data-action="restore-task"/);
+  assert.match(html, />今日に戻す<\/button>/);
+  click("restore-task", { taskId: id });
+  assert.deepEqual(todayIds(), [id]);
+  assert.doesNotMatch(run("renderTodayView()"), /data-action="toggle-shelved-tasks"/);
 });
 
 test("同じ保存ボタンの連続操作では入力を二重追加しない", () => {
